@@ -1,0 +1,38 @@
+# ==== Build output ====
+bin/
+obj/
+release/
+publish/
+
+# ==== Visual Studio ====
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.cache
+
+# ==== Rider / VS Code ====
+.idea/
+.vscode/
+
+# ==== Inno Setup ====
+*.iss.bak
+
+# ==== OS junk ====
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+desktop.ini
+$RECYCLE.BIN/
+
+# ==== Logs / temp ====
+*.log
+*.tmp
+*.swp
+
+# ==== App config (user-local) ====
+appsettings.json
+
+# ==== Old / hidden iconography ====
+.fold11_icon.ico
