@@ -36,6 +36,11 @@ Movies/
 This is the **Plex / Kodi / Jellyfin / MediaElch** standard layout.
 
 ---
+<img width="1600" height="952" alt="rename" src="https://github.com/user-attachments/assets/e5cdd96c-c8f6-42bc-a279-a48f3c24811d" />
+
+
+<img width="1600" height="952" alt="f2f" src="https://github.com/user-attachments/assets/7f262903-9bba-4182-8acf-08f6fd257b66" />
+
 
 ## Recommended Workflow
 
