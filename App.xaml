@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="CineLibraryEssentials.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:CineLibraryEssentials"
+    xmlns:util="using:CineLibraryEssentials.Utilities">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+            <util:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            <util:BoolToVisibilityReverseConverter x:Key="BoolToVisibilityReverseConverter" />
+            <util:StringVisibilityConverter x:Key="StringVisibilityConverter" />
+            <util:ConfidenceColorConverter x:Key="ConfidenceColorConverter" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

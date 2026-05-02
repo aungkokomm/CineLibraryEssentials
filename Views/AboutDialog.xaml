@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="CineLibraryEssentials.Views.AboutDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="About CineLibrary Essentials"
+    CloseButtonText="Close"
+    DefaultButton="Close">
+    <StackPanel Spacing="14" Width="420">
+
+        <!-- Icon + name -->
+        <StackPanel Orientation="Horizontal" Spacing="14" HorizontalAlignment="Center">
+            <Image Width="48" Height="48"
+                   Source="ms-appx:///Assets/AppIcon.ico"
+                   VerticalAlignment="Center" />
+            <StackPanel VerticalAlignment="Center" Spacing="2">
+                <TextBlock Text="CineLibrary Essentials"
+                           FontSize="18"
+                           FontWeight="SemiBold" />
+                <TextBlock x:Name="VersionText"
+                           Text="Version 1.0"
+                           FontSize="12"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Description -->
+        <TextBlock Text="Clean, organize, and enrich your movie library. Renames messy filenames, sorts each movie into its own Title (Year)/ folder, and downloads metadata, posters and actor photos from TMDb — fully Plex/Kodi/Jellyfin compatible."
+                   TextWrapping="Wrap"
+                   FontSize="13"
+                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+        <!-- Links -->
+        <StackPanel Spacing="8">
+            <HyperlinkButton x:Name="GitHubLink"
+                             NavigateUri="https://github.com/aungkokomm"
+                             Padding="0">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE71B;" FontSize="14" />
+                    <TextBlock Text="github.com/aungkokomm" />
+                </StackPanel>
+            </HyperlinkButton>
+
+            <HyperlinkButton NavigateUri="https://www.themoviedb.org/"
+                             Padding="0">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE774;" FontSize="14" />
+                    <TextBlock Text="Metadata by TMDb" />
+                </StackPanel>
+            </HyperlinkButton>
+        </StackPanel>
+
+        <!-- TMDb attribution (required by their ToS) -->
+        <TextBlock Text="This product uses the TMDb API but is not endorsed or certified by TMDb."
+                   FontSize="11"
+                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                   TextWrapping="Wrap" />
+    </StackPanel>
+</ContentDialog>
