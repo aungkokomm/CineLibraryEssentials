@@ -1,7 +1,8 @@
 <div align="center">
   <img src="Assets/AppIcon.ico" width="80" height="80" alt="CineLibrary Essentials" />
   <h1>CineLibrary Essentials</h1>
-  <p><b>Clean up messy movie downloads. Rename, organize, and prep them for scraping — fast.</b></p>
+  <p><b>Drag your movie folder into CineLibrary Essentials and let the Magic begin! Clean up messy movie downloads. Rename, organize, and prep them for scraping, fast. 
+     </b></p>
   <p>
     A Windows desktop tool (WinUI 3) that takes the chaos out of your downloads folder.
     Recommended as the <b>preparation step</b> for
