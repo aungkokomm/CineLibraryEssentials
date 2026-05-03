@@ -44,6 +44,9 @@ public partial class RenameViewModel : ObservableObject
     private bool isRecursive;
 
     [ObservableProperty]
+    private bool renameParentFolder;
+
+    [ObservableProperty]
     private string outputTemplate = RenameService.TemplatePlex;
 
     // ---- Stats ----
@@ -345,7 +348,10 @@ public partial class RenameViewModel : ObservableObject
         IsLoading = true;
         try
         {
-            var result = await _renameService.RenameInPlaceAsync(toRename);
+            var result = await _renameService.RenameInPlaceAsync(
+                toRename,
+                renameParentFolders: RenameParentFolder,
+                sourceFolder: SourceFolderPath);
 
             // After rename, the originals on disk have changed: re-validate and refresh stats
             ValidateAll();

@@ -88,13 +88,22 @@ public class RenameService
     /// Renames the given files IN PLACE (same folder). Updates each FilePreview's
     /// OriginalName / OriginalFilePath to reflect the new on-disk state.
     /// Companion subtitle files are renamed alongside the video.
+    ///
+    /// If <paramref name="renameParentFolders"/> is true, also renames the containing
+    /// folder for any video that lives in its own subfolder (single-video folder, not
+    /// the source root).
     /// </summary>
-    public async Task<ProcessingResult> RenameInPlaceAsync(IEnumerable<FilePreview> previews)
+    public async Task<ProcessingResult> RenameInPlaceAsync(
+        IEnumerable<FilePreview> previews,
+        bool renameParentFolders = false,
+        string? sourceFolder = null)
     {
+        var previewsList = previews.ToList();
         var result = new ProcessingResult { Success = true };
         var companionExtensions = new[] { ".srt", ".sub", ".ass", ".ssa", ".vtt", ".idx" };
 
-        foreach (var p in previews)
+        // ---- Pass 1: rename files in their current folder ----
+        foreach (var p in previewsList)
         {
             if (string.IsNullOrEmpty(p.OriginalFilePath))
             {
@@ -164,6 +173,70 @@ public class RenameService
             {
                 result.Success = false;
                 result.Errors.Add($"{p.OriginalName}: {ex.Message}");
+            }
+        }
+
+        // ---- Pass 2: rename containing folder (only if requested) ----
+        if (renameParentFolders)
+        {
+            // Group surviving previews by their parent folder
+            var byParent = previewsList
+                .Where(p => !string.IsNullOrEmpty(p.OriginalFilePath) && File.Exists(p.OriginalFilePath))
+                .GroupBy(p => Path.GetDirectoryName(p.OriginalFilePath) ?? string.Empty)
+                .ToList();
+
+            foreach (var group in byParent)
+            {
+                var parentPath = group.Key;
+                if (string.IsNullOrEmpty(parentPath)) continue;
+
+                // Skip the source folder itself — that's the user-picked root, never rename it
+                if (!string.IsNullOrEmpty(sourceFolder)
+                    && string.Equals(Path.GetFullPath(parentPath).TrimEnd('\\'),
+                                     Path.GetFullPath(sourceFolder).TrimEnd('\\'),
+                                     StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                // Skip multi-video folders — ambiguous which movie to name them after
+                if (group.Count() > 1) continue;
+
+                var preview = group.First();
+                var grandParent = Path.GetDirectoryName(parentPath);
+                if (string.IsNullOrEmpty(grandParent)) continue;
+
+                // New folder name = cleaned filename without extension
+                var newFolderName = Path.GetFileNameWithoutExtension(preview.CleanedName);
+                if (string.IsNullOrWhiteSpace(newFolderName)) continue;
+                newFolderName = PathSanitizer.SanitizeFolderName(newFolderName);
+
+                var oldFolderName = Path.GetFileName(parentPath);
+                if (string.Equals(oldFolderName, newFolderName, StringComparison.Ordinal))
+                    continue;  // already matches
+
+                var newParentPath = Path.Combine(grandParent, newFolderName);
+
+                if (Directory.Exists(newParentPath))
+                {
+                    result.Errors.Add($"Folder rename target exists: {newFolderName}");
+                    continue;
+                }
+
+                try
+                {
+                    await Task.Run(() => Directory.Move(parentPath, newParentPath));
+
+                    // Update file paths inside the renamed folder
+                    foreach (var inner in group)
+                    {
+                        var innerName = Path.GetFileName(inner.OriginalFilePath);
+                        inner.OriginalFilePath = Path.Combine(newParentPath, innerName);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    result.Success = false;
+                    result.Errors.Add($"Folder rename failed ({oldFolderName}): {ex.Message}");
+                }
             }
         }
 
