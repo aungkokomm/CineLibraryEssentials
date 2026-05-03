@@ -56,7 +56,8 @@ public sealed partial class ScrapingStep : UserControl
         {
             XamlRoot = this.XamlRoot
         };
-        dialog.SetInitialQuery(item.MovieTitle);
+        // Carry both title AND year into the search so TMDb narrows results
+        dialog.SetInitialQuery(item.MovieTitle, item.Year);
 
         var result = await dialog.ShowAsync();
         if (result == ContentDialogResult.Primary && dialog.SelectedItem != null)

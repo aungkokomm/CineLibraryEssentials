@@ -36,3 +36,6 @@ appsettings.json
 
 # ==== Old / hidden iconography ====
 .fold11_icon.ico
+
+# ==== Claude Code session metadata ====
+.claude/

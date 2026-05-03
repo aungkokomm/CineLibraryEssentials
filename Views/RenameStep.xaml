@@ -32,11 +32,14 @@
                     ToolTipService.ToolTip="Pick source folder">
                 <FontIcon Glyph="&#xE838;" FontSize="14" />
             </Button>
-            <CheckBox Grid.Column="3"
-                      Content="Subfolders"
-                      IsChecked="{Binding IsRecursive, Mode=TwoWay}"
-                      VerticalAlignment="Center"
-                      ToolTipService.ToolTip="Recursively scan all subfolders" />
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <CheckBox Content="Subfolders"
+                          IsChecked="{Binding IsRecursive, Mode=TwoWay}"
+                          ToolTipService.ToolTip="Recursively scan all subfolders" />
+                <CheckBox Content="Rename folder"
+                          IsChecked="{Binding RenameParentFolder, Mode=TwoWay}"
+                          ToolTipService.ToolTip="Also rename the containing folder when a movie sits in its own subfolder" />
+            </StackPanel>
             <ComboBox Grid.Column="4"
                       SelectedItem="{Binding OutputTemplate, Mode=TwoWay}"
                       VerticalAlignment="Center"
