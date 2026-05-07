@@ -11,6 +11,9 @@
 </div>
 
 ---
+![Stars](https://img.shields.io/github/stars/aungkokomm/CineLibraryEssentials?style=for-the-badge&color=blue)
+![Downloads](https://img.shields.io/github/downloads/aungkokomm/CineLibraryEssentials/total?style=for-the-badge&color=green)
+![Release](https://img.shields.io/github/v/release/aungkokomm/CineLibraryEssentials?style=for-the-badge&color=yellow)
 
 ## What it does
 
@@ -106,8 +109,7 @@ Movies from Step 2 are auto-listed. You can also **+ Add Folder** for any movie 
 Or skip this step entirely and use **MediaElch** instead — your folders are already in the format MediaElch expects.
 
 ---
-![Stars](https://img.shields.io/github/stars/aungkokomm/CineLibraryEssentials?style=for-the-badge&color=blue)
-![GitHub all releases](https://img.shields.io/github/downloads/aungkokomm/CineLibraryEssentials/total.svg)
+
 
 ## Install
 
