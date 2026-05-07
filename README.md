@@ -107,7 +107,8 @@ Or skip this step entirely and use **MediaElch** instead — your folders are al
 
 ---
 ![Stars](https://img.shields.io/github/stars/aungkokomm/CineLibraryEssentials?style=for-the-badge&color=blue)
-![Downloads](https://img.shields.io/github/downloads/aungkokomm/CineLibraryEssentials/total?style=for-the-badge&color=brightgreen)
+![GitHub all releases](https://img.shields.io/github/downloads/aungkokomm/CineLibraryEssentials/total.svg)
+
 ## Install
 
 Download the latest installer from [Releases](../../releases) and run:
