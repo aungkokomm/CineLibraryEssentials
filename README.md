@@ -65,7 +65,9 @@ The built-in casual scraper is good enough if you just want posters, plots, and 
 
 ## User Guide
 
-📖 **Full user guide:** [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — covers every feature, edge case, and troubleshooting tip.
+📖 **User guide:** [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — covers every feature, edge case, and troubleshooting tip.
+
+📖 **Full detailed user guide** [In my GitHub.io **CineLibrary Essentials page**] (https://aungkokomm.github.io/cinelibraryessentials/guide/)
 
 Short version below — the app is a **3-step wizard**. The header pills (`① Clean Names → ② Organize → ③ Scrape`) show where you are.
 
