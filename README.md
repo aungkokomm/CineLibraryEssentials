@@ -65,7 +65,9 @@ The built-in casual scraper is good enough if you just want posters, plots, and 
 
 ## User Guide
 
-The app is a **3-step wizard**. The header pills (`① Clean Names → ② Organize → ③ Scrape`) show where you are.
+📖 **Full user guide:** [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — covers every feature, edge case, and troubleshooting tip.
+
+Short version below — the app is a **3-step wizard**. The header pills (`① Clean Names → ② Organize → ③ Scrape`) show where you are.
 
 ### Step 1 · Clean Names
 
