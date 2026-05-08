@@ -150,8 +150,12 @@ public class ScrapingProgressItem
 public partial class MovieFolderItem : ObservableObject
 {
     public string FolderPath { get; set; } = string.Empty;
-    public string MovieTitle { get; set; } = string.Empty;
-    public int Year { get; set; }
+
+    [ObservableProperty]
+    private string movieTitle = string.Empty;
+
+    [ObservableProperty]
+    private int year;
 
     [ObservableProperty]
     private bool isSelected = true;
@@ -168,5 +172,15 @@ public partial class MovieFolderItem : ObservableObject
     [ObservableProperty]
     private string errorMessage = string.Empty;
 
+    /// <summary>Local poster path if already scraped (for thumbnail display in Step 3 cards).</summary>
+    [ObservableProperty]
+    private string? posterPath;
+
+    [ObservableProperty]
+    private string? overview;
+
     public string DisplayName => Year > 0 ? $"{MovieTitle} ({Year})" : MovieTitle;
+
+    partial void OnMovieTitleChanged(string value) => OnPropertyChanged(nameof(DisplayName));
+    partial void OnYearChanged(int value) => OnPropertyChanged(nameof(DisplayName));
 }

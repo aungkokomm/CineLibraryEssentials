@@ -24,6 +24,54 @@ public class ConfidenceColorConverter : IValueConverter
         => throw new NotImplementedException();
 }
 
+/// <summary>
+/// Maps Step 3 status text → chip color.
+/// </summary>
+public class ScrapingStatusColorConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        var s = value as string ?? string.Empty;
+        if (s.StartsWith("Complete", StringComparison.OrdinalIgnoreCase) ||
+            s.StartsWith("Already", StringComparison.OrdinalIgnoreCase))
+            return Color.FromArgb(255, 16, 137, 62);  // green
+        if (s.StartsWith("Failed", StringComparison.OrdinalIgnoreCase))
+            return Color.FromArgb(255, 196, 43, 28);  // red
+        if (s.StartsWith("Scraping", StringComparison.OrdinalIgnoreCase) ||
+            s.StartsWith("Searching", StringComparison.OrdinalIgnoreCase) ||
+            s.StartsWith("Downloading", StringComparison.OrdinalIgnoreCase))
+            return Color.FromArgb(255, 0, 120, 215);  // blue
+        return Color.FromArgb(255, 130, 130, 130);    // grey (Ready / Pending)
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+        => throw new NotImplementedException();
+}
+
+/// <summary>
+/// True/false → empty/filled visibility helper based on string presence (for poster fallback).
+/// </summary>
+public class StringNonEmptyToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+        => string.IsNullOrEmpty(value as string) ? Visibility.Collapsed : Visibility.Visible;
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+        => throw new NotImplementedException();
+}
+
+/// <summary>
+/// Inverse of StringNonEmptyToVisibilityConverter — visible when string is empty.
+/// </summary>
+public class StringEmptyToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+        => string.IsNullOrEmpty(value as string) ? Visibility.Visible : Visibility.Collapsed;
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+        => throw new NotImplementedException();
+}
+
 public class BoolToVisibilityConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, string language)

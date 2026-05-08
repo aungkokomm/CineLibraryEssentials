@@ -6,214 +6,312 @@
     xmlns:util="using:CineLibraryEssentials.Utilities"
     AllowDrop="True"
     DragOver="OnDragOver"
+    DragLeave="OnDragLeave"
     Drop="OnDrop">
 
     <UserControl.KeyboardAccelerators>
         <KeyboardAccelerator Modifiers="Control" Key="A" Invoked="OnAcceleratorSelectAll" />
     </UserControl.KeyboardAccelerators>
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="8">
+    <Grid>
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" RowSpacing="8">
 
-        <!-- ============ Source folder + recursive + format (single compact row) ============ -->
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
-            <TextBlock Text="Source"
-                       VerticalAlignment="Center"
-                       FontSize="13"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-            <TextBox Grid.Column="1"
-                     x:Name="SourceFolderText"
-                     IsReadOnly="True"
-                     PlaceholderText="Drop a folder here or click Browse"
-                     VerticalAlignment="Center" />
-            <Button Grid.Column="2"
-                    x:Name="BrowseButton"
-                    Click="OnBrowseClick"
-                    VerticalAlignment="Center"
-                    ToolTipService.ToolTip="Pick source folder">
-                <FontIcon Glyph="&#xE838;" FontSize="14" />
-            </Button>
-            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                <CheckBox Content="Subfolders"
-                          IsChecked="{Binding IsRecursive, Mode=TwoWay}"
-                          ToolTipService.ToolTip="Recursively scan all subfolders" />
-                <CheckBox Content="Rename folder"
-                          IsChecked="{Binding RenameParentFolder, Mode=TwoWay}"
-                          ToolTipService.ToolTip="Also rename the containing folder when a movie sits in its own subfolder" />
-            </StackPanel>
-            <ComboBox Grid.Column="4"
-                      SelectedItem="{Binding OutputTemplate, Mode=TwoWay}"
-                      VerticalAlignment="Center"
-                      MinWidth="130"
-                      ToolTipService.ToolTip="Output filename format">
-                <x:String>{Title} ({Year})</x:String>
-                <x:String>{Year} - {Title}</x:String>
-            </ComboBox>
-        </Grid>
+            <!-- ============ Warning InfoBar ============ -->
+            <InfoBar Grid.Row="0"
+                     x:Name="WarningInfoBar"
+                     Severity="Informational"
+                     Title="Tip"
+                     Message="Review Low / Medium confidence rows before renaming. Renames are permanent — there is a 30-second Undo toast after each batch."
+                     IsOpen="True"
+                     IsClosable="True"
+                     CloseButtonClick="OnWarningInfoBarClosed" />
 
-        <!-- ============ Toolbar: search, filter, find/replace ============ -->
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
-            <TextBox Grid.Column="0"
-                     PlaceholderText="🔍 Search"
-                     Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                     MinWidth="180"
-                     VerticalAlignment="Center" />
+            <!-- ============ Source folder + recursive + format (single compact row) ============ -->
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+                <TextBlock Text="Source"
+                           VerticalAlignment="Center"
+                           FontSize="13"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBox Grid.Column="1"
+                         x:Name="SourceFolderText"
+                         IsReadOnly="True"
+                         PlaceholderText="Drop a folder here or click Browse"
+                         VerticalAlignment="Center" />
+                <SplitButton Grid.Column="2"
+                             x:Name="BrowseButton"
+                             Click="OnBrowseClick"
+                             VerticalAlignment="Center"
+                             ToolTipService.ToolTip="Pick source folder. Click ▾ for recent folders.">
+                    <FontIcon Glyph="&#xE838;" FontSize="14" />
+                    <SplitButton.Flyout>
+                        <MenuFlyout x:Name="RecentFoldersFlyout" Placement="Bottom" />
+                    </SplitButton.Flyout>
+                </SplitButton>
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <CheckBox Content="Subfolders"
+                              IsChecked="{Binding IsRecursive, Mode=TwoWay}"
+                              ToolTipService.ToolTip="Recursively scan all subfolders" />
+                    <CheckBox Content="Rename folder"
+                              IsChecked="{Binding RenameParentFolder, Mode=TwoWay}"
+                              ToolTipService.ToolTip="Also rename the containing folder when a movie sits in its own subfolder" />
+                    <CheckBox Content="Clean metadata"
+                              IsChecked="{Binding CleanEmbeddedMetadata, Mode=TwoWay}"
+                              ToolTipService.ToolTip="Also clean the file's embedded title/comment fields (kills the website link in VLC's titlebar)" />
+                </StackPanel>
+                <ComboBox Grid.Column="4"
+                          SelectedItem="{Binding OutputTemplate, Mode=TwoWay}"
+                          VerticalAlignment="Center"
+                          MinWidth="130"
+                          ToolTipService.ToolTip="Output filename format">
+                    <x:String>{Title} ({Year})</x:String>
+                    <x:String>{Year} - {Title}</x:String>
+                </ComboBox>
+            </Grid>
 
-            <ComboBox Grid.Column="2"
-                      SelectedItem="{Binding ConfidenceFilter, Mode=TwoWay}"
-                      VerticalAlignment="Center"
-                      MinWidth="110"
-                      ToolTipService.ToolTip="Filter by confidence">
-                <x:String>All</x:String>
-                <x:String>High</x:String>
-                <x:String>Medium</x:String>
-                <x:String>Low</x:String>
-                <x:String>Warnings</x:String>
-            </ComboBox>
+            <!-- ============ Toolbar: search, filter, find/replace ============ -->
+            <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
+                <TextBox Grid.Column="0"
+                         PlaceholderText="🔍 Search"
+                         Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         MinWidth="180"
+                         VerticalAlignment="Center" />
 
-            <TextBox Grid.Column="3"
-                     PlaceholderText="Find"
-                     Text="{Binding FindText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                     MinWidth="100"
-                     VerticalAlignment="Center" />
-            <TextBox Grid.Column="4"
-                     PlaceholderText="Replace"
-                     Text="{Binding ReplaceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                     MinWidth="100"
-                     VerticalAlignment="Center" />
-            <Button Grid.Column="5"
-                    Content="Replace"
-                    Click="OnFindReplaceClick"
-                    VerticalAlignment="Center" />
+                <ComboBox Grid.Column="2"
+                          SelectedItem="{Binding ConfidenceFilter, Mode=TwoWay}"
+                          VerticalAlignment="Center"
+                          MinWidth="130"
+                          ToolTipService.ToolTip="Filter by confidence">
+                    <x:String>All</x:String>
+                    <x:String>High</x:String>
+                    <x:String>Medium</x:String>
+                    <x:String>Low</x:String>
+                    <x:String>Warnings</x:String>
+                    <x:String>Needs renaming</x:String>
+                </ComboBox>
 
-            <Button Grid.Column="6"
-                    VerticalAlignment="Center"
-                    ToolTipService.ToolTip="More actions">
-                <FontIcon Glyph="&#xE712;" FontSize="14" />
-                <Button.Flyout>
-                    <MenuFlyout>
-                        <MenuFlyoutItem Text="Select All  (Ctrl+A)" Click="OnSelectAllClick" />
-                        <MenuFlyoutItem Text="Select None" Click="OnSelectNoneClick" />
-                        <MenuFlyoutSeparator />
-                        <MenuFlyoutItem Text="Apply Smart Title Case" Click="OnApplyTitleCaseClick" />
-                        <MenuFlyoutItem Text="Reset Auto-Cleaning" Click="OnResetClick" />
-                    </MenuFlyout>
-                </Button.Flyout>
-            </Button>
-        </Grid>
+                <ToggleButton Grid.Column="3"
+                              IsChecked="{Binding HideUnchanged, Mode=TwoWay}"
+                              VerticalAlignment="Center"
+                              ToolTipService.ToolTip="Hide rows whose cleaned name already matches the original">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE71C;" FontSize="13" />
+                        <TextBlock Text="Modified only" FontSize="12" />
+                    </StackPanel>
+                </ToggleButton>
 
-        <!-- ============ File list ============ -->
-        <ListView Grid.Row="2"
-                  x:Name="FilePreviewList"
-                  SelectionMode="None"
-                  ItemsSource="{Binding FilePreviews}"
+                <TextBox Grid.Column="4"
+                         PlaceholderText="Find"
+                         Text="{Binding FindText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         MinWidth="100"
+                         VerticalAlignment="Center" />
+                <TextBox Grid.Column="5"
+                         PlaceholderText="Replace"
+                         Text="{Binding ReplaceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         MinWidth="100"
+                         VerticalAlignment="Center" />
+                <Button Grid.Column="6"
+                        Content="Replace"
+                        Click="OnFindReplaceClick"
+                        VerticalAlignment="Center" />
+
+                <Button Grid.Column="7"
+                        VerticalAlignment="Center"
+                        ToolTipService.ToolTip="More actions">
+                    <FontIcon Glyph="&#xE712;" FontSize="14" />
+                    <Button.Flyout>
+                        <MenuFlyout>
+                            <MenuFlyoutItem Text="Select All  (Ctrl+A)" Click="OnSelectAllClick" />
+                            <MenuFlyoutItem Text="Select None" Click="OnSelectNoneClick" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Text="Apply Smart Title Case" Click="OnApplyTitleCaseClick" />
+                            <MenuFlyoutItem Text="Reset Auto-Cleaning" Click="OnResetClick" />
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </Grid>
+
+            <!-- ============ Sortable column headers ============ -->
+            <Grid Grid.Row="3"
+                  ColumnDefinitions="36,*,*,80,32,32"
+                  Padding="10,6"
+                  Background="{ThemeResource LayerFillColorDefaultBrush}"
                   BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                  BorderThickness="1"
-                  CornerRadius="4">
-            <ListView.HeaderTemplate>
-                <DataTemplate>
-                    <Grid ColumnDefinitions="36,*,*,80,32,32"
-                          Padding="10,8"
-                          Background="{ThemeResource LayerFillColorDefaultBrush}"
-                          BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                          BorderThickness="0,0,0,1">
-                        <TextBlock Text="" />
-                        <TextBlock Grid.Column="1" Text="Original"
-                                   FontWeight="SemiBold" FontSize="12"
+                  BorderThickness="1,1,1,0"
+                  CornerRadius="4,4,0,0">
+                <TextBlock Text="" />
+                <Button Grid.Column="1"
+                        x:Name="SortByOriginalButton"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="2,0"
+                        HorizontalContentAlignment="Left"
+                        HorizontalAlignment="Stretch"
+                        Click="OnSortOriginalClick">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Original" FontWeight="SemiBold" FontSize="12"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock Grid.Column="2" Text="Cleaned"
-                                   FontWeight="SemiBold" FontSize="12"
+                        <FontIcon x:Name="SortOriginalIcon" Glyph="" FontSize="10" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="2"
+                        x:Name="SortByCleanedButton"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="2,0"
+                        HorizontalContentAlignment="Left"
+                        HorizontalAlignment="Stretch"
+                        Click="OnSortCleanedClick">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Cleaned" FontWeight="SemiBold" FontSize="12"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock Grid.Column="3" Text="Confidence"
-                                   FontWeight="SemiBold" FontSize="12"
+                        <FontIcon x:Name="SortCleanedIcon" Glyph="" FontSize="10" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="3"
+                        x:Name="SortByConfidenceButton"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="2,0"
+                        HorizontalContentAlignment="Left"
+                        HorizontalAlignment="Stretch"
+                        Click="OnSortConfidenceClick">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Confidence" FontWeight="SemiBold" FontSize="12"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    </Grid>
-                </DataTemplate>
-            </ListView.HeaderTemplate>
-            <ListView.Header>
-                <Grid />
-            </ListView.Header>
-            <ListView.ItemContainerStyle>
-                <Style TargetType="ListViewItem">
-                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                    <Setter Property="Padding" Value="6,2" />
-                    <Setter Property="MinHeight" Value="48" />
-                </Style>
-            </ListView.ItemContainerStyle>
-            <ListView.ItemTemplate>
-                <DataTemplate>
-                    <Grid ColumnDefinitions="36,*,*,80,32,32">
-                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                        <FontIcon x:Name="SortConfidenceIcon" Glyph="&#xE74B;" FontSize="10" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <!-- ============ File list ============ -->
+            <ListView Grid.Row="4"
+                      x:Name="FilePreviewList"
+                      SelectionMode="None"
+                      ItemsSource="{Binding FilePreviews}"
+                      BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                      BorderThickness="1,0,1,1"
+                      CornerRadius="0,0,4,4">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Padding" Value="6,2" />
+                        <Setter Property="MinHeight" Value="48" />
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnDefinitions="36,*,*,80,32,32">
+                            <Grid.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="Search TMDb..."
+                                                    Click="OnContextSearchTmdbClick">
+                                        <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE721;" /></MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutItem Text="Apply Title Case"
+                                                    Click="OnContextTitleCaseClick" />
+                                    <MenuFlyoutItem Text="Reset Cleaning"
+                                                    Click="OnContextResetClick" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="Open Containing Folder"
+                                                    Click="OnContextOpenFolderClick">
+                                        <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE838;" /></MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutItem Text="Remove from List"
+                                                    Click="OnContextRemoveClick">
+                                        <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;" /></MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                </MenuFlyout>
+                            </Grid.ContextFlyout>
+
+                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                      VerticalAlignment="Center" />
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,0" Spacing="1">
+                                <TextBlock util:RichTextBehavior.Segments="{Binding OriginalDiffSegments}"
+                                           TextWrapping="Wrap"
+                                           FontSize="12"
+                                           ToolTipService.ToolTip="{Binding OriginalName}" />
+                                <TextBlock Text="{Binding FileSizeDisplay}"
+                                           FontSize="10"
+                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                            </StackPanel>
+
+                            <TextBox Grid.Column="2"
+                                     Text="{Binding CleanedName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                     VerticalAlignment="Center"
+                                     Margin="4,0"
+                                     FontSize="12" />
+
+                            <Border Grid.Column="3"
+                                    CornerRadius="8"
+                                    Padding="6,1"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Margin="4,0">
+                                <Border.Background>
+                                    <SolidColorBrush Color="{Binding ConfidenceLabel, Converter={StaticResource ConfidenceColorConverter}}" />
+                                </Border.Background>
+                                <TextBlock Text="{Binding ConfidenceLabel}"
+                                           Foreground="White"
+                                           FontWeight="SemiBold"
+                                           FontSize="10" />
+                            </Border>
+
+                            <FontIcon Grid.Column="4"
+                                      Glyph="&#xE7BA;"
+                                      FontSize="14"
+                                      Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                      VerticalAlignment="Center"
+                                      HorizontalAlignment="Center"
+                                      Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibilityConverter}}"
+                                      ToolTipService.ToolTip="{Binding WarningMessage}" />
+
+                            <Button Grid.Column="5"
+                                    Tag="{Binding}"
+                                    Click="OnTmdbSearchClick"
+                                    Width="28" Height="28"
+                                    Padding="0"
+                                    VerticalAlignment="Center"
+                                    ToolTipService.ToolTip="Search TMDb">
+                                <FontIcon Glyph="&#xE721;" FontSize="13" />
+                            </Button>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <!-- ============ Footer: stats + Rename button ============ -->
+            <Grid Grid.Row="5" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,4,0,0">
+                <TextBlock Text="{Binding StatsSummary}"
+                           FontSize="11"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <ProgressRing IsActive="{Binding IsLoading}" Width="18" Height="18"
                                   VerticalAlignment="Center" />
-
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,0" Spacing="1">
-                            <TextBlock util:RichTextBehavior.Segments="{Binding OriginalDiffSegments}"
-                                       TextWrapping="Wrap"
-                                       FontSize="12"
-                                       ToolTipService.ToolTip="{Binding OriginalName}" />
-                            <TextBlock Text="{Binding FileSizeDisplay}"
-                                       FontSize="10"
-                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                        </StackPanel>
-
-                        <TextBox Grid.Column="2"
-                                 Text="{Binding CleanedName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                 VerticalAlignment="Center"
-                                 Margin="4,0"
-                                 FontSize="12" />
-
-                        <Border Grid.Column="3"
-                                CornerRadius="8"
-                                Padding="6,1"
-                                HorizontalAlignment="Left"
-                                VerticalAlignment="Center"
-                                Margin="4,0">
-                            <Border.Background>
-                                <SolidColorBrush Color="{Binding ConfidenceLabel, Converter={StaticResource ConfidenceColorConverter}}" />
-                            </Border.Background>
-                            <TextBlock Text="{Binding ConfidenceLabel}"
-                                       Foreground="White"
-                                       FontWeight="SemiBold"
-                                       FontSize="10" />
-                        </Border>
-
-                        <FontIcon Grid.Column="4"
-                                  Glyph="&#xE7BA;"
-                                  FontSize="14"
-                                  Foreground="{ThemeResource SystemFillColorCautionBrush}"
-                                  VerticalAlignment="Center"
-                                  HorizontalAlignment="Center"
-                                  Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibilityConverter}}"
-                                  ToolTipService.ToolTip="{Binding WarningMessage}" />
-
-                        <Button Grid.Column="5"
-                                Tag="{Binding}"
-                                Click="OnTmdbSearchClick"
-                                Width="28" Height="28"
-                                Padding="0"
-                                VerticalAlignment="Center"
-                                ToolTipService.ToolTip="Search TMDb">
-                            <FontIcon Glyph="&#xE721;" FontSize="13" />
-                        </Button>
-                    </Grid>
-                </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
-
-        <!-- ============ Footer: stats + Rename button ============ -->
-        <Grid Grid.Row="3" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,4,0,0">
-            <TextBlock Text="{Binding StatsSummary}"
-                       FontSize="11"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                       VerticalAlignment="Center" />
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                <ProgressRing IsActive="{Binding IsLoading}" Width="18" Height="18"
-                              VerticalAlignment="Center" />
-                <Button x:Name="RenameButton"
-                        Content="Rename Selected"
-                        Style="{ThemeResource AccentButtonStyle}"
-                        Click="OnRenameInPlaceClick"
-                        ToolTipService.ToolTip="Rename the checked files in their current folder" />
-            </StackPanel>
+                    <Button x:Name="RenameButton"
+                            Content="Rename Selected"
+                            Style="{ThemeResource AccentButtonStyle}"
+                            Click="OnRenameInPlaceClick"
+                            ToolTipService.ToolTip="Rename the checked files in their current folder" />
+                </StackPanel>
+            </Grid>
         </Grid>
+
+        <!-- ============ Drag-drop overlay (full-page when dragging) ============ -->
+        <Border x:Name="DragOverlay"
+                Background="#CC000000"
+                Visibility="Collapsed"
+                IsHitTestVisible="False"
+                CornerRadius="6">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                <FontIcon Glyph="&#xE8B7;" FontSize="56" Foreground="White" />
+                <TextBlock Text="Drop folder to load"
+                           FontSize="20"
+                           FontWeight="SemiBold"
+                           Foreground="White"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

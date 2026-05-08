@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CineLibraryEssentials.Models;
 using CineLibraryEssentials.Services;
+using CineLibraryEssentials.Utilities;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -10,6 +11,7 @@ public partial class FileToFolderViewModel : ObservableObject
 {
     private readonly FileToFolderService _folderService = new();
     private readonly RenameService _renameService = new();
+    private readonly ConfigService _configService;
     private readonly WizardViewModel _parentViewModel;
 
     [ObservableProperty]
@@ -24,9 +26,10 @@ public partial class FileToFolderViewModel : ObservableObject
     [ObservableProperty]
     private string statusMessage = string.Empty;
 
-    public FileToFolderViewModel(WizardViewModel parentViewModel)
+    public FileToFolderViewModel(WizardViewModel parentViewModel, ConfigService? configService = null)
     {
         _parentViewModel = parentViewModel;
+        _configService = configService ?? new ConfigService();
     }
 
     /// <summary>
@@ -36,7 +39,6 @@ public partial class FileToFolderViewModel : ObservableObject
     /// </summary>
     public void RefreshFromRenameStep()
     {
-        // Default output folder to source so the preview always shows a real destination
         if (string.IsNullOrEmpty(OutputFolderPath)
             && !string.IsNullOrEmpty(_parentViewModel.SelectedSourceFolder))
         {
@@ -49,34 +51,145 @@ public partial class FileToFolderViewModel : ObservableObject
     [RelayCommand]
     public void LoadPreview()
     {
-        if (_parentViewModel.RenamePreview.Count == 0)
+        if (_parentViewModel.RenamePreview.Count == 0 && OperationsPreview.Count == 0)
             return;
 
-        // Use the source folder Step 1 selected; output folder is set on this VM
-        var operations = _renameService.CreateFileOperations(
-            _parentViewModel.SelectedSourceFolder ?? string.Empty,
-            _parentViewModel.RenamePreview,
-            string.IsNullOrEmpty(OutputFolderPath)
-                ? "(awaiting output folder)"
-                : OutputFolderPath);
-
-        OperationsPreview.Clear();
-        foreach (var op in operations)
+        // If we have rename-step data, build operations from it (replacing only those rows,
+        // preserving any manually-added rows that weren't in RenamePreview)
+        if (_parentViewModel.RenamePreview.Count > 0)
         {
-            op.IsSelected = true;  // all checked by default
-            OperationsPreview.Add(op);
+            var operations = _renameService.CreateFileOperations(
+                _parentViewModel.SelectedSourceFolder ?? string.Empty,
+                _parentViewModel.RenamePreview,
+                string.IsNullOrEmpty(OutputFolderPath)
+                    ? "(awaiting output folder)"
+                    : OutputFolderPath);
+
+            // Replace existing rename-step rows but keep manually-added ones
+            var manuallyAdded = OperationsPreview
+                .Where(op => !_parentViewModel.RenamePreview.Any(rp =>
+                    string.Equals(rp.OriginalFilePath, op.OriginalFilePath, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+
+            OperationsPreview.Clear();
+            foreach (var op in operations)
+            {
+                op.IsSelected = true;
+                OperationsPreview.Add(op);
+            }
+            foreach (var op in manuallyAdded)
+            {
+                // Recompute destination with the (possibly new) output folder
+                RecomputeDestination(op);
+                OperationsPreview.Add(op);
+            }
+        }
+        else
+        {
+            // Recompute destinations for all manual operations
+            foreach (var op in OperationsPreview)
+                RecomputeDestination(op);
         }
 
-        StatusMessage = string.IsNullOrEmpty(OutputFolderPath)
-            ? "Select an output folder above to enable Run."
-            : $"{OperationsPreview.Count} file(s) ready to organize into {OutputFolderPath}";
+        UpdateStatusMessage();
+    }
+
+    private void RecomputeDestination(FileOperation op)
+    {
+        if (string.IsNullOrEmpty(OutputFolderPath))
+        {
+            op.DestinationFolder = "(awaiting output folder)";
+            return;
+        }
+
+        var folderName = Path.GetFileNameWithoutExtension(op.FinalFileName);
+        if (string.IsNullOrWhiteSpace(folderName))
+            folderName = Path.GetFileNameWithoutExtension(op.OriginalFileName);
+        folderName = PathSanitizer.SanitizeFolderName(folderName);
+        op.DestinationFolder = Path.Combine(OutputFolderPath, folderName);
     }
 
     partial void OnOutputFolderPathChanged(string value)
     {
-        // Keep the preview's destination paths in sync as the user changes output folder
+        if (!string.IsNullOrEmpty(value))
+            _configService.AddRecentOutputFolder(value);
         if (OperationsPreview.Count > 0)
             LoadPreview();
+    }
+
+    /// <summary>
+    /// Manually appends a list of file paths to the operations list. Useful when
+    /// the user lands on Step 2 directly without renaming first.
+    /// </summary>
+    public void AddFiles(IEnumerable<string> filePaths)
+    {
+        foreach (var path in filePaths)
+        {
+            if (!File.Exists(path)) continue;
+            if (!FileFormatValidator.IsVideoFile(path)) continue;
+            // Dedupe
+            if (OperationsPreview.Any(op => string.Equals(op.OriginalFilePath, path, StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            var fileName = Path.GetFileName(path);
+            var parsed = RegexPatterns.ParseFilename(fileName);
+            var ext = Path.GetExtension(path);
+            var formatted = RenameService.ApplyTemplate(parsed.Title, parsed.Year, _configService.GetLastTemplate());
+            var cleanedName = PathSanitizer.SanitizeFileName(formatted) + ext;
+
+            var op = new FileOperation
+            {
+                OriginalFilePath = path,
+                OriginalFileName = fileName,
+                CleanedTitle = parsed.Title,
+                Year = parsed.Year,
+                Confidence = parsed.Confidence,
+                FinalFileName = cleanedName,
+                IsSelected = true,
+            };
+            RecomputeDestination(op);
+            OperationsPreview.Add(op);
+        }
+        UpdateStatusMessage();
+    }
+
+    /// <summary>Recursively pulls all videos from a folder and its subfolders.</summary>
+    public void AddFolder(string folderPath, bool recursive = true)
+    {
+        if (!Directory.Exists(folderPath)) return;
+        var option = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+        var files = Directory.EnumerateFiles(folderPath, "*", option)
+            .Where(FileFormatValidator.IsVideoFile);
+        AddFiles(files);
+    }
+
+    public void RemoveOperation(FileOperation op)
+    {
+        if (op != null) OperationsPreview.Remove(op);
+        UpdateStatusMessage();
+    }
+
+    public void ClearAll()
+    {
+        OperationsPreview.Clear();
+        UpdateStatusMessage();
+    }
+
+    private void UpdateStatusMessage()
+    {
+        if (OperationsPreview.Count == 0)
+        {
+            StatusMessage = "No files yet — drop a folder, click + Add Files, or come back from Step 1.";
+        }
+        else if (string.IsNullOrEmpty(OutputFolderPath))
+        {
+            StatusMessage = "Pick an output folder above to enable Run.";
+        }
+        else
+        {
+            var selected = OperationsPreview.Count(op => op.IsSelected);
+            StatusMessage = $"{selected} of {OperationsPreview.Count} file(s) ready to organize into {OutputFolderPath}";
+        }
     }
 
     /// <summary>

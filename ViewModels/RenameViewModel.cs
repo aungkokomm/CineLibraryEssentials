@@ -12,8 +12,12 @@ namespace CineLibraryEssentials.ViewModels;
 public partial class RenameViewModel : ObservableObject
 {
     private readonly RenameService _renameService = new();
+    private readonly ConfigService _configService;
+    private readonly UndoService _undoService = new();
     private readonly WizardViewModel _parentViewModel;
     private readonly DispatcherQueue _dispatcherQueue;
+
+    public UndoService UndoService => _undoService;
 
     /// <summary>Master list of all loaded files (unfiltered).</summary>
     public ObservableCollection<FilePreview> AllPreviews { get; } = new();
@@ -49,6 +53,18 @@ public partial class RenameViewModel : ObservableObject
     [ObservableProperty]
     private string outputTemplate = RenameService.TemplatePlex;
 
+    [ObservableProperty]
+    private bool cleanEmbeddedMetadata;
+
+    [ObservableProperty]
+    private bool hideUnchanged;
+
+    [ObservableProperty]
+    private string sortColumn = "Confidence";
+
+    [ObservableProperty]
+    private bool sortDescending = true;
+
     // ---- Stats ----
     [ObservableProperty] private int totalCount;
     [ObservableProperty] private int reviewedCount;
@@ -59,10 +75,18 @@ public partial class RenameViewModel : ObservableObject
     [ObservableProperty]
     private string statsSummary = "No files loaded";
 
-    public RenameViewModel(WizardViewModel parentViewModel)
+    public RenameViewModel(WizardViewModel parentViewModel, ConfigService? configService = null)
     {
         _parentViewModel = parentViewModel;
+        _configService = configService ?? new ConfigService();
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+
+        // Restore persisted settings
+        cleanEmbeddedMetadata = _configService.GetCleanEmbeddedMetadata();
+        outputTemplate = _configService.GetLastTemplate();
+        var (col, desc) = _configService.GetStep1Sort();
+        sortColumn = col;
+        sortDescending = desc;
     }
 
     // -----------------------------------------------------------------
@@ -76,6 +100,7 @@ public partial class RenameViewModel : ObservableObject
 
         IsLoading = true;
         SourceFolderPath = folderPath;
+        _configService.AddRecentSourceFolder(folderPath);
 
         var recursive = IsRecursive;
         var template = OutputTemplate;
@@ -108,6 +133,7 @@ public partial class RenameViewModel : ObservableObject
 
     partial void OnOutputTemplateChanged(string value)
     {
+        _configService.SetLastTemplate(value);
         // Re-apply template to all NON-reviewed rows in place (faster than re-scanning)
         if (AllPreviews.Count == 0) return;
         foreach (var p in AllPreviews)
@@ -146,6 +172,19 @@ public partial class RenameViewModel : ObservableObject
 
     partial void OnSearchTextChanged(string value) => ApplyFilter();
     partial void OnConfidenceFilterChanged(string value) => ApplyFilter();
+    partial void OnHideUnchangedChanged(bool value) => ApplyFilter();
+    partial void OnSortColumnChanged(string value)
+    {
+        _configService.SetStep1Sort(value, SortDescending);
+        ApplyFilter();
+    }
+    partial void OnSortDescendingChanged(bool value)
+    {
+        _configService.SetStep1Sort(SortColumn, value);
+        ApplyFilter();
+    }
+    partial void OnCleanEmbeddedMetadataChanged(bool value)
+        => _configService.SetCleanEmbeddedMetadata(value);
 
     private void ApplyFilter()
     {
@@ -165,11 +204,49 @@ public partial class RenameViewModel : ObservableObject
             "Medium" => filtered.Where(p => p.Confidence >= 0.50 && p.Confidence < 0.80),
             "High" => filtered.Where(p => p.Confidence >= 0.80),
             "Warnings" => filtered.Where(p => p.HasWarning),
+            "Needs renaming" => filtered.Where(p =>
+                !string.Equals(p.OriginalName, p.CleanedName, StringComparison.Ordinal)),
             _ => filtered
         };
 
-        FilePreviews = new ObservableCollection<FilePreview>(filtered);
+        // "Hide unchanged" toggle (orthogonal to the dropdown filter)
+        if (HideUnchanged)
+        {
+            filtered = filtered.Where(p =>
+                !string.Equals(p.OriginalName, p.CleanedName, StringComparison.Ordinal));
+        }
+
+        // Apply sorting
+        IOrderedEnumerable<FilePreview> sorted = SortColumn switch
+        {
+            "Original" => SortDescending
+                ? filtered.OrderByDescending(p => p.OriginalName, StringComparer.OrdinalIgnoreCase)
+                : filtered.OrderBy(p => p.OriginalName, StringComparer.OrdinalIgnoreCase),
+            "Cleaned" => SortDescending
+                ? filtered.OrderByDescending(p => p.CleanedName, StringComparer.OrdinalIgnoreCase)
+                : filtered.OrderBy(p => p.CleanedName, StringComparer.OrdinalIgnoreCase),
+            "Size" => SortDescending
+                ? filtered.OrderByDescending(p => p.FileSizeBytes)
+                : filtered.OrderBy(p => p.FileSizeBytes),
+            _ => SortDescending
+                ? filtered.OrderByDescending(p => p.Confidence)
+                : filtered.OrderBy(p => p.Confidence),
+        };
+
+        FilePreviews = new ObservableCollection<FilePreview>(sorted);
         UpdateStats();
+    }
+
+    /// <summary>Toggles the sort direction if the same column is clicked, else switches column.</summary>
+    public void ToggleSort(string column)
+    {
+        if (string.Equals(column, SortColumn, StringComparison.OrdinalIgnoreCase))
+            SortDescending = !SortDescending;
+        else
+        {
+            SortColumn = column;
+            SortDescending = column == "Confidence" || column == "Size";  // sensible defaults
+        }
     }
 
     // -----------------------------------------------------------------
@@ -348,10 +425,17 @@ public partial class RenameViewModel : ObservableObject
         IsLoading = true;
         try
         {
+            var undoLog = new List<UndoService.RenameRecord>();
             var result = await _renameService.RenameInPlaceAsync(
                 toRename,
                 renameParentFolders: RenameParentFolder,
-                sourceFolder: SourceFolderPath);
+                sourceFolder: SourceFolderPath,
+                cleanEmbeddedMetadata: CleanEmbeddedMetadata,
+                undoLog: undoLog);
+
+            // Push the batch onto the undo stack so the UI can offer a 30s undo toast
+            if (undoLog.Count > 0)
+                _undoService.Push(undoLog);
 
             // After rename, the originals on disk have changed: re-validate and refresh stats
             ValidateAll();
@@ -365,6 +449,16 @@ public partial class RenameViewModel : ObservableObject
         {
             IsLoading = false;
         }
+    }
+
+    /// <summary>Reverses the last rename batch.</summary>
+    public (int succeeded, int failed) UndoLastRename()
+    {
+        var (ok, bad) = _undoService.UndoLast();
+        // Reload the current source folder so previews reflect the on-disk state again
+        if (ok > 0 && !string.IsNullOrEmpty(SourceFolderPath))
+            _ = LoadFilesAsync(SourceFolderPath);
+        return (ok, bad);
     }
 
     // -----------------------------------------------------------------

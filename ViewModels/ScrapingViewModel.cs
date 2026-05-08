@@ -122,6 +122,12 @@ public partial class ScrapingViewModel : ObservableObject
         {
             item.IsScraped = true;
             item.Status = "Complete";
+            // Pick up the freshly-downloaded poster for the card thumbnail
+            try
+            {
+                item.PosterPath = Directory.GetFiles(item.FolderPath, "*-poster.jpg").FirstOrDefault();
+            }
+            catch { }
         }
         else
         {
@@ -162,6 +168,12 @@ public partial class ScrapingViewModel : ObservableObject
         {
             item.IsScraped = true;
             item.Status = "Complete";
+            // Pick up the freshly-downloaded poster for the card thumbnail
+            try
+            {
+                item.PosterPath = Directory.GetFiles(item.FolderPath, "*-poster.jpg").FirstOrDefault();
+            }
+            catch { }
         }
         else
         {
@@ -229,15 +241,33 @@ public partial class ScrapingViewModel : ObservableObject
         var folderName = Path.GetFileName(folderPath);
         var (title, year) = ExtractTitleAndYear(folderName);
 
+        // Detect existing scraped state by looking for a poster + nfo
+        var existingPoster = Directory.GetFiles(folderPath, "*-poster.jpg").FirstOrDefault();
+        var hasNfo = Directory.GetFiles(folderPath, "*.nfo").Any();
+
         return new MovieFolderItem
         {
             FolderPath = folderPath,
             MovieTitle = title,
             Year = year,
-            Status = "Ready",
-            IsSelected = true
+            Status = (hasNfo && existingPoster != null) ? "Already scraped" : "Ready",
+            IsScraped = hasNfo && existingPoster != null,
+            PosterPath = existingPoster,
+            IsSelected = !(hasNfo && existingPoster != null)  // don't pre-check already-scraped
         };
     }
+
+    /// <summary>Manually adds a single folder to the scraping list.</summary>
+    public void AddSingleFolder(string folderPath)
+    {
+        if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath)) return;
+        if (MovieFolders.Any(m => string.Equals(m.FolderPath, folderPath, StringComparison.OrdinalIgnoreCase)))
+            return;
+        if (HasVideoFile(folderPath))
+            MovieFolders.Add(CreateMovieItem(folderPath));
+    }
+
+    public void ClearAll() => MovieFolders.Clear();
 
     private void EnsureScraperService()
     {
