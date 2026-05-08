@@ -2,114 +2,197 @@
 <UserControl
     x:Class="CineLibraryEssentials.Views.FileToFolderStep"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Microsoft.UI.Xaml.Controls.Primitives"
+    AllowDrop="True"
+    DragOver="OnDragOver"
+    DragLeave="OnDragLeave"
+    Drop="OnDrop">
+    <Grid>
+        <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="8">
 
-        <!-- Output folder picker (single compact row) -->
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-            <TextBlock Text="Output"
-                       VerticalAlignment="Center"
-                       FontSize="13"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-            <TextBox Grid.Column="1"
-                     x:Name="OutputFolderText"
-                     IsReadOnly="True"
-                     Text="{Binding OutputFolderPath, Mode=OneWay}"
-                     PlaceholderText="No folder selected"
-                     VerticalAlignment="Center" />
-            <Button Grid.Column="2"
-                    x:Name="BrowseButton"
-                    Click="OnBrowseClick"
-                    VerticalAlignment="Center"
-                    ToolTipService.ToolTip="Change output folder">
-                <FontIcon Glyph="&#xE838;" FontSize="14" />
-            </Button>
-        </Grid>
+            <!-- Output folder picker (single compact row) -->
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                <TextBlock Text="Output"
+                           VerticalAlignment="Center"
+                           FontSize="13"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBox Grid.Column="1"
+                         x:Name="OutputFolderText"
+                         IsReadOnly="True"
+                         Text="{Binding OutputFolderPath, Mode=OneWay}"
+                         PlaceholderText="No folder selected"
+                         VerticalAlignment="Center" />
+                <SplitButton Grid.Column="2"
+                             x:Name="ChangeOutputButton"
+                             Click="OnBrowseClick"
+                             VerticalAlignment="Center"
+                             ToolTipService.ToolTip="Pick output folder. Click ▾ for recent folders.">
+                    <FontIcon Glyph="&#xE838;" FontSize="14" />
+                    <SplitButton.Flyout>
+                        <MenuFlyout x:Name="RecentOutputFlyout" Placement="Bottom" />
+                    </SplitButton.Flyout>
+                </SplitButton>
+            </Grid>
 
-        <!-- Side-by-side preview list -->
-        <ListView Grid.Row="1"
-                  x:Name="OperationsList"
-                  SelectionMode="None"
-                  ItemsSource="{Binding OperationsPreview}"
+            <!-- Manual add buttons -->
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+                <Button Click="OnAddFilesClick"
+                        ToolTipService.ToolTip="Add individual video files">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE710;" FontSize="13" />
+                        <TextBlock Text="Add Files" FontSize="12" />
+                    </StackPanel>
+                </Button>
+                <Button Click="OnAddFolderClick"
+                        ToolTipService.ToolTip="Add all videos from a folder (recursive)">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE8B7;" FontSize="13" />
+                        <TextBlock Text="Add Folder" FontSize="12" />
+                    </StackPanel>
+                </Button>
+                <Button Click="OnClearAllClick"
+                        ToolTipService.ToolTip="Clear the list (does not touch any files)">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE74D;" FontSize="13" />
+                        <TextBlock Text="Clear" FontSize="12" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <!-- Side-by-side preview list OR empty state -->
+            <Grid Grid.Row="2"
                   BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                   BorderThickness="1"
                   CornerRadius="4">
-            <ListView.HeaderTemplate>
-                <DataTemplate>
-                    <Grid ColumnDefinitions="36,*,Auto,*"
-                          Padding="10,8"
-                          Background="{ThemeResource LayerFillColorDefaultBrush}"
-                          BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                          BorderThickness="0,0,0,1">
-                        <TextBlock Text="" />
-                        <TextBlock Grid.Column="1" Text="Original"
-                                   FontWeight="SemiBold" FontSize="12"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock Grid.Column="2" Text="" />
-                        <TextBlock Grid.Column="3" Text="Will Move To"
-                                   FontWeight="SemiBold" FontSize="12"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    </Grid>
-                </DataTemplate>
-            </ListView.HeaderTemplate>
-            <ListView.Header>
-                <Grid />
-            </ListView.Header>
-            <ListView.ItemContainerStyle>
-                <Style TargetType="ListViewItem">
-                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                    <Setter Property="Padding" Value="10,4" />
-                </Style>
-            </ListView.ItemContainerStyle>
-            <ListView.ItemTemplate>
-                <DataTemplate>
-                    <Grid ColumnDefinitions="36,*,Auto,*">
-                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                  VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding OriginalFileName}"
-                                   VerticalAlignment="Center"
-                                   FontSize="12"
-                                   TextTrimming="CharacterEllipsis"
-                                   ToolTipService.ToolTip="{Binding OriginalFilePath}" />
-                        <FontIcon Grid.Column="2"
-                                  Glyph="&#xE72A;"
-                                  FontSize="12"
-                                  Margin="10,0"
-                                  Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                  VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="3"
-                                    VerticalAlignment="Center"
-                                    Spacing="1">
-                            <TextBlock Text="{Binding FinalFileName}"
-                                       FontWeight="SemiBold"
-                                       FontSize="12"
-                                       TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text="{Binding DestinationFolder}"
-                                       FontSize="10"
-                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                       TextTrimming="CharacterEllipsis"
-                                       ToolTipService.ToolTip="{Binding DestinationFolder}" />
-                        </StackPanel>
-                    </Grid>
-                </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
+                <ListView x:Name="OperationsList"
+                          SelectionMode="None"
+                          ItemsSource="{Binding OperationsPreview}">
+                    <ListView.HeaderTemplate>
+                        <DataTemplate>
+                            <Grid ColumnDefinitions="36,*,Auto,*"
+                                  Padding="10,8"
+                                  Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                  BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                  BorderThickness="0,0,0,1">
+                                <TextBlock Text="" />
+                                <TextBlock Grid.Column="1" Text="Original"
+                                           FontWeight="SemiBold" FontSize="12"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Column="2" Text="" />
+                                <TextBlock Grid.Column="3" Text="Will Move To"
+                                           FontWeight="SemiBold" FontSize="12"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.HeaderTemplate>
+                    <ListView.Header><Grid /></ListView.Header>
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="10,4" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnDefinitions="36,*,Auto,*">
+                                <Grid.ContextFlyout>
+                                    <MenuFlyout>
+                                        <MenuFlyoutItem Text="Open Containing Folder"
+                                                        Click="OnContextOpenFolderClick">
+                                            <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE838;" /></MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutItem Text="Remove from List"
+                                                        Click="OnContextRemoveClick">
+                                            <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;" /></MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                    </MenuFlyout>
+                                </Grid.ContextFlyout>
+                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding OriginalFileName}"
+                                           VerticalAlignment="Center"
+                                           FontSize="12"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTipService.ToolTip="{Binding OriginalFilePath}" />
+                                <FontIcon Grid.Column="2"
+                                          Glyph="&#xE72A;"
+                                          FontSize="12"
+                                          Margin="10,0"
+                                          Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                          VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="3"
+                                            VerticalAlignment="Center"
+                                            Spacing="1">
+                                    <TextBlock Text="{Binding FinalFileName}"
+                                               FontWeight="SemiBold"
+                                               FontSize="12"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding DestinationFolder}"
+                                               FontSize="10"
+                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTipService.ToolTip="{Binding DestinationFolder}" />
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
 
-        <!-- Footer -->
-        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,4,0,0">
-            <TextBlock Text="{Binding StatusMessage}"
-                       FontSize="11"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                       VerticalAlignment="Center" />
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                <ProgressRing IsActive="{Binding IsLoading}" Width="18" Height="18"
-                              VerticalAlignment="Center" />
-                <Button x:Name="RunButton"
-                        Content="Run File to Folder"
-                        Style="{ThemeResource AccentButtonStyle}"
-                        Click="OnRunClick" />
-            </StackPanel>
+                <!-- Empty-state overlay -->
+                <StackPanel x:Name="EmptyState"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="14"
+                            Padding="24"
+                            Visibility="Collapsed">
+                    <FontIcon Glyph="&#xE8B7;" FontSize="56"
+                              Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                    <TextBlock Text="No files in the queue yet"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="Drop a folder here, click + Add Files / + Add Folder above, or come back from Step 1."
+                               FontSize="12"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               HorizontalAlignment="Center"
+                               TextWrapping="Wrap"
+                               MaxWidth="360" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Footer -->
+            <Grid Grid.Row="3" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,4,0,0">
+                <TextBlock Text="{Binding StatusMessage}"
+                           FontSize="11"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <ProgressRing IsActive="{Binding IsLoading}" Width="18" Height="18"
+                                  VerticalAlignment="Center" />
+                    <Button x:Name="RunButton"
+                            Content="Run File to Folder"
+                            Style="{ThemeResource AccentButtonStyle}"
+                            Click="OnRunClick" />
+                </StackPanel>
+            </Grid>
         </Grid>
+
+        <!-- Drag-drop overlay -->
+        <Border x:Name="DragOverlay"
+                Background="#CC000000"
+                Visibility="Collapsed"
+                IsHitTestVisible="False"
+                CornerRadius="6">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                <FontIcon Glyph="&#xE8B7;" FontSize="56" Foreground="White" />
+                <TextBlock Text="Drop folder or files to add"
+                           FontSize="20"
+                           FontWeight="SemiBold"
+                           Foreground="White"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

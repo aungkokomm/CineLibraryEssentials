@@ -96,11 +96,14 @@ public class RenameService
     public async Task<ProcessingResult> RenameInPlaceAsync(
         IEnumerable<FilePreview> previews,
         bool renameParentFolders = false,
-        string? sourceFolder = null)
+        string? sourceFolder = null,
+        bool cleanEmbeddedMetadata = false,
+        List<UndoService.RenameRecord>? undoLog = null)
     {
         var previewsList = previews.ToList();
         var result = new ProcessingResult { Success = true };
         var companionExtensions = new[] { ".srt", ".sub", ".ass", ".ssa", ".vtt", ".idx" };
+        var metadataCleaner = cleanEmbeddedMetadata ? new MetadataCleanerService() : null;
 
         // ---- Pass 1: rename files in their current folder ----
         foreach (var p in previewsList)
@@ -145,10 +148,12 @@ public class RenameService
 
             try
             {
-                await Task.Run(() => File.Move(p.OriginalFilePath, newPath));
+                var oldFilePath = p.OriginalFilePath;
+                await Task.Run(() => File.Move(oldFilePath, newPath));
+                undoLog?.Add(new UndoService.RenameRecord(oldFilePath, newPath, IsDirectory: false));
 
                 // Rename companion files (same base name, different extension)
-                var oldBase = Path.GetFileNameWithoutExtension(p.OriginalFilePath);
+                var oldBase = Path.GetFileNameWithoutExtension(oldFilePath);
                 var newBase = Path.GetFileNameWithoutExtension(p.CleanedName);
                 foreach (var ext in companionExtensions)
                 {
@@ -156,11 +161,28 @@ public class RenameService
                     if (!File.Exists(oldCompanion)) continue;
                     var newCompanion = Path.Combine(dir, newBase + ext);
                     if (File.Exists(newCompanion)) continue;
-                    try { await Task.Run(() => File.Move(oldCompanion, newCompanion)); }
+                    try
+                    {
+                        await Task.Run(() => File.Move(oldCompanion, newCompanion));
+                        undoLog?.Add(new UndoService.RenameRecord(oldCompanion, newCompanion, IsDirectory: false));
+                    }
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine(
                             $"Companion rename failed: {oldCompanion} -> {newCompanion}: {ex.Message}");
+                    }
+                }
+
+                // Optionally scrub embedded container metadata (sets Title to clean name,
+                // clears Comment/Description/etc.)
+                if (metadataCleaner != null)
+                {
+                    var metaTitle = Path.GetFileNameWithoutExtension(p.CleanedName);
+                    var metaResult = metadataCleaner.Clean(newPath, metaTitle);
+                    if (!metaResult.Success && !string.IsNullOrEmpty(metaResult.Error))
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"Metadata clean failed for {newPath}: {metaResult.Error}");
                     }
                 }
 
@@ -224,6 +246,7 @@ public class RenameService
                 try
                 {
                     await Task.Run(() => Directory.Move(parentPath, newParentPath));
+                    undoLog?.Add(new UndoService.RenameRecord(parentPath, newParentPath, IsDirectory: true));
 
                     // Update file paths inside the renamed folder
                     foreach (var inner in group)
