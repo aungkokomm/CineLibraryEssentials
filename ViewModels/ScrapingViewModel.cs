@@ -27,6 +27,29 @@ public partial class ScrapingViewModel : ObservableObject
     {
         _parentViewModel = parentViewModel;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+
+        // Watch for items added/removed so we can subscribe / unsubscribe to their
+        // PropertyChanged — needed to keep the All/None toggle states accurate.
+        MovieFolders.CollectionChanged += (_, e) =>
+        {
+            if (e.NewItems != null)
+                foreach (MovieFolderItem item in e.NewItems)
+                    item.PropertyChanged += OnMovieItemPropertyChanged;
+            if (e.OldItems != null)
+                foreach (MovieFolderItem item in e.OldItems)
+                    item.PropertyChanged -= OnMovieItemPropertyChanged;
+            OnPropertyChanged(nameof(IsAllSelected));
+            OnPropertyChanged(nameof(IsNoneSelected));
+        };
+    }
+
+    private void OnMovieItemPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MovieFolderItem.IsSelected))
+        {
+            OnPropertyChanged(nameof(IsAllSelected));
+            OnPropertyChanged(nameof(IsNoneSelected));
+        }
     }
 
     /// <summary>
@@ -67,33 +90,51 @@ public partial class ScrapingViewModel : ObservableObject
             picker.FileTypeFilter.Add("*");
 
             var folder = await picker.PickSingleFolderAsync();
-            if (folder == null)
-                return;
+            if (folder == null) return;
 
-            // If user picks a parent folder containing several movie folders, add each child
-            // folder that contains a video. Otherwise, add the picked folder itself.
-            var subFolders = Directory.GetDirectories(folder.Path)
-                .Where(HasVideoFile)
-                .ToList();
-
-            if (subFolders.Count > 0)
-            {
-                foreach (var sub in subFolders)
-                {
-                    if (MovieFolders.Any(m => string.Equals(m.FolderPath, sub, StringComparison.OrdinalIgnoreCase)))
-                        continue;
-                    MovieFolders.Add(CreateMovieItem(sub));
-                }
-            }
-            else if (HasVideoFile(folder.Path))
-            {
-                if (!MovieFolders.Any(m => string.Equals(m.FolderPath, folder.Path, StringComparison.OrdinalIgnoreCase)))
-                    MovieFolders.Add(CreateMovieItem(folder.Path));
-            }
+            AddFromRootFolder(folder.Path);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Error adding folder: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Recursively finds every folder under <paramref name="rootPath"/> that contains
+    /// at least one video file (at any depth) and adds each one as a movie item.
+    /// Handles arbitrary nesting like Genre/Year/Movie/file.mkv.
+    /// </summary>
+    public void AddFromRootFolder(string rootPath)
+    {
+        if (string.IsNullOrEmpty(rootPath) || !Directory.Exists(rootPath)) return;
+
+        foreach (var movieFolder in EnumerateMovieFolders(rootPath))
+        {
+            if (MovieFolders.Any(m => string.Equals(m.FolderPath, movieFolder, StringComparison.OrdinalIgnoreCase)))
+                continue;
+            MovieFolders.Add(CreateMovieItem(movieFolder));
+        }
+    }
+
+    /// <summary>
+    /// Walks the directory tree from <paramref name="root"/> and yields every folder
+    /// whose immediate files include a video. The root itself is checked too.
+    /// </summary>
+    public static IEnumerable<string> EnumerateMovieFolders(string root)
+    {
+        if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) yield break;
+
+        // Check root itself
+        if (HasVideoFile(root)) yield return root;
+
+        string[] subDirs;
+        try { subDirs = Directory.GetDirectories(root, "*", SearchOption.AllDirectories); }
+        catch { yield break; }
+
+        foreach (var sub in subDirs)
+        {
+            if (HasVideoFile(sub)) yield return sub;
         }
     }
 
@@ -253,8 +294,41 @@ public partial class ScrapingViewModel : ObservableObject
             Status = (hasNfo && existingPoster != null) ? "Already scraped" : "Ready",
             IsScraped = hasNfo && existingPoster != null,
             PosterPath = existingPoster,
-            IsSelected = !(hasNfo && existingPoster != null)  // don't pre-check already-scraped
+            // Always default to UNCHECKED — user picks which movies to scrape via the
+            // checkbox or the All/None toggles. Avoids the "uncheck 100 items manually"
+            // problem when most are already scraped.
+            IsSelected = false
         };
+    }
+
+    /// <summary>True when every item is selected. Drives the All toggle's pressed state.</summary>
+    public bool IsAllSelected => MovieFolders.Count > 0 && MovieFolders.All(m => m.IsSelected);
+
+    /// <summary>True when no item is selected. Drives the None toggle's pressed state.</summary>
+    public bool IsNoneSelected => MovieFolders.Count == 0 || MovieFolders.All(m => !m.IsSelected);
+
+    [RelayCommand]
+    public void SelectAll()
+    {
+        foreach (var m in MovieFolders)
+        {
+            if (m.IsSelected) m.IsSelected = false;
+            m.IsSelected = true;
+        }
+        OnPropertyChanged(nameof(IsAllSelected));
+        OnPropertyChanged(nameof(IsNoneSelected));
+    }
+
+    [RelayCommand]
+    public void SelectNone()
+    {
+        foreach (var m in MovieFolders)
+        {
+            if (!m.IsSelected) m.IsSelected = true;
+            m.IsSelected = false;
+        }
+        OnPropertyChanged(nameof(IsAllSelected));
+        OnPropertyChanged(nameof(IsNoneSelected));
     }
 
     /// <summary>Manually adds a single folder to the scraping list.</summary>

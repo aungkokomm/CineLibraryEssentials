@@ -75,24 +75,18 @@
                          Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          MinWidth="180"
                          VerticalAlignment="Center" />
-                <Button Grid.Column="1"
-                        Click="OnSelectAllClick"
-                        VerticalAlignment="Center"
-                        ToolTipService.ToolTip="Select all visible rows (Ctrl+A)">
-                    <StackPanel Orientation="Horizontal" Spacing="4">
-                        <FontIcon Glyph="&#xE73A;" FontSize="12" />
-                        <TextBlock Text="All" FontSize="12" />
-                    </StackPanel>
-                </Button>
-                <Button Grid.Column="2"
-                        Click="OnSelectNoneClick"
-                        VerticalAlignment="Center"
-                        ToolTipService.ToolTip="Deselect all visible rows">
-                    <StackPanel Orientation="Horizontal" Spacing="4">
-                        <FontIcon Glyph="&#xE739;" FontSize="12" />
-                        <TextBlock Text="None" FontSize="12" />
-                    </StackPanel>
-                </Button>
+                <CheckBox Grid.Column="1"
+                          x:Name="AllCheckBox"
+                          Content="All"
+                          Click="OnSelectAllClick"
+                          VerticalAlignment="Center"
+                          ToolTipService.ToolTip="Select all rows (Ctrl+A)" />
+                <CheckBox Grid.Column="2"
+                          x:Name="NoneCheckBox"
+                          Content="None"
+                          Click="OnSelectNoneClick"
+                          VerticalAlignment="Center"
+                          ToolTipService.ToolTip="Deselect all rows" />
 
                 <ComboBox Grid.Column="4"
                           SelectedItem="{Binding ConfidenceFilter, Mode=TwoWay}"
