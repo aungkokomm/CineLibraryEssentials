@@ -65,17 +65,19 @@
                             <ItemsPanelTemplate>
                                 <controls:WrapGrid xmlns:controls="using:Microsoft.UI.Xaml.Controls"
                                                    Orientation="Horizontal"
-                                                   ItemWidth="200"
-                                                   ItemHeight="320" />
+                                                   ItemWidth="140"
+                                                   ItemHeight="240" />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Margin="6"
+                                <Border Margin="4"
                                         BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="6"
-                                        Background="{ThemeResource LayerFillColorDefaultBrush}">
+                                        CornerRadius="4"
+                                        Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                        DoubleTapped="OnCardDoubleTapped"
+                                        Tag="{Binding}">
                                     <Border.ContextFlyout>
                                         <MenuFlyout>
                                             <MenuFlyoutItem Text="Search TMDb..."
@@ -93,7 +95,7 @@
                                             </MenuFlyoutItem>
                                         </MenuFlyout>
                                     </Border.ContextFlyout>
-                                    <Grid RowDefinitions="200,Auto,*">
+                                    <Grid RowDefinitions="190,*">
 
                                         <!-- Poster (or placeholder) -->
                                         <Grid Grid.Row="0">
@@ -103,78 +105,74 @@
                                             <Border Background="{ThemeResource ControlFillColorTertiaryBrush}"
                                                     Visibility="{Binding PosterPath, Converter={StaticResource StringEmptyToVisibilityConverter}}">
                                                 <FontIcon Glyph="&#xE8B2;"
-                                                          FontSize="50"
+                                                          FontSize="38"
                                                           HorizontalAlignment="Center"
                                                           VerticalAlignment="Center"
                                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                                             </Border>
                                             <!-- Selection checkbox -->
                                             <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                                      HorizontalAlignment="Right"
+                                                      HorizontalAlignment="Left"
                                                       VerticalAlignment="Top"
-                                                      Margin="6"
+                                                      Margin="4"
+                                                      MinWidth="0"
                                                       Background="#88000000" />
                                             <!-- Status pill bottom-left -->
-                                            <Border CornerRadius="10"
-                                                    Padding="8,2"
+                                            <Border CornerRadius="8"
+                                                    Padding="6,1"
                                                     HorizontalAlignment="Left"
                                                     VerticalAlignment="Bottom"
-                                                    Margin="6">
+                                                    Margin="4">
                                                 <Border.Background>
                                                     <SolidColorBrush Color="{Binding Status, Converter={StaticResource ScrapingStatusColorConverter}}" />
                                                 </Border.Background>
                                                 <TextBlock Text="{Binding Status}"
                                                            Foreground="White"
                                                            FontWeight="SemiBold"
-                                                           FontSize="10" />
+                                                           FontSize="9" />
                                             </Border>
+                                            <!-- Hover overlay with quick actions -->
+                                            <Grid x:Name="HoverActions"
+                                                  Background="#AA000000"
+                                                  Opacity="0"
+                                                  PointerEntered="OnCardPointerEntered"
+                                                  PointerExited="OnCardPointerExited">
+                                                <StackPanel Orientation="Horizontal"
+                                                            Spacing="6"
+                                                            HorizontalAlignment="Center"
+                                                            VerticalAlignment="Center">
+                                                    <Button Tag="{Binding}"
+                                                            Click="OnScrapeRowClick"
+                                                            Padding="8,4"
+                                                            ToolTipService.ToolTip="Scrape">
+                                                        <FontIcon Glyph="&#xE721;" FontSize="13" />
+                                                    </Button>
+                                                    <Button Tag="{Binding}"
+                                                            Click="OnOpenRowClick"
+                                                            Padding="8,4"
+                                                            ToolTipService.ToolTip="Open folder">
+                                                        <FontIcon Glyph="&#xE838;" FontSize="13" />
+                                                    </Button>
+                                                    <Button Tag="{Binding}"
+                                                            Click="OnRemoveRowClick"
+                                                            Padding="8,4"
+                                                            ToolTipService.ToolTip="Remove">
+                                                        <FontIcon Glyph="&#xE74D;" FontSize="13" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </Grid>
                                         </Grid>
 
                                         <!-- Title + year -->
-                                        <StackPanel Grid.Row="1" Padding="10,8,10,4" Spacing="2">
-                                            <TextBlock Text="{Binding DisplayName}"
-                                                       FontWeight="SemiBold"
-                                                       FontSize="13"
-                                                       MaxLines="2"
-                                                       TextWrapping="Wrap"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       ToolTipService.ToolTip="{Binding DisplayName}" />
-                                            <TextBlock Text="{Binding FolderPath}"
-                                                       FontSize="10"
-                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                                       MaxLines="1"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       ToolTipService.ToolTip="{Binding FolderPath}" />
-                                        </StackPanel>
-
-                                        <!-- Action buttons -->
-                                        <StackPanel Grid.Row="2"
-                                                    Orientation="Horizontal"
-                                                    Spacing="4"
-                                                    Padding="10,4,10,10"
-                                                    HorizontalAlignment="Stretch">
-                                            <Button Tag="{Binding}"
-                                                    Click="OnScrapeRowClick"
-                                                    HorizontalAlignment="Stretch"
-                                                    Style="{ThemeResource AccentButtonStyle}">
-                                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <FontIcon Glyph="&#xE721;" FontSize="11" />
-                                                    <TextBlock Text="Scrape" FontSize="11" />
-                                                </StackPanel>
-                                            </Button>
-                                            <Button Tag="{Binding}"
-                                                    Click="OnOpenRowClick"
-                                                    Padding="8,4"
-                                                    ToolTipService.ToolTip="Open folder">
-                                                <FontIcon Glyph="&#xE838;" FontSize="11" />
-                                            </Button>
-                                            <Button Tag="{Binding}"
-                                                    Click="OnRemoveRowClick"
-                                                    Padding="8,4"
-                                                    ToolTipService.ToolTip="Remove from list">
-                                                <FontIcon Glyph="&#xE74D;" FontSize="11" />
-                                            </Button>
-                                        </StackPanel>
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding DisplayName}"
+                                                   Padding="6,4"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="11"
+                                                   MaxLines="2"
+                                                   TextWrapping="Wrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTipService.ToolTip="{Binding FolderPath}" />
                                     </Grid>
                                 </Border>
                             </DataTemplate>

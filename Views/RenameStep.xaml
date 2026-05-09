@@ -21,7 +21,7 @@
                      x:Name="WarningInfoBar"
                      Severity="Informational"
                      Title="Tip"
-                     Message="Review Low / Medium confidence rows before renaming. Renames are permanent — there is a 30-second Undo toast after each batch."
+                     Message="Already-clean files are hidden by default — toggle 'Modified only' off to see them. Review Low / Medium confidence rows carefully; you have a 30-second Undo after each rename batch."
                      IsOpen="True"
                      IsClosable="True"
                      CloseButtonClick="OnWarningInfoBarClosed" />
@@ -69,14 +69,32 @@
             </Grid>
 
             <!-- ============ Toolbar: search, filter, find/replace ============ -->
-            <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
+            <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
                 <TextBox Grid.Column="0"
                          PlaceholderText="🔍 Search"
                          Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          MinWidth="180"
                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Click="OnSelectAllClick"
+                        VerticalAlignment="Center"
+                        ToolTipService.ToolTip="Select all visible rows (Ctrl+A)">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE73A;" FontSize="12" />
+                        <TextBlock Text="All" FontSize="12" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="2"
+                        Click="OnSelectNoneClick"
+                        VerticalAlignment="Center"
+                        ToolTipService.ToolTip="Deselect all visible rows">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE739;" FontSize="12" />
+                        <TextBlock Text="None" FontSize="12" />
+                    </StackPanel>
+                </Button>
 
-                <ComboBox Grid.Column="2"
+                <ComboBox Grid.Column="4"
                           SelectedItem="{Binding ConfidenceFilter, Mode=TwoWay}"
                           VerticalAlignment="Center"
                           MinWidth="130"
@@ -89,7 +107,7 @@
                     <x:String>Needs renaming</x:String>
                 </ComboBox>
 
-                <ToggleButton Grid.Column="3"
+                <ToggleButton Grid.Column="5"
                               IsChecked="{Binding HideUnchanged, Mode=TwoWay}"
                               VerticalAlignment="Center"
                               ToolTipService.ToolTip="Hide rows whose cleaned name already matches the original">
@@ -99,30 +117,27 @@
                     </StackPanel>
                 </ToggleButton>
 
-                <TextBox Grid.Column="4"
+                <TextBox Grid.Column="6"
                          PlaceholderText="Find"
                          Text="{Binding FindText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          MinWidth="100"
                          VerticalAlignment="Center" />
-                <TextBox Grid.Column="5"
+                <TextBox Grid.Column="7"
                          PlaceholderText="Replace"
                          Text="{Binding ReplaceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          MinWidth="100"
                          VerticalAlignment="Center" />
-                <Button Grid.Column="6"
+                <Button Grid.Column="8"
                         Content="Replace"
                         Click="OnFindReplaceClick"
                         VerticalAlignment="Center" />
 
-                <Button Grid.Column="7"
+                <Button Grid.Column="9"
                         VerticalAlignment="Center"
                         ToolTipService.ToolTip="More actions">
                     <FontIcon Glyph="&#xE712;" FontSize="14" />
                     <Button.Flyout>
                         <MenuFlyout>
-                            <MenuFlyoutItem Text="Select All  (Ctrl+A)" Click="OnSelectAllClick" />
-                            <MenuFlyoutItem Text="Select None" Click="OnSelectNoneClick" />
-                            <MenuFlyoutSeparator />
                             <MenuFlyoutItem Text="Apply Smart Title Case" Click="OnApplyTitleCaseClick" />
                             <MenuFlyoutItem Text="Reset Auto-Cleaning" Click="OnResetClick" />
                         </MenuFlyout>

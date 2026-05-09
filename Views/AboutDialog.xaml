@@ -31,13 +31,29 @@
                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
         <!-- Links -->
-        <StackPanel Spacing="8">
+        <StackPanel Spacing="2">
+            <HyperlinkButton NavigateUri="https://aungkokomm.github.io/cinelibraryessentials/guide/"
+                             Padding="0">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE82D;" FontSize="14" />
+                    <TextBlock Text="📖 User Guide" />
+                </StackPanel>
+            </HyperlinkButton>
+
+            <HyperlinkButton NavigateUri="https://aungkokomm.github.io/cinelibraryessentials/"
+                             Padding="0">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE774;" FontSize="14" />
+                    <TextBlock Text="🌐 Project page" />
+                </StackPanel>
+            </HyperlinkButton>
+
             <HyperlinkButton x:Name="GitHubLink"
-                             NavigateUri="https://github.com/aungkokomm"
+                             NavigateUri="https://github.com/aungkokomm/CineLibraryEssentials"
                              Padding="0">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <FontIcon Glyph="&#xE71B;" FontSize="14" />
-                    <TextBlock Text="github.com/aungkokomm" />
+                    <TextBlock Text="GitHub repo · github.com/aungkokomm" />
                 </StackPanel>
             </HyperlinkButton>
 

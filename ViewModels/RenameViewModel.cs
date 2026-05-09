@@ -56,8 +56,12 @@ public partial class RenameViewModel : ObservableObject
     [ObservableProperty]
     private bool cleanEmbeddedMetadata;
 
+    /// <summary>
+    /// When true, rows where CleanedName already matches OriginalName are hidden.
+    /// Defaults to ON so users only see files that actually need renaming.
+    /// </summary>
     [ObservableProperty]
-    private bool hideUnchanged;
+    private bool hideUnchanged = true;
 
     [ObservableProperty]
     private string sortColumn = "Confidence";
@@ -71,6 +75,7 @@ public partial class RenameViewModel : ObservableObject
     [ObservableProperty] private int warningCount;
     [ObservableProperty] private int duplicateCount;
     [ObservableProperty] private int selectedCount;
+    [ObservableProperty] private int alreadyCleanCount;
 
     [ObservableProperty]
     private string statsSummary = "No files loaded";
@@ -306,11 +311,29 @@ public partial class RenameViewModel : ObservableObject
         WarningCount = AllPreviews.Count(p => p.HasWarning);
         DuplicateCount = AllPreviews.Count(p => p.IsDuplicate);
         SelectedCount = AllPreviews.Count(p => p.IsSelected);
+        AlreadyCleanCount = AllPreviews.Count(p =>
+            string.Equals(p.OriginalName, p.CleanedName, StringComparison.Ordinal));
 
-        StatsSummary = AllPreviews.Count == 0
-            ? "No files loaded"
-            : $"{TotalCount} files · {SelectedCount} selected · {WarningCount} warning{(WarningCount == 1 ? "" : "s")}"
-              + (DuplicateCount > 0 ? $" · {DuplicateCount} duplicate{(DuplicateCount == 1 ? "" : "s")}" : "");
+        if (AllPreviews.Count == 0)
+        {
+            StatsSummary = "No files loaded";
+            return;
+        }
+
+        var parts = new List<string> { $"{TotalCount} file{(TotalCount == 1 ? "" : "s")}" };
+
+        if (HideUnchanged && AlreadyCleanCount > 0)
+            parts.Add($"{AlreadyCleanCount} already clean (hidden)");
+
+        parts.Add($"{SelectedCount} selected");
+
+        if (WarningCount > 0)
+            parts.Add($"{WarningCount} warning{(WarningCount == 1 ? "" : "s")}");
+
+        if (DuplicateCount > 0)
+            parts.Add($"{DuplicateCount} duplicate{(DuplicateCount == 1 ? "" : "s")}");
+
+        StatsSummary = string.Join(" · ", parts);
     }
 
     // -----------------------------------------------------------------
