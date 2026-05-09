@@ -38,26 +38,37 @@ public sealed partial class WizardPage : Page
     //  Step pill clicks (with validation when moving forward)
     // -----------------------------------------------------------------
 
-    private async void OnStep1Click(object sender, RoutedEventArgs e) => GoToStep(0);
+    private void OnStep1Click(object sender, RoutedEventArgs e) => GoToStep(0);
 
-    private async void OnStep2Click(object sender, RoutedEventArgs e)
+    // Step 2 supports manual + Add Files / + Add Folder, so direct nav is fine.
+    // We still hand off Step 1's data (best-effort, no blocking) so the user gets
+    // a populated list if they came from Step 1 normally.
+    private void OnStep2Click(object sender, RoutedEventArgs e)
     {
-        // Going from Step 1 → Step 2 needs the rename data validated
-        if (_viewModel.CurrentStep == 0)
-        {
-            if (!await ValidateRenameStepAsync()) return;
-        }
+        TryHandOffRenameStepData();
         GoToStep(1);
     }
 
-    private async void OnStep3Click(object sender, RoutedEventArgs e)
+    // Step 3 supports manual + Add Folder + drag-drop. Direct nav is fine —
+    // useful when the user has an already-organised library and just wants to scrape.
+    private void OnStep3Click(object sender, RoutedEventArgs e) => GoToStep(2);
+
+    /// <summary>
+    /// Pushes Step 1's selected rename previews into the parent VM if they're valid.
+    /// Silent on failure — if there's nothing to hand off, Step 2 will simply show
+    /// its empty state and the user can use Add Files / Add Folder / drag-drop.
+    /// </summary>
+    private void TryHandOffRenameStepData()
     {
-        if (_viewModel.CurrentStep == 0)
-        {
-            if (!await ValidateRenameStepAsync()) return;
-        }
-        // Step 3 normally flows from Step 2 via OperationCompleted, but allow direct nav too
-        GoToStep(2);
+        if (_renameViewModel == null) return;
+        if (string.IsNullOrEmpty(_renameViewModel.SourceFolderPath)) return;
+
+        var selected = _renameViewModel.AllPreviews.Where(p => p.IsSelected).ToList();
+        if (selected.Count == 0) return;
+        if (_renameViewModel.DuplicateCount > 0) return;
+
+        _viewModel.SelectedSourceFolder = _renameViewModel.SourceFolderPath;
+        _viewModel.SetRenamePreview(selected);
     }
 
     private void OnPreviousClick(object sender, RoutedEventArgs e)
@@ -121,45 +132,4 @@ public sealed partial class WizardPage : Page
         }
     }
 
-    // -----------------------------------------------------------------
-    //  Step 1 → Step 2 validation
-    // -----------------------------------------------------------------
-
-    private async Task<bool> ValidateRenameStepAsync()
-    {
-        if (string.IsNullOrEmpty(_renameViewModel.SourceFolderPath))
-        {
-            await ShowErrorAsync("Please select a source folder.");
-            return false;
-        }
-
-        var selected = _renameViewModel.AllPreviews.Where(p => p.IsSelected).ToList();
-        if (selected.Count == 0)
-        {
-            await ShowErrorAsync("No files selected.");
-            return false;
-        }
-
-        if (_renameViewModel.DuplicateCount > 0)
-        {
-            await ShowErrorAsync($"Resolve {_renameViewModel.DuplicateCount} duplicate name(s) before continuing.");
-            return false;
-        }
-
-        _viewModel.SelectedSourceFolder = _renameViewModel.SourceFolderPath;
-        _viewModel.SetRenamePreview(selected);
-        return true;
-    }
-
-    private async Task ShowErrorAsync(string message)
-    {
-        var dialog = new ContentDialog
-        {
-            Title = "CineLibrary",
-            Content = message,
-            CloseButtonText = "OK",
-            XamlRoot = Content.XamlRoot
-        };
-        await dialog.ShowAsync();
-    }
 }

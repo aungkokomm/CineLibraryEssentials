@@ -128,6 +128,26 @@ public sealed partial class ScrapingStep : UserControl
     }
 
     // -----------------------------------------------------------------
+    //  Card hover effect + double-tap to scrape
+    // -----------------------------------------------------------------
+
+    private void OnCardPointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is Grid g) g.Opacity = 1;
+    }
+
+    private void OnCardPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is Grid g) g.Opacity = 0;
+    }
+
+    private async void OnCardDoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
+    {
+        if (sender is Border b && b.Tag is MovieFolderItem item)
+            await OpenTmdbDialogForAsync(item);
+    }
+
+    // -----------------------------------------------------------------
     //  Context menu (works for both views since we use DataContext)
     // -----------------------------------------------------------------
 
