@@ -168,6 +168,8 @@ public partial class RenameViewModel : ObservableObject
             ValidateAll();
             UpdateStats();
             OnPropertyChanged(nameof(PendingRenameCount));
+            OnPropertyChanged(nameof(IsAllSelected));
+            OnPropertyChanged(nameof(IsNoneSelected));
         }
     }
 
@@ -341,15 +343,23 @@ public partial class RenameViewModel : ObservableObject
     // -----------------------------------------------------------------
 
     [RelayCommand]
-    public void SelectAll()
-    {
-        foreach (var p in FilePreviews) p.IsSelected = true;
-    }
+    public void SelectAll() => SetAllSelection(true);
 
     [RelayCommand]
-    public void SelectNone()
+    public void SelectNone() => SetAllSelection(false);
+
+    private void SetAllSelection(bool value)
     {
-        foreach (var p in FilePreviews) p.IsSelected = false;
+        foreach (var p in AllPreviews)
+        {
+            if (p.IsSelected == value) p.IsSelected = !value;
+            p.IsSelected = value;
+        }
+        // Final notifications — guarantees the master toggles update even if the
+        // intermediate property changes were debounced by a binding system.
+        OnPropertyChanged(nameof(IsAllSelected));
+        OnPropertyChanged(nameof(IsNoneSelected));
+        ApplyFilter();
     }
 
     [RelayCommand]
@@ -428,6 +438,12 @@ public partial class RenameViewModel : ObservableObject
         .Count(p => p.IsSelected
                  && !string.IsNullOrWhiteSpace(p.CleanedName)
                  && !string.Equals(p.OriginalName, p.CleanedName, StringComparison.Ordinal));
+
+    /// <summary>True when every row is selected. Drives the "All" toggle's pressed state.</summary>
+    public bool IsAllSelected => AllPreviews.Count > 0 && AllPreviews.All(p => p.IsSelected);
+
+    /// <summary>True when no row is selected. Drives the "None" toggle's pressed state.</summary>
+    public bool IsNoneSelected => AllPreviews.Count == 0 || AllPreviews.All(p => !p.IsSelected);
 
     /// <summary>
     /// Performs the actual rename on disk for selected rows whose CleanedName

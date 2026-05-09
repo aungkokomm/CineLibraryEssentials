@@ -11,9 +11,9 @@
         <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
 
             <!-- Toolbar -->
-            <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="6">
                 <Button Click="OnAddFolderClick"
-                        ToolTipService.ToolTip="Add a movie folder">
+                        ToolTipService.ToolTip="Add a movie folder (recursively scans for videos)">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <FontIcon Glyph="&#xE710;" FontSize="13" />
                         <TextBlock Text="Add Folder" FontSize="13" />
@@ -27,14 +27,26 @@
                         <TextBlock Text="Clear" FontSize="12" />
                     </StackPanel>
                 </Button>
-                <ToggleButton Grid.Column="2"
+                <CheckBox Grid.Column="2"
+                          x:Name="AllCheckBox"
+                          Content="All"
+                          Click="OnSelectAllClick"
+                          VerticalAlignment="Center"
+                          ToolTipService.ToolTip="Select all movies" />
+                <CheckBox Grid.Column="3"
+                          x:Name="NoneCheckBox"
+                          Content="None"
+                          Click="OnSelectNoneClick"
+                          VerticalAlignment="Center"
+                          ToolTipService.ToolTip="Deselect all movies" />
+                <ToggleButton Grid.Column="4"
                               x:Name="ListViewToggle"
                               IsChecked="False"
                               Click="OnViewToggleClick"
                               ToolTipService.ToolTip="Switch to list view">
                     <FontIcon Glyph="&#xE8FD;" FontSize="13" />
                 </ToggleButton>
-                <TextBlock Grid.Column="3"
+                <TextBlock Grid.Column="5"
                            x:Name="StatusText"
                            Text="{Binding StatusMessage}"
                            VerticalAlignment="Center"
@@ -42,7 +54,7 @@
                            Margin="8,0,0,0"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                            TextTrimming="CharacterEllipsis" />
-                <Button Grid.Column="4"
+                <Button Grid.Column="6"
                         Content="Scrape Selected (auto)"
                         Click="OnScrapeSelectedClick"
                         ToolTipService.ToolTip="Auto-scrape every checked movie using the first TMDb match" />
@@ -55,129 +67,125 @@
                   CornerRadius="4"
                   Padding="2">
 
-                <!-- Card grid (default) -->
-                <ScrollViewer x:Name="GridScroll"
+                <!-- Card grid (default) — ItemsRepeater + UniformGridLayout for true auto-fit -->
+                <ScrollViewer x:Name="MovieGrid"
                               HorizontalScrollMode="Disabled"
-                              VerticalScrollBarVisibility="Auto">
-                    <ItemsControl x:Name="MovieGrid"
-                                  ItemsSource="{Binding MovieFolders}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <controls:WrapGrid xmlns:controls="using:Microsoft.UI.Xaml.Controls"
-                                                   Orientation="Horizontal"
-                                                   ItemWidth="140"
-                                                   ItemHeight="240" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
+                              VerticalScrollBarVisibility="Auto"
+                              Padding="6">
+                    <ItemsRepeater ItemsSource="{Binding MovieFolders}">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="140"
+                                               MinItemHeight="260"
+                                               MinRowSpacing="6"
+                                               MinColumnSpacing="6"
+                                               ItemsStretch="Fill" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
                             <DataTemplate>
-                                <Border Margin="4"
+                                <Border Height="260"
                                         BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                                         BorderThickness="1"
                                         CornerRadius="4"
                                         Background="{ThemeResource LayerFillColorDefaultBrush}"
                                         DoubleTapped="OnCardDoubleTapped"
                                         Tag="{Binding}">
-                                    <Border.ContextFlyout>
-                                        <MenuFlyout>
-                                            <MenuFlyoutItem Text="Search TMDb..."
-                                                            Click="OnContextScrapeClick">
-                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE721;" /></MenuFlyoutItem.Icon>
-                                            </MenuFlyoutItem>
-                                            <MenuFlyoutItem Text="Open Folder"
-                                                            Click="OnContextOpenClick">
-                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE838;" /></MenuFlyoutItem.Icon>
-                                            </MenuFlyoutItem>
-                                            <MenuFlyoutSeparator />
-                                            <MenuFlyoutItem Text="Remove from List"
-                                                            Click="OnContextRemoveClick">
-                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;" /></MenuFlyoutItem.Icon>
-                                            </MenuFlyoutItem>
-                                        </MenuFlyout>
-                                    </Border.ContextFlyout>
-                                    <Grid RowDefinitions="190,*">
+                                <Border.ContextFlyout>
+                                    <MenuFlyout>
+                                        <MenuFlyoutItem Text="Search TMDb..."
+                                                        Click="OnContextScrapeClick">
+                                            <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE721;" /></MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutItem Text="Open Folder"
+                                                        Click="OnContextOpenClick">
+                                            <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE838;" /></MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutSeparator />
+                                        <MenuFlyoutItem Text="Remove from List"
+                                                        Click="OnContextRemoveClick">
+                                            <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;" /></MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                    </MenuFlyout>
+                                </Border.ContextFlyout>
+                                <Grid RowDefinitions="170,*,Auto">
 
-                                        <!-- Poster (or placeholder) -->
-                                        <Grid Grid.Row="0">
-                                            <Image Source="{Binding PosterPath}"
-                                                   Stretch="UniformToFill"
-                                                   Visibility="{Binding PosterPath, Converter={StaticResource StringNonEmptyToVisibilityConverter}}" />
-                                            <Border Background="{ThemeResource ControlFillColorTertiaryBrush}"
-                                                    Visibility="{Binding PosterPath, Converter={StaticResource StringEmptyToVisibilityConverter}}">
-                                                <FontIcon Glyph="&#xE8B2;"
-                                                          FontSize="38"
-                                                          HorizontalAlignment="Center"
-                                                          VerticalAlignment="Center"
-                                                          Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                                            </Border>
-                                            <!-- Selection checkbox -->
+                                    <!-- Poster (or placeholder) -->
+                                    <Grid Grid.Row="0">
+                                        <Image Source="{Binding PosterPath}"
+                                               Stretch="UniformToFill"
+                                               Visibility="{Binding PosterPath, Converter={StaticResource StringNonEmptyToVisibilityConverter}}" />
+                                        <Border Background="{ThemeResource ControlFillColorTertiaryBrush}"
+                                                Visibility="{Binding PosterPath, Converter={StaticResource StringEmptyToVisibilityConverter}}">
+                                            <FontIcon Glyph="&#xE8B2;"
+                                                      FontSize="36"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                        </Border>
+                                        <!-- Selection checkbox in its own backdrop so it stays visible on any poster -->
+                                        <Border HorizontalAlignment="Left"
+                                                VerticalAlignment="Top"
+                                                Background="#99000000"
+                                                CornerRadius="3"
+                                                Padding="2"
+                                                Margin="4">
                                             <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                                      HorizontalAlignment="Left"
-                                                      VerticalAlignment="Top"
-                                                      Margin="4"
                                                       MinWidth="0"
-                                                      Background="#88000000" />
-                                            <!-- Status pill bottom-left -->
-                                            <Border CornerRadius="8"
-                                                    Padding="6,1"
-                                                    HorizontalAlignment="Left"
-                                                    VerticalAlignment="Bottom"
-                                                    Margin="4">
-                                                <Border.Background>
-                                                    <SolidColorBrush Color="{Binding Status, Converter={StaticResource ScrapingStatusColorConverter}}" />
-                                                </Border.Background>
-                                                <TextBlock Text="{Binding Status}"
-                                                           Foreground="White"
-                                                           FontWeight="SemiBold"
-                                                           FontSize="9" />
-                                            </Border>
-                                            <!-- Hover overlay with quick actions -->
-                                            <Grid x:Name="HoverActions"
-                                                  Background="#AA000000"
-                                                  Opacity="0"
-                                                  PointerEntered="OnCardPointerEntered"
-                                                  PointerExited="OnCardPointerExited">
-                                                <StackPanel Orientation="Horizontal"
-                                                            Spacing="6"
-                                                            HorizontalAlignment="Center"
-                                                            VerticalAlignment="Center">
-                                                    <Button Tag="{Binding}"
-                                                            Click="OnScrapeRowClick"
-                                                            Padding="8,4"
-                                                            ToolTipService.ToolTip="Scrape">
-                                                        <FontIcon Glyph="&#xE721;" FontSize="13" />
-                                                    </Button>
-                                                    <Button Tag="{Binding}"
-                                                            Click="OnOpenRowClick"
-                                                            Padding="8,4"
-                                                            ToolTipService.ToolTip="Open folder">
-                                                        <FontIcon Glyph="&#xE838;" FontSize="13" />
-                                                    </Button>
-                                                    <Button Tag="{Binding}"
-                                                            Click="OnRemoveRowClick"
-                                                            Padding="8,4"
-                                                            ToolTipService.ToolTip="Remove">
-                                                        <FontIcon Glyph="&#xE74D;" FontSize="13" />
-                                                    </Button>
-                                                </StackPanel>
-                                            </Grid>
-                                        </Grid>
-
-                                        <!-- Title + year -->
-                                        <TextBlock Grid.Row="1"
-                                                   Text="{Binding DisplayName}"
-                                                   Padding="6,4"
-                                                   FontWeight="SemiBold"
-                                                   FontSize="11"
-                                                   MaxLines="2"
-                                                   TextWrapping="Wrap"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   ToolTipService.ToolTip="{Binding FolderPath}" />
+                                                      Padding="0" />
+                                        </Border>
+                                        <!-- Status pill bottom-left -->
+                                        <Border CornerRadius="8"
+                                                Padding="6,1"
+                                                HorizontalAlignment="Left"
+                                                VerticalAlignment="Bottom"
+                                                Margin="4">
+                                            <Border.Background>
+                                                <SolidColorBrush Color="{Binding Status, Converter={StaticResource ScrapingStatusColorConverter}}" />
+                                            </Border.Background>
+                                            <TextBlock Text="{Binding Status}"
+                                                       Foreground="White"
+                                                       FontWeight="SemiBold"
+                                                       FontSize="9" />
+                                        </Border>
                                     </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+
+                                    <!-- Title + year -->
+                                    <TextBlock Grid.Row="1"
+                                               Text="{Binding DisplayName}"
+                                               Padding="6,4,6,2"
+                                               FontWeight="SemiBold"
+                                               FontSize="11"
+                                               MaxLines="2"
+                                               TextWrapping="Wrap"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTipService.ToolTip="{Binding FolderPath}" />
+
+                                    <!-- Action buttons (always visible, no hover overlay) -->
+                                    <StackPanel Grid.Row="2"
+                                                Orientation="Horizontal"
+                                                Spacing="2"
+                                                HorizontalAlignment="Center"
+                                                Padding="2,2,2,4">
+                                        <Button Tag="{Binding}" Click="OnScrapeRowClick"
+                                                Padding="8,3" MinWidth="0"
+                                                ToolTipService.ToolTip="Scrape (or double-click the card)">
+                                            <FontIcon Glyph="&#xE721;" FontSize="11" />
+                                        </Button>
+                                        <Button Tag="{Binding}" Click="OnOpenRowClick"
+                                                Padding="8,3" MinWidth="0"
+                                                ToolTipService.ToolTip="Open folder">
+                                            <FontIcon Glyph="&#xE838;" FontSize="11" />
+                                        </Button>
+                                        <Button Tag="{Binding}" Click="OnRemoveRowClick"
+                                                Padding="8,3" MinWidth="0"
+                                                ToolTipService.ToolTip="Remove">
+                                            <FontIcon Glyph="&#xE74D;" FontSize="11" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
                 </ScrollViewer>
 
                 <!-- List view (toggle) -->

@@ -38,8 +38,21 @@ public sealed partial class RenameStep : UserControl
             {
                 UpdateSortIndicators();
             }
+            else if (e.PropertyName == nameof(RenameViewModel.IsAllSelected)
+                  || e.PropertyName == nameof(RenameViewModel.IsNoneSelected))
+            {
+                SyncMasterCheckBoxes();
+            }
         };
         UpdateSortIndicators();
+        SyncMasterCheckBoxes();
+    }
+
+    private void SyncMasterCheckBoxes()
+    {
+        if (_viewModel == null) return;
+        AllCheckBox.IsChecked = _viewModel.IsAllSelected;
+        NoneCheckBox.IsChecked = _viewModel.IsNoneSelected;
     }
 
     private void OnWarningInfoBarClosed(InfoBar sender, object args)
@@ -181,8 +194,17 @@ public sealed partial class RenameStep : UserControl
     //  Toolbar buttons
     // -----------------------------------------------------------------
 
-    private void OnSelectAllClick(object sender, RoutedEventArgs e) => _viewModel?.SelectAllCommand.Execute(null);
-    private void OnSelectNoneClick(object sender, RoutedEventArgs e) => _viewModel?.SelectNoneCommand.Execute(null);
+    private void OnSelectAllClick(object sender, RoutedEventArgs e)
+    {
+        _viewModel?.SelectAllCommand.Execute(null);
+        SyncMasterCheckBoxes();
+    }
+
+    private void OnSelectNoneClick(object sender, RoutedEventArgs e)
+    {
+        _viewModel?.SelectNoneCommand.Execute(null);
+        SyncMasterCheckBoxes();
+    }
     private void OnApplyTitleCaseClick(object sender, RoutedEventArgs e) => _viewModel?.ApplyTitleCaseCommand.Execute(null);
     private void OnFindReplaceClick(object sender, RoutedEventArgs e) => _viewModel?.FindAndReplaceCommand.Execute(null);
     private void OnResetClick(object sender, RoutedEventArgs e) => _viewModel?.ResetCleaningCommand.Execute(null);

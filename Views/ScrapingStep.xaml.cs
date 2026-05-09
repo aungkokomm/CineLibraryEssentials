@@ -35,7 +35,23 @@ public sealed partial class ScrapingStep : UserControl
         _viewModel = viewModel;
         DataContext = viewModel;
         viewModel.MovieFolders.CollectionChanged += (_, _) => UpdateEmptyState();
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ScrapingViewModel.IsAllSelected)
+                || e.PropertyName == nameof(ScrapingViewModel.IsNoneSelected))
+            {
+                SyncMasterCheckBoxes();
+            }
+        };
         UpdateEmptyState();
+        SyncMasterCheckBoxes();
+    }
+
+    private void SyncMasterCheckBoxes()
+    {
+        if (_viewModel == null) return;
+        AllCheckBox.IsChecked = _viewModel.IsAllSelected;
+        NoneCheckBox.IsChecked = _viewModel.IsNoneSelected;
     }
 
     public void RefreshFromOrganized()
@@ -62,12 +78,12 @@ public sealed partial class ScrapingStep : UserControl
     {
         if (view == "List")
         {
-            GridScroll.Visibility = Visibility.Collapsed;
+            MovieGrid.Visibility = Visibility.Collapsed;
             MovieList.Visibility = Visibility.Visible;
         }
         else
         {
-            GridScroll.Visibility = Visibility.Visible;
+            MovieGrid.Visibility = Visibility.Visible;
             MovieList.Visibility = Visibility.Collapsed;
         }
     }
@@ -93,6 +109,18 @@ public sealed partial class ScrapingStep : UserControl
     {
         if (_viewModel != null)
             await _viewModel.ScrapeSelectedCommand.ExecuteAsync(null);
+    }
+
+    private void OnSelectAllClick(object sender, RoutedEventArgs e)
+    {
+        _viewModel?.SelectAllCommand.Execute(null);
+        SyncMasterCheckBoxes();
+    }
+
+    private void OnSelectNoneClick(object sender, RoutedEventArgs e)
+    {
+        _viewModel?.SelectNoneCommand.Execute(null);
+        SyncMasterCheckBoxes();
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
@@ -128,18 +156,8 @@ public sealed partial class ScrapingStep : UserControl
     }
 
     // -----------------------------------------------------------------
-    //  Card hover effect + double-tap to scrape
+    //  Double-tap a card to open TMDb search
     // -----------------------------------------------------------------
-
-    private void OnCardPointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-    {
-        if (sender is Grid g) g.Opacity = 1;
-    }
-
-    private void OnCardPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-    {
-        if (sender is Grid g) g.Opacity = 0;
-    }
 
     private async void OnCardDoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
     {
@@ -236,23 +254,11 @@ public sealed partial class ScrapingStep : UserControl
         {
             var items = await e.DataView.GetStorageItemsAsync();
             int beforeCount = _viewModel.MovieFolders.Count;
+
+            // Recursively find every folder containing video files (any depth)
             foreach (var f in items.OfType<StorageFolder>())
-            {
-                // If user drops a parent folder containing many movie folders, add each.
-                // Otherwise add the dropped folder directly.
-                var subFolders = Directory.GetDirectories(f.Path)
-                    .Where(d => Directory.EnumerateFiles(d).Any(Utilities.FileFormatValidator.IsVideoFile))
-                    .ToList();
-                if (subFolders.Count > 0)
-                {
-                    foreach (var sub in subFolders)
-                        _viewModel.AddSingleFolder(sub);
-                }
-                else
-                {
-                    _viewModel.AddSingleFolder(f.Path);
-                }
-            }
+                _viewModel.AddFromRootFolder(f.Path);
+
             int added = _viewModel.MovieFolders.Count - beforeCount;
             if (added > 0) ToastService.Success($"Added {added} folder(s).");
             UpdateEmptyState();
