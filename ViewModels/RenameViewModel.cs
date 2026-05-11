@@ -452,14 +452,18 @@ public partial class RenameViewModel : ObservableObject
     /// </summary>
     public async Task<ProcessingResult> RenameInPlaceAsync()
     {
+        // Include rows that need renaming. If "Clean metadata" is ticked, ALSO include
+        // selected rows whose name is already clean — the user explicitly asked for the
+        // metadata to be scrubbed, so the action must run even when no rename is pending.
         var toRename = AllPreviews
             .Where(p => p.IsSelected
                      && !string.IsNullOrWhiteSpace(p.CleanedName)
-                     && !string.Equals(p.OriginalName, p.CleanedName, StringComparison.Ordinal))
+                     && (CleanEmbeddedMetadata
+                         || !string.Equals(p.OriginalName, p.CleanedName, StringComparison.Ordinal)))
             .ToList();
 
         if (toRename.Count == 0)
-            return new ProcessingResult { Success = true, Message = "No files needed renaming." };
+            return new ProcessingResult { Success = true, Message = "No files selected." };
 
         IsLoading = true;
         try

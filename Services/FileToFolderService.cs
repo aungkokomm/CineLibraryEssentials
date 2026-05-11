@@ -4,35 +4,62 @@ namespace CineLibraryEssentials.Services;
 
 public class FileToFolderService
 {
-    public async Task<ProcessingResult> OrganizeFilesAsync(List<FileOperation> operations)
+    public async Task<ProcessingResult> OrganizeFilesAsync(
+        List<FileOperation> operations,
+        bool cleanEmbeddedMetadata = false)
     {
         var result = new ProcessingResult { Success = true };
+        var metadataCleaner = cleanEmbeddedMetadata ? new MetadataCleanerService() : null;
 
         foreach (var operation in operations)
         {
             try
             {
-                // Create destination folder
                 if (!Directory.Exists(operation.DestinationFolder))
-                {
                     Directory.CreateDirectory(operation.DestinationFolder);
-                }
 
-                // Get final destination file path
                 var destinationFile = Path.Combine(operation.DestinationFolder, operation.FinalFileName);
 
-                // Check if file already exists
                 if (File.Exists(destinationFile))
                 {
-                    result.Errors.Add($"Destination already exists: {destinationFile}");
+                    // If the destination IS the source file (user re-ran the wizard
+                    // on an already-organized folder), there's nothing to move —
+                    // but we still want to clean metadata if they asked for it.
+                    var srcFull = Path.GetFullPath(operation.OriginalFilePath);
+                    var destFull = Path.GetFullPath(destinationFile);
+                    var sameFile = string.Equals(srcFull, destFull, StringComparison.OrdinalIgnoreCase);
+
+                    if (sameFile && metadataCleaner != null)
+                    {
+                        var metaTitle = Path.GetFileNameWithoutExtension(operation.FinalFileName);
+                        var meta = metadataCleaner.Clean(destinationFile, metaTitle);
+                        if (!meta.Success && !string.IsNullOrEmpty(meta.Error))
+                            result.Errors.Add($"{operation.OriginalFileName}: metadata clean failed: {meta.Error}");
+                    }
+                    else if (!sameFile)
+                    {
+                        result.Errors.Add($"Destination already exists: {destinationFile}");
+                    }
                     continue;
                 }
 
-                // Move the file
                 File.Move(operation.OriginalFilePath, destinationFile, overwrite: false);
 
-                // Move companion files (subtitles, etc.)
                 await MoveCompanionFilesAsync(operation.OriginalFilePath, operation.DestinationFolder, operation.FinalFileName);
+
+                // Optionally scrub embedded container metadata after the move.
+                // Done HERE (not just in Step 1's RenameInPlaceAsync) so that users
+                // who skip Step 1's "Rename Selected" and go straight to Step 2's
+                // "Run File to Folder" still get a clean output file.
+                if (metadataCleaner != null)
+                {
+                    var metaTitle = Path.GetFileNameWithoutExtension(operation.FinalFileName);
+                    var meta = metadataCleaner.Clean(destinationFile, metaTitle);
+                    if (!meta.Success && !string.IsNullOrEmpty(meta.Error))
+                    {
+                        result.Errors.Add($"{operation.OriginalFileName}: metadata clean failed: {meta.Error}");
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -41,7 +68,9 @@ public class FileToFolderService
             }
         }
 
-        result.Message = result.Errors.Count == 0 ? "All files organized successfully" : $"{result.Errors.Count} errors occurred";
+        result.Message = result.Errors.Count == 0
+            ? "All files organized successfully"
+            : $"{result.Errors.Count} errors occurred";
 
         return result;
     }

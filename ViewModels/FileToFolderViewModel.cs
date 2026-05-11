@@ -212,12 +212,17 @@ public partial class FileToFolderViewModel : ObservableObject
         IsLoading = true;
         try
         {
-            var result = await _folderService.OrganizeFilesAsync(toRun);
+            // Honour the same "Clean metadata" preference that Step 1 uses.
+            // This way users who skip Step 1's "Rename Selected" still get clean files.
+            var cleanMetadata = _configService.GetCleanEmbeddedMetadata();
+
+            var result = await _folderService.OrganizeFilesAsync(toRun, cleanMetadata);
             if (result.Success)
             {
                 _parentViewModel.SetFileOperations(toRun);
                 _parentViewModel.SelectedOutputFolder = OutputFolderPath;
-                StatusMessage = $"✓ Organized {toRun.Count} file(s) into {OutputFolderPath}";
+                var suffix = cleanMetadata ? " (with metadata cleanup)" : string.Empty;
+                StatusMessage = $"✓ Organized {toRun.Count} file(s) into {OutputFolderPath}{suffix}";
             }
             else
             {

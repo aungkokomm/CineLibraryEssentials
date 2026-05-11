@@ -17,9 +17,29 @@
                 <TextBlock Text="CineLibrary Essentials"
                            FontSize="18"
                            FontWeight="SemiBold" />
-                <TextBlock x:Name="VersionText"
-                           Text="Version 1.0"
-                           FontSize="12"
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock x:Name="VersionText"
+                               Text="Version 1.0"
+                               FontSize="12"
+                               VerticalAlignment="Center"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <HyperlinkButton x:Name="CheckUpdatesButton"
+                                     Content="Check for updates"
+                                     FontSize="12"
+                                     Padding="0"
+                                     Click="OnCheckUpdatesClick" />
+                    <ProgressRing x:Name="UpdateProgress"
+                                  IsActive="False"
+                                  Visibility="Collapsed"
+                                  Width="14" Height="14"
+                                  VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock x:Name="UpdateStatusText"
+                           Text=""
+                           FontSize="11"
+                           Visibility="Collapsed"
+                           TextWrapping="Wrap"
+                           MaxWidth="320"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
         </StackPanel>
@@ -64,12 +84,26 @@
                     <TextBlock Text="Metadata by TMDb" />
                 </StackPanel>
             </HyperlinkButton>
+
+            <HyperlinkButton NavigateUri="https://mkvtoolnix.download/"
+                             Padding="0">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE7C3;" FontSize="14" />
+                    <TextBlock Text="MKV cleanup powered by MKVToolNix (GPL v2)" />
+                </StackPanel>
+            </HyperlinkButton>
         </StackPanel>
 
-        <!-- TMDb attribution (required by their ToS) -->
-        <TextBlock Text="This product uses the TMDb API but is not endorsed or certified by TMDb."
-                   FontSize="11"
-                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                   TextWrapping="Wrap" />
+        <!-- Attributions -->
+        <StackPanel Spacing="4">
+            <TextBlock Text="This product uses the TMDb API but is not endorsed or certified by TMDb."
+                       FontSize="11"
+                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                       TextWrapping="Wrap" />
+            <TextBlock Text="Bundles mkvpropedit.exe from MKVToolNix (GPL v2) — see Tools/MKVToolNix/LICENSE.txt"
+                       FontSize="11"
+                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                       TextWrapping="Wrap" />
+        </StackPanel>
     </StackPanel>
 </ContentDialog>

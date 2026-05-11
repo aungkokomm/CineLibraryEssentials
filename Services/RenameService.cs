@@ -119,7 +119,20 @@ public class RenameService
                 continue;
             }
             if (string.Equals(p.OriginalName, p.CleanedName, StringComparison.Ordinal))
-                continue;  // no change needed
+            {
+                // No rename needed, but still clean metadata if user requested it.
+                // This is the path that fires when the file is ALREADY named correctly
+                // from a previous run — without this, the cleaner silently never runs.
+                if (metadataCleaner != null)
+                {
+                    var metaTitle = Path.GetFileNameWithoutExtension(p.OriginalName);
+                    var metaResult = metadataCleaner.Clean(p.OriginalFilePath, metaTitle);
+                    if (!metaResult.Success && !string.IsNullOrEmpty(metaResult.Error))
+                        result.Errors.Add($"{p.OriginalName}: metadata clean failed: {metaResult.Error}");
+                }
+                p.IsReviewed = true;
+                continue;
+            }
             if (string.IsNullOrWhiteSpace(p.CleanedName))
             {
                 result.Errors.Add($"{p.OriginalName}: target name is empty");

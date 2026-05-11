@@ -351,19 +351,41 @@ public sealed partial class RenameStep : UserControl
         if (_viewModel == null) return;
 
         var pending = _viewModel.PendingRenameCount;
-        if (pending == 0)
+        var cleanOnly = pending == 0 && _viewModel.CleanEmbeddedMetadata;
+        var selectedCount = _viewModel.SelectedCount;
+
+        // Nothing to do AT ALL: no renames pending and Clean Metadata isn't ticked.
+        if (pending == 0 && !_viewModel.CleanEmbeddedMetadata)
         {
-            ToastService.Info("No files need renaming — every selected row's cleaned name already matches.");
+            ToastService.Info("No files need renaming — every selected row's cleaned name already matches. Tick 'Clean metadata' if you only want to scrub embedded tags.");
             return;
+        }
+
+        // Build a dialog message that reflects what's actually about to happen.
+        string title, content, primary;
+        if (cleanOnly)
+        {
+            title = "Clean embedded metadata?";
+            content = $"All {selectedCount} selected file(s) are already named correctly. " +
+                      $"This will scrub their embedded title, comment, tags, track names and " +
+                      $"attachments (e.g. logo images) using the bundled mkvpropedit.\n\n" +
+                      $"The video/audio data itself is not touched.";
+            primary = "Clean Metadata";
+        }
+        else
+        {
+            title = "Rename files?";
+            content = $"This will rename {pending} file(s) on disk. " +
+                      $"Companion subtitles (.srt etc) will be renamed too.\n\n" +
+                      $"You'll have ~30 seconds to undo from a toast notification.";
+            primary = "Rename";
         }
 
         var confirm = new ContentDialog
         {
-            Title = "Rename files?",
-            Content = $"This will rename {pending} file(s) on disk. " +
-                      $"Companion subtitles (.srt etc) will be renamed too.\n\n" +
-                      $"You'll have ~30 seconds to undo from a toast notification.",
-            PrimaryButtonText = "Rename",
+            Title = title,
+            Content = content,
+            PrimaryButtonText = primary,
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = this.XamlRoot
@@ -376,18 +398,25 @@ public sealed partial class RenameStep : UserControl
 
         if (opResult.Success && opResult.Errors.Count == 0)
         {
-            // Success toast with Undo action button (30s window)
-            ToastService.ShowAction(
-                message: $"Renamed {pending} file(s).",
-                title: "Done",
-                actionText: "Undo",
-                onAction: () =>
-                {
-                    if (_viewModel == null) return;
-                    var (ok, bad) = _viewModel.UndoLastRename();
-                    if (bad == 0) ToastService.Success($"Reverted {ok} rename(s).");
-                    else ToastService.Warning($"Reverted {ok}, {bad} failed.");
-                });
+            if (cleanOnly)
+            {
+                ToastService.Success($"Cleaned metadata on {selectedCount} file(s).");
+            }
+            else
+            {
+                // Success toast with Undo action button (30s window)
+                ToastService.ShowAction(
+                    message: $"Renamed {pending} file(s).",
+                    title: "Done",
+                    actionText: "Undo",
+                    onAction: () =>
+                    {
+                        if (_viewModel == null) return;
+                        var (ok, bad) = _viewModel.UndoLastRename();
+                        if (bad == 0) ToastService.Success($"Reverted {ok} rename(s).");
+                        else ToastService.Warning($"Reverted {ok}, {bad} failed.");
+                    });
+            }
         }
         else
         {
