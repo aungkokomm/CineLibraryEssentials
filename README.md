@@ -9,6 +9,7 @@
     <a href="https://github.com/aungkokomm/CineLibraryCS"><b>CineLibrary</b></a>.
   </p>
 </div>
+<img width="1536" height="1024" alt="mockup" src="https://github.com/user-attachments/assets/59d1724f-fd85-49b5-b2e9-3a6054bebd98" />
 
 ---
 ![Stars](https://img.shields.io/github/stars/aungkokomm/CineLibraryEssentials?style=for-the-badge&color=blue)
