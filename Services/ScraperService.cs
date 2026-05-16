@@ -87,19 +87,20 @@ public class ScraperService
         var videoFile = Directory.GetFiles(movieFolderPath, "*.*")
             .FirstOrDefault(f => Utilities.FileFormatValidator.IsVideoFile(f));
 
-        // Poster
+        // Poster — pull TMDb's "original" upload (typically 1500–2000px tall).
+        // The previous w500 default produced blurry results on any modern display.
         if (!string.IsNullOrEmpty(details.PosterPath) && !string.IsNullOrEmpty(videoFile))
         {
             progress?.Report("Downloading poster...");
-            var posterUrl = _tmdbClient.GetImageUrl(details.PosterPath);
+            var posterUrl = _tmdbClient.GetImageUrl(details.PosterPath, "original");
             await _imageService.DownloadPosterAsync(posterUrl, videoFile);
         }
 
-        // Fanart
+        // Fanart — also "original" (typically 1920×1080+) for sharp 1080p/4K TVs.
         if (!string.IsNullOrEmpty(details.BackdropPath) && !string.IsNullOrEmpty(videoFile))
         {
             progress?.Report("Downloading fanart...");
-            var fanartUrl = _tmdbClient.GetImageUrl(details.BackdropPath, "w1280");
+            var fanartUrl = _tmdbClient.GetImageUrl(details.BackdropPath, "original");
             await _imageService.DownloadFanartAsync(fanartUrl, videoFile);
         }
 

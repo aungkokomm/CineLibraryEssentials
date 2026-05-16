@@ -53,7 +53,11 @@ public class ImageDownloadService
             var fileName = $"{actor.Name.Replace(" ", "-")}.jpg";
             var filePath = Path.Combine(actorsFolderPath, fileName);
 
-            var imageUrl = $"https://image.tmdb.org/t/p/w185{actor.ProfilePath}";
+            // Use TMDb's "original" upload for actor photos. The previous w185
+            // size was 185px wide — blurry the moment Plex/Kodi rendered it at
+            // any reasonable thumbnail size. "original" headshots are typically
+            // 1000×1500 and only ~150–400 KB each.
+            var imageUrl = $"https://image.tmdb.org/t/p/original{actor.ProfilePath}";
 
             if (await DownloadImageAsync(imageUrl, filePath))
                 downloaded++;

@@ -115,7 +115,15 @@ public class TmdbApiClient
         }
     }
 
-    public string GetImageUrl(string? imagePath, string size = "w500")
+    /// <summary>
+    /// Builds a TMDb image URL. Default is "original" (the full uploaded asset)
+    /// because library scrapers (Plex/Kodi/Jellyfin) all expect full-resolution
+    /// artwork — lower sizes look blurry on modern displays. Callers can still
+    /// override (e.g. small thumbnails in the TMDb search picker use "w185").
+    /// Valid sizes: posters w92/w154/w185/w342/w500/w780/original,
+    /// backdrops w300/w780/w1280/original, profiles w45/w185/h632/original.
+    /// </summary>
+    public string GetImageUrl(string? imagePath, string size = "original")
     {
         if (string.IsNullOrEmpty(imagePath))
             return string.Empty;
