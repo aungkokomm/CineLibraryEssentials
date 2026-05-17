@@ -35,37 +35,78 @@ public class ImageDownloadService
         return await DownloadImageAsync(imageUrl, fullPath);
     }
 
+    /// <summary>
+    /// Downloads every cast member's headshot in parallel (5 concurrent) at full
+    /// TMDb resolution. Idempotent: skips actors whose photo already exists on
+    /// disk, so a re-scrape only fills in the gaps. Uses the Kodi/Plex/Jellyfin
+    /// "Firstname_Lastname.jpg" filename convention so the standard NFO
+    /// &lt;actor&gt;&lt;thumb&gt; refs resolve cleanly.
+    /// </summary>
     public async Task<(int downloaded, int failed)> DownloadActorPhotosAsync(
         List<CastMember> cast,
         string actorsFolderPath)
     {
-        int downloaded = 0;
-        int failed = 0;
-
         if (!Directory.Exists(actorsFolderPath))
             Directory.CreateDirectory(actorsFolderPath);
 
-        foreach (var actor in cast.Take(10)) // Limit to top 10 actors
+        // Only cast members with a TMDb profile photo. (Many minor roles have no
+        // profile_path — those can't be downloaded and we don't pretend to.)
+        var candidates = cast.Where(a => !string.IsNullOrEmpty(a.ProfilePath)).ToList();
+        if (candidates.Count == 0) return (0, 0);
+
+        // 5 concurrent HTTP downloads is the sweet spot: well under TMDb's
+        // 40 req / 10 sec rate ceiling, fast enough that a 30-actor movie
+        // finishes in seconds instead of a minute.
+        using var gate = new SemaphoreSlim(5, 5);
+        int downloaded = 0, failed = 0;
+
+        var tasks = candidates.Select(async actor =>
         {
-            if (string.IsNullOrEmpty(actor.ProfilePath))
-                continue;
+            await gate.WaitAsync();
+            try
+            {
+                var fileName = BuildActorFileName(actor.Name);
+                var filePath = Path.Combine(actorsFolderPath, fileName);
 
-            var fileName = $"{actor.Name.Replace(" ", "-")}.jpg";
-            var filePath = Path.Combine(actorsFolderPath, fileName);
+                // Skip if we already have it — makes re-scrapes near-instant.
+                if (File.Exists(filePath) && new FileInfo(filePath).Length > 0)
+                {
+                    Interlocked.Increment(ref downloaded);
+                    return;
+                }
 
-            // Use TMDb's "original" upload for actor photos. The previous w185
-            // size was 185px wide — blurry the moment Plex/Kodi rendered it at
-            // any reasonable thumbnail size. "original" headshots are typically
-            // 1000×1500 and only ~150–400 KB each.
-            var imageUrl = $"https://image.tmdb.org/t/p/original{actor.ProfilePath}";
+                var imageUrl = $"https://image.tmdb.org/t/p/original{actor.ProfilePath}";
+                if (await DownloadImageAsync(imageUrl, filePath))
+                    Interlocked.Increment(ref downloaded);
+                else
+                    Interlocked.Increment(ref failed);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        });
 
-            if (await DownloadImageAsync(imageUrl, filePath))
-                downloaded++;
-            else
-                failed++;
-        }
-
+        await Task.WhenAll(tasks);
         return (downloaded, failed);
+    }
+
+    /// <summary>
+    /// Builds the Kodi/Plex/Jellyfin-standard ".actors/" filename for an actor.
+    /// Spaces become underscores, filesystem-invalid chars are stripped, so
+    /// "Robert De Niro" → "Robert_De_Niro.jpg" and "J.K. Simmons" → "J.K._Simmons.jpg".
+    /// </summary>
+    public static string BuildActorFileName(string actorName)
+    {
+        var safe = new System.Text.StringBuilder(actorName.Length);
+        foreach (var c in actorName)
+        {
+            if (c == ' ') safe.Append('_');
+            else if (Array.IndexOf(Path.GetInvalidFileNameChars(), c) < 0) safe.Append(c);
+        }
+        var name = safe.ToString().Trim('_');
+        if (string.IsNullOrEmpty(name)) name = "actor";
+        return name + ".jpg";
     }
 
     private async Task<bool> DownloadImageAsync(string imageUrl, string outputPath)

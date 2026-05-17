@@ -86,22 +86,28 @@ public class TmdbApiClient
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
+            // Keep the FULL cast list as TMDb returns it (already sorted by billing
+            // order). The previous .Take(10) is what made CineLibrary Essentials look
+            // sparse compared to MediaElch. We cap at 50 below as a sanity ceiling for
+            // huge ensemble casts — far above the ~15-25 useful entries per movie.
             var cast = new List<CastMember>();
             if (root.TryGetProperty("cast", out var castArray))
             {
-                foreach (var member in castArray.EnumerateArray().Take(10))
+                foreach (var member in castArray.EnumerateArray().Take(50))
                 {
                     var name = member.TryGetProperty("name", out var n) ? n.GetString() : "";
                     var character = member.TryGetProperty("character", out var c) ? c.GetString() : "";
                     var profilePath = member.TryGetProperty("profile_path", out var pp) ? pp.GetString() : null;
                     var id = member.TryGetProperty("id", out var mid) ? mid.GetInt32() : 0;
+                    var order = member.TryGetProperty("order", out var o) ? o.GetInt32() : 0;
 
                     cast.Add(new CastMember
                     {
                         Id = id,
                         Name = name ?? "",
                         Character = character ?? "",
-                        ProfilePath = profilePath
+                        ProfilePath = profilePath,
+                        Order = order
                     });
                 }
             }

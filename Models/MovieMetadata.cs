@@ -61,6 +61,10 @@ public class CastMember
 
     [JsonPropertyName("profile_path")]
     public string? ProfilePath { get; set; }
+
+    /// <summary>Billing order as reported by TMDb (lower = higher billing).</summary>
+    [JsonPropertyName("order")]
+    public int Order { get; set; }
 }
 
 public class TmdbSearchResult
