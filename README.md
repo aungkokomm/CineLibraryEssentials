@@ -46,6 +46,7 @@ This is the **Plex / Kodi / Jellyfin / MediaElch** standard layout.
 
 <img width="1600" height="952" alt="f2f" src="https://github.com/user-attachments/assets/7f262903-9bba-4182-8acf-08f6fd257b66" />
 
+<img width="960" height="499" alt="image" src="https://github.com/user-attachments/assets/a7b59a10-ea91-4adf-819a-8e80d51ec23e" />
 
 ## Recommended Workflow
 
