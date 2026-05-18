@@ -7,12 +7,14 @@ public class ScraperService
     private readonly TmdbApiClient _tmdbClient;
     private readonly ImageDownloadService _imageService;
     private readonly NfoGeneratorService _nfoService;
+    private readonly MediaProbeService _mediaProbe;
 
     public ScraperService(string tmdbApiKey)
     {
         _tmdbClient = new TmdbApiClient(tmdbApiKey);
         _imageService = new ImageDownloadService();
         _nfoService = new NfoGeneratorService();
+        _mediaProbe = new MediaProbeService();
     }
 
     /// <summary>
@@ -72,16 +74,11 @@ public class ScraperService
         int tmdbId,
         IProgress<string>? progress)
     {
-        // Details
+        // Details — single batched call now returns cast + crew + certification + trailer.
         progress?.Report("Downloading metadata...");
         var details = await _tmdbClient.GetMovieDetailsAsync(tmdbId);
         if (details == null)
             return (false, "Failed to get movie details");
-
-        // Cast
-        progress?.Report("Downloading cast information...");
-        var cast = await _tmdbClient.GetMovieCastAsync(tmdbId);
-        details.Cast = cast;
 
         // Find a video file in the folder to base poster/fanart filenames on
         var videoFile = Directory.GetFiles(movieFolderPath, "*.*")
@@ -109,9 +106,19 @@ public class ScraperService
         var actorsFolder = Path.Combine(movieFolderPath, ".actors");
         await _imageService.DownloadActorPhotosAsync(details.Cast, actorsFolder);
 
+        // Probe the actual file for <fileinfo>/<streamdetails> — duration, video codec,
+        // audio tracks with language, subtitle tracks. This is what lets the companion
+        // viewer (and MediaElch / Plex / Kodi / Jellyfin) show the full detail strip.
+        StreamDetails? streamDetails = null;
+        if (!string.IsNullOrEmpty(videoFile))
+        {
+            progress?.Report("Probing media file...");
+            streamDetails = _mediaProbe.Probe(videoFile);
+        }
+
         // NFO
         progress?.Report("Generating metadata file...");
-        _nfoService.SaveNfoFile(details, movieFolderPath);
+        _nfoService.SaveNfoFile(details, movieFolderPath, streamDetails);
 
         progress?.Report("Complete");
         return (true, $"Metadata scraped for '{details.Title}'");

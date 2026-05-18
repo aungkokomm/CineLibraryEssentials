@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using CineLibraryEssentials.Services;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
@@ -9,6 +10,7 @@ namespace CineLibraryEssentials.Views;
 public sealed partial class MainWindow : Window
 {
     private readonly ConfigService _configService = new();
+    private readonly UpdateService _updateService = new();
 
     public MainWindow()
     {
@@ -22,6 +24,77 @@ public sealed partial class MainWindow : Window
         ToastService.Register(ToastHost, DispatcherQueue);
 
         ContentFrame.Navigate(typeof(WizardPage));
+
+        // Fire-and-forget auto-update check — runs once per 24h, silent if up-to-date.
+        _ = AutoCheckForUpdatesAsync();
+    }
+
+    /// <summary>
+    /// Silently polls GitHub on startup and, if a newer release exists, shows a
+    /// dismissable toast with a "Download" button. Throttled to once per 24h
+    /// and respects the user's "Skip this version" choice so we never nag.
+    /// </summary>
+    private async Task AutoCheckForUpdatesAsync()
+    {
+        try
+        {
+            // Throttle: only check once every 24 hours so launches don't hit the
+            // GitHub API every time.
+            var lastCheck = _configService.GetLastUpdateCheck();
+            if (lastCheck != DateTime.MinValue
+                && (DateTime.UtcNow - lastCheck) < TimeSpan.FromHours(24))
+                return;
+
+            // Wait ~5s after launch so the toast doesn't slam the user the instant
+            // the window appears.
+            await Task.Delay(TimeSpan.FromSeconds(5));
+
+            var info = await _updateService.CheckForUpdateAsync();
+            // Always update the timestamp so failures don't retry on every launch either.
+            _configService.SetLastUpdateCheckNow();
+
+            if (!info.Success || !info.IsUpdateAvailable) return;
+
+            // Honour the user's "Skip" — only nag again once a newer version ships.
+            var skipped = _configService.GetSkippedUpdateVersion();
+            if (!string.IsNullOrEmpty(skipped)
+                && string.Equals(skipped, info.LatestVersion, StringComparison.Ordinal))
+                return;
+
+            // Show the toast on the UI thread.
+            DispatcherQueue.TryEnqueue(() => ShowUpdateToast(info));
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"AutoCheckForUpdates failed: {ex.Message}");
+        }
+    }
+
+    private void ShowUpdateToast(UpdateService.UpdateInfo info)
+    {
+        // Action toast: primary button opens the release page; the toast's built-in
+        // X dismisses for this session. The 24h throttle means it won't reappear
+        // again today even if the user just closes it.
+        ToastService.ShowAction(
+            message: $"Version {info.LatestVersion} is available — you're on {info.CurrentVersion}.",
+            title: "Update available",
+            actionText: "Download",
+            onAction: () =>
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = info.ReleaseUrl,
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Open release URL failed: {ex.Message}");
+                }
+            },
+            autoDismissMs: 60000); // visible for one minute, then auto-fades
     }
 
     private void ConfigureTitleBar()

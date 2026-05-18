@@ -35,4 +35,10 @@ public class AppConfig
     /// <summary>Sort key for Step 1's file list.</summary>
     public string Step1SortColumn { get; set; } = "Confidence";
     public bool Step1SortDescending { get; set; } = true;
+
+    // ----- Auto-update check (v1.1.10) -----
+    /// <summary>UTC ticks of the last successful GitHub update check, 0 = never.</summary>
+    public long LastUpdateCheckUtcTicks { get; set; }
+    /// <summary>Version the user clicked "Skip" on — don't bug them about it again until a newer one ships.</summary>
+    public string SkippedUpdateVersion { get; set; } = string.Empty;
 }

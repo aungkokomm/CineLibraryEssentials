@@ -48,7 +48,11 @@ public class TmdbApiClient
     {
         await RateLimitAsync();
 
-        var url = $"{BaseUrl}/movie/{tmdbId}?api_key={_apiKey}&append_to_response=credits";
+        // Single batched call: append credits (cast + crew), release_dates (for
+        // MPAA certification), and videos (for trailer URL). Gives us everything
+        // MediaElch writes to the NFO in one request.
+        var url = $"{BaseUrl}/movie/{tmdbId}?api_key={_apiKey}" +
+                  $"&append_to_response=credits,release_dates,videos";
 
         try
         {
@@ -59,6 +63,24 @@ public class TmdbApiClient
 
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var metadata = JsonSerializer.Deserialize<MovieMetadata>(json, options);
+            if (metadata == null) return null;
+
+            // Parse the appended sub-objects that don't deserialize automatically
+            // because they live under nested response keys.
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("credits", out var creditsEl))
+            {
+                metadata.Cast = ParseCast(creditsEl);
+                ParseCrew(creditsEl, metadata);
+            }
+
+            if (root.TryGetProperty("release_dates", out var rdEl))
+                metadata.Certification = ParseCertification(rdEl);
+
+            if (root.TryGetProperty("videos", out var videosEl))
+                metadata.TrailerUrl = ParseTrailerUrl(videosEl);
 
             return metadata;
         }
@@ -67,6 +89,135 @@ public class TmdbApiClient
             System.Diagnostics.Debug.WriteLine($"Error getting movie details: {ex.Message}");
             return null;
         }
+    }
+
+    private static List<CastMember> ParseCast(JsonElement creditsEl)
+    {
+        var list = new List<CastMember>();
+        if (!creditsEl.TryGetProperty("cast", out var castArr)) return list;
+
+        foreach (var m in castArr.EnumerateArray().Take(50))
+        {
+            list.Add(new CastMember
+            {
+                Id = m.TryGetProperty("id", out var i) ? i.GetInt32() : 0,
+                Name = m.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
+                Character = m.TryGetProperty("character", out var c) ? c.GetString() ?? "" : "",
+                ProfilePath = m.TryGetProperty("profile_path", out var pp) ? pp.GetString() : null,
+                Order = m.TryGetProperty("order", out var o) ? o.GetInt32() : 0,
+            });
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// Splits credits.crew into Directors / Writers / Producers — the three
+    /// groups Kodi/MediaElch surface in the NFO. Directors are by job, the
+    /// other two are by department because TMDb encodes them as roles.
+    /// </summary>
+    private static void ParseCrew(JsonElement creditsEl, MovieMetadata metadata)
+    {
+        if (!creditsEl.TryGetProperty("crew", out var crewArr)) return;
+
+        foreach (var m in crewArr.EnumerateArray())
+        {
+            var member = new CrewMember
+            {
+                Id = m.TryGetProperty("id", out var i) ? i.GetInt32() : 0,
+                Name = m.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
+                Job = m.TryGetProperty("job", out var j) ? j.GetString() ?? "" : "",
+                Department = m.TryGetProperty("department", out var d) ? d.GetString() ?? "" : "",
+                ProfilePath = m.TryGetProperty("profile_path", out var pp) ? pp.GetString() : null,
+            };
+
+            if (string.Equals(member.Job, "Director", StringComparison.OrdinalIgnoreCase))
+                metadata.Directors.Add(member);
+            else if (string.Equals(member.Department, "Writing", StringComparison.OrdinalIgnoreCase))
+                metadata.Writers.Add(member);
+            else if (string.Equals(member.Department, "Production", StringComparison.OrdinalIgnoreCase)
+                     && member.Job.Contains("Producer", StringComparison.OrdinalIgnoreCase))
+                metadata.Producers.Add(member);
+        }
+    }
+
+    /// <summary>
+    /// Picks the MPAA certification from the release_dates response. Prefers
+    /// the US theatrical rating (type 3) — MediaElch defaults to the same so
+    /// the &lt;mpaa&gt; tag is comparable across scrapers.
+    /// </summary>
+    private static string ParseCertification(JsonElement rdEl)
+    {
+        if (!rdEl.TryGetProperty("results", out var resultsArr)) return string.Empty;
+
+        // First pass: look for US
+        foreach (var region in resultsArr.EnumerateArray())
+        {
+            if (!region.TryGetProperty("iso_3166_1", out var iso)) continue;
+            if (!string.Equals(iso.GetString(), "US", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!region.TryGetProperty("release_dates", out var dates)) continue;
+            foreach (var d in dates.EnumerateArray())
+            {
+                if (d.TryGetProperty("certification", out var cert))
+                {
+                    var s = cert.GetString();
+                    if (!string.IsNullOrWhiteSpace(s)) return s;
+                }
+            }
+        }
+
+        // Fallback: first non-empty certification from any region
+        foreach (var region in resultsArr.EnumerateArray())
+        {
+            if (!region.TryGetProperty("release_dates", out var dates)) continue;
+            foreach (var d in dates.EnumerateArray())
+            {
+                if (d.TryGetProperty("certification", out var cert))
+                {
+                    var s = cert.GetString();
+                    if (!string.IsNullOrWhiteSpace(s)) return s;
+                }
+            }
+        }
+
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// Picks the official YouTube trailer URL from the videos response, falling
+    /// back to any teaser if no trailer is flagged official.
+    /// </summary>
+    private static string ParseTrailerUrl(JsonElement videosEl)
+    {
+        if (!videosEl.TryGetProperty("results", out var resultsArr)) return string.Empty;
+
+        string? officialTrailer = null;
+        string? anyTrailer = null;
+        string? anyTeaser = null;
+
+        foreach (var v in resultsArr.EnumerateArray())
+        {
+            var site = v.TryGetProperty("site", out var s) ? s.GetString() : null;
+            if (!string.Equals(site, "YouTube", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var key = v.TryGetProperty("key", out var k) ? k.GetString() : null;
+            if (string.IsNullOrEmpty(key)) continue;
+
+            var type = v.TryGetProperty("type", out var t) ? t.GetString() : null;
+            var official = v.TryGetProperty("official", out var o) && o.GetBoolean();
+            var url = $"https://www.youtube.com/watch?v={key}";
+
+            if (string.Equals(type, "Trailer", StringComparison.OrdinalIgnoreCase))
+            {
+                if (official) { officialTrailer ??= url; }
+                anyTrailer ??= url;
+            }
+            else if (string.Equals(type, "Teaser", StringComparison.OrdinalIgnoreCase))
+            {
+                anyTeaser ??= url;
+            }
+        }
+
+        return officialTrailer ?? anyTrailer ?? anyTeaser ?? string.Empty;
     }
 
     public async Task<List<CastMember>> GetMovieCastAsync(int tmdbId)

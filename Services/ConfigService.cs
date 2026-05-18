@@ -107,6 +107,25 @@ public class ConfigService
         SaveConfig();
     }
 
+    // ----- Auto-update check (v1.1.10) -----
+    public DateTime GetLastUpdateCheck() =>
+        _config.LastUpdateCheckUtcTicks == 0
+            ? DateTime.MinValue
+            : new DateTime(_config.LastUpdateCheckUtcTicks, DateTimeKind.Utc);
+
+    public void SetLastUpdateCheckNow()
+    {
+        _config.LastUpdateCheckUtcTicks = DateTime.UtcNow.Ticks;
+        SaveConfig();
+    }
+
+    public string GetSkippedUpdateVersion() => _config.SkippedUpdateVersion ?? string.Empty;
+    public void SetSkippedUpdateVersion(string v)
+    {
+        _config.SkippedUpdateVersion = v ?? string.Empty;
+        SaveConfig();
+    }
+
     // ----- Persistence -----
     private AppConfig LoadConfig()
     {
