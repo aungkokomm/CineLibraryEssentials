@@ -20,7 +20,8 @@
   - [Undo](#undo)
 - [Step 2 — Organize](#step-2--organize)
 - [Step 3 — Scrape](#step-3--scrape)
-- [Settings & persistence](#settings--persistence)
+- [Settings page](#settings-page)
+- [Persistence](#persistence)
 - [Tips & tricks](#tips--tricks)
 - [Troubleshooting](#troubleshooting)
 - [FAQ](#faq)
@@ -87,7 +88,7 @@ If you drop a *file* instead of a folder, the app uses the file's parent folder.
 | ☑ | Whether this row will be processed when you click Rename Selected. Defaults to checked. |
 | **Original** | The filename on disk now. **Red strikethrough** marks tokens the parser is going to remove (`1080p`, `BluRay`, `x265`, release groups, etc.). Grey tokens are the ones that survive into the cleaned name. |
 | File size | Right under the original, dimmed. Helps you spot tiny "sample" files. |
-| **Cleaned** | The proposed new filename. **Editable** — type into it to override the parser. |
+| **Cleaned** | The proposed new filename. **Editable** — type into it to override the parser. If an edition is detected (Director's Cut, Extended, IMAX, 4K Remaster, Theatrical, Unrated, Criterion, etc.) a small **chip** appears under the cleaned name. The edition isn't added to the filename itself, but it *is* written to the NFO so Plex / Kodi can group multiple cuts of the same movie. |
 | **Confidence** | A coloured pill — *High* (green) means the parser is sure, *Medium* (amber) means probably right, *Low* (red) means review carefully. |
 | ⚠ | Warning icon. Hover for details: missing year, duplicate name, invalid characters, TV-episode pattern, filename too long, etc. |
 | 🔍 | Inline TMDb search button — click to confirm the title against The Movie Database. |
@@ -244,26 +245,49 @@ Click **Scrape Selected (auto)** at the top → every checked card is processed 
 
 - **+ Add Folder** — add a movie folder that wasn't part of Steps 1 or 2. The app accepts both single movie folders and "parent" folders that contain many movie folders.
 - **Drag-drop** — same as above.
-- **Right-click a card** → Search TMDb / Open Folder / Remove from List.
+- **Double-tap a scraped card** — opens the **Movie Details** window (hero fanart, poster, plot, color-coded crew / studio / country / genres / IDs / file info, scrollable cast strip with photos, plus Play / Open Folder / Trailer buttons). ESC closes it. Resizable and maximizable.
+- **Double-tap an unscraped card** — opens the resizable TMDb search dialog so you can pick the right match.
+- **Right-click a card** → View details / Search TMDb / Open Folder / Remove from List.
 - **List view toggle** (icon in toolbar) — for libraries with hundreds of movies, the dense list view is faster. Your preference is remembered.
+- **Each card shows an inline spinner** next to its status pill while it's being scraped — easy to see which one is in flight when you batch-scrape.
 - **Done** button — closes out the workflow with a confirmation message. Files and metadata are already on disk, so this is more of a "finished" indicator than an action.
 
 ---
 
-## Settings & persistence
+## Settings page
+
+A **gear icon** lives in the title bar next to the About icon. Clicking it opens a single Settings dialog with everything you can persist:
+
+**General**
+
+- **Default output template** — `{Title} ({Year})` or `{Year} - {Title}`.
+- **Recursively scan subfolders by default** — Step 1 starts with the Subfolders toggle on.
+- **Clean embedded MKV metadata by default** — Step 1's "Clean metadata" checkbox starts on.
+
+**Scraping**
+
+- **TMDb language** — 16 languages including English, Burmese, Hindi, Tamil, Telugu, Thai, Chinese, Japanese, Korean, French, German, Spanish, Italian, Portuguese, Russian, Arabic. TMDb returns titles, plots and posters in the chosen language where available, and falls back to English when it doesn't.
+
+**Updates**
+
+- **Check for updates on startup** — silent once-per-24h check against GitHub. When a newer version is published, a toast appears with a **Download** button that fetches the installer directly inside the app (with a live progress percentage) and launches it for you.
+
+---
+
+## Persistence
 
 The app saves settings into `appsettings.json` next to the .exe. You shouldn't need to touch this file, but if you ever want to reset everything, just delete it.
 
 What's remembered between sessions:
 
 - TMDb API key (embedded by default)
+- Everything from the Settings page above
 - Recent source / output folders (last 10 each)
 - Window size + position
 - Which warnings you've dismissed
 - Step 3 view preference (Grid / List)
-- Last output template (`{Title} ({Year})` or `{Year} - {Title}`)
-- "Clean metadata" checkbox state
 - Step 1 sort column + direction
+- Last successful update-check timestamp
 
 ---
 
