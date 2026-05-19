@@ -123,6 +123,9 @@ public class NfoGeneratorService
         // ---- Trailer ----
         AddText(root, "trailer", metadata.TrailerUrl);
 
+        // ---- Edition (Kodi-standard; Director's Cut / Extended / IMAX / …) ----
+        AddText(root, "edition", metadata.Edition);
+
         // ---- Local image refs (kept after fields the spec lists earlier) ----
         AddText(root, "poster", $"{folderBase}-poster.jpg");
         AddText(root, "fanart", $"{folderBase}-fanart.jpg");

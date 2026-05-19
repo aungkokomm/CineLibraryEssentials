@@ -66,15 +66,23 @@
             </Button>
         </StackPanel>
 
-        <!-- About button -->
-        <Button Grid.Column="1"
-                Click="OnAboutClick"
-                Padding="8,4"
-                Background="Transparent"
-                BorderThickness="0"
-                ToolTipService.ToolTip="About CineLibrary Essentials">
-            <FontIcon Glyph="&#xE946;" FontSize="14" />
-        </Button>
+        <!-- Settings + About buttons -->
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+            <Button Click="OnSettingsClick"
+                    Padding="8,4"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    ToolTipService.ToolTip="Settings">
+                <FontIcon Glyph="&#xE713;" FontSize="14" />
+            </Button>
+            <Button Click="OnAboutClick"
+                    Padding="8,4"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    ToolTipService.ToolTip="About CineLibrary Essentials">
+                <FontIcon Glyph="&#xE946;" FontSize="14" />
+            </Button>
+        </StackPanel>
         </Grid>
 
         <!-- ========== Step content (one of three is visible) ========== -->

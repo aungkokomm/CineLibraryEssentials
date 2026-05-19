@@ -222,7 +222,8 @@ public partial class FileToFolderViewModel : ObservableObject
                 _parentViewModel.SetFileOperations(toRun);
                 _parentViewModel.SelectedOutputFolder = OutputFolderPath;
                 var suffix = cleanMetadata ? " (with metadata cleanup)" : string.Empty;
-                StatusMessage = $"✓ Organized {toRun.Count} file(s) into {OutputFolderPath}{suffix}";
+                // result.Message already includes merge counts ("N organized · M merged…")
+                StatusMessage = $"✓ {result.Message} → {OutputFolderPath}{suffix}";
             }
             else
             {

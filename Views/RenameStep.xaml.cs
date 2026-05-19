@@ -267,14 +267,14 @@ public sealed partial class RenameStep : UserControl
             return;
         }
 
-        var dialog = new TmdbSearchDialog(apiKey) { XamlRoot = this.XamlRoot };
+        var dialog = new TmdbSearchDialog(apiKey, _configService.GetScrapeLanguage());
         dialog.SetInitialQuery(preview.CleanedName);
 
-        var result = await dialog.ShowAsync();
-        if (result == ContentDialogResult.Primary && dialog.SelectedItem != null)
+        var selected = await dialog.ShowDialogAsync(App.MainWindow);
+        if (selected != null)
         {
-            _viewModel.ApplyTmdbMatch(preview, dialog.SelectedItem.Title, dialog.SelectedItem.Year);
-            ToastService.Success($"Applied TMDb match: {dialog.SelectedItem.TitleWithYear}");
+            _viewModel.ApplyTmdbMatch(preview, selected.Title, selected.Year);
+            ToastService.Success($"Applied TMDb match: {selected.TitleWithYear}");
         }
     }
 

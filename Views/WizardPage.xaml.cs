@@ -82,6 +82,12 @@ public sealed partial class WizardPage : Page
         await dialog.ShowAsync();
     }
 
+    private async void OnSettingsClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SettingsDialog { XamlRoot = this.XamlRoot };
+        await dialog.ShowAsync();
+    }
+
     // -----------------------------------------------------------------
     //  Step navigation
     // -----------------------------------------------------------------

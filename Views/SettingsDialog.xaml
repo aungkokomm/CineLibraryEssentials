@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="CineLibraryEssentials.Views.SettingsDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Settings"
+    CloseButtonText="Close"
+    DefaultButton="Close">
+    <ScrollViewer MaxHeight="520">
+        <StackPanel Spacing="20" Width="460">
+
+            <!-- ============ General ============ -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="General"
+                           FontWeight="SemiBold"
+                           FontSize="14"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                <!-- Output template -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Default output template" FontSize="13" />
+                    <ComboBox x:Name="TemplateCombo"
+                              MinWidth="220"
+                              SelectionChanged="OnTemplateChanged">
+                        <ComboBoxItem Content="Title (Year)" Tag="{}{Title} ({Year})" />
+                        <ComboBoxItem Content="Year - Title" Tag="{}{Year} - {Title}" />
+                    </ComboBox>
+                    <TextBlock Text="Used when Step 1 cleans filenames."
+                               FontSize="11"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                </StackPanel>
+
+                <!-- Recursive default -->
+                <ToggleSwitch x:Name="RecursiveToggle"
+                              Header="Recursively scan subfolders by default"
+                              Toggled="OnRecursiveToggled" />
+
+                <!-- Clean metadata default -->
+                <ToggleSwitch x:Name="CleanMetaToggle"
+                              Header="Clean embedded MKV metadata by default"
+                              Toggled="OnCleanMetaToggled" />
+            </StackPanel>
+
+            <!-- ============ Scraping ============ -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="Scraping"
+                           FontWeight="SemiBold"
+                           FontSize="14"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                <!-- TMDb language -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="TMDb language" FontSize="13" />
+                    <ComboBox x:Name="LanguageCombo"
+                              MinWidth="260"
+                              SelectionChanged="OnLanguageChanged">
+                        <ComboBoxItem Content="English" Tag="en" />
+                        <ComboBoxItem Content="မြန်မာ — Burmese" Tag="my" />
+                        <ComboBoxItem Content="हिन्दी — Hindi" Tag="hi" />
+                        <ComboBoxItem Content="தமிழ் — Tamil" Tag="ta" />
+                        <ComboBoxItem Content="తెలుగు — Telugu" Tag="te" />
+                        <ComboBoxItem Content="ไทย — Thai" Tag="th" />
+                        <ComboBoxItem Content="中文 — Chinese (Simplified)" Tag="zh" />
+                        <ComboBoxItem Content="日本語 — Japanese" Tag="ja" />
+                        <ComboBoxItem Content="한국어 — Korean" Tag="ko" />
+                        <ComboBoxItem Content="Français — French" Tag="fr" />
+                        <ComboBoxItem Content="Deutsch — German" Tag="de" />
+                        <ComboBoxItem Content="Español — Spanish" Tag="es" />
+                        <ComboBoxItem Content="Italiano — Italian" Tag="it" />
+                        <ComboBoxItem Content="Português — Portuguese" Tag="pt" />
+                        <ComboBoxItem Content="Русский — Russian" Tag="ru" />
+                        <ComboBoxItem Content="العربية — Arabic" Tag="ar" />
+                    </ComboBox>
+                    <TextBlock Text="TMDb will return titles, plots and posters in this language where available. Falls back to English when missing."
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- ============ Updates ============ -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="Updates"
+                           FontWeight="SemiBold"
+                           FontSize="14"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                <ToggleSwitch x:Name="AutoUpdateToggle"
+                              Header="Check for updates on startup"
+                              Toggled="OnAutoUpdateToggled" />
+                <TextBlock Text="Silent once-per-24-hour check against GitHub. A toast appears when a newer version is available."
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</ContentDialog>

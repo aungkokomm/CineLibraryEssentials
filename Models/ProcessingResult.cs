@@ -19,6 +19,9 @@ public class FileOperation
     public string DestinationFolder { get; set; } = string.Empty;
     public string FinalFileName { get; set; } = string.Empty;
 
+    /// <summary>Detected edition tag (e.g. "Director's Cut", "IMAX"), empty if none.</summary>
+    public string Edition { get; set; } = string.Empty;
+
     /// <summary>Whether this operation will be executed when "Run File to Folder" is clicked.</summary>
     public bool IsSelected { get; set; } = true;
 }
@@ -36,6 +39,10 @@ public partial class FilePreview : ObservableObject
     public string OriginalFilePath { get; set; } = string.Empty;
     public long FileSizeBytes { get; set; }
     public int Year { get; set; }
+
+    /// <summary>Detected edition tag (e.g. "Director's Cut", "IMAX"), empty if none.</summary>
+    [ObservableProperty]
+    private string edition = string.Empty;
 
     [ObservableProperty]
     private string cleanedName = string.Empty;

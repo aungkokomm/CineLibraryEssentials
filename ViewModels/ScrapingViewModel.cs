@@ -348,7 +348,8 @@ public partial class ScrapingViewModel : ObservableObject
         if (_scraperService == null)
         {
             var apiKey = _configService.GetApiKey() ?? string.Empty;
-            _scraperService = new ScraperService(apiKey);
+            var lang = _configService.GetScrapeLanguage();
+            _scraperService = new ScraperService(apiKey, lang);
         }
     }
 

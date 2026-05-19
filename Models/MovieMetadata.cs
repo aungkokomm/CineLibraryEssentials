@@ -74,6 +74,12 @@ public class MovieMetadata
     /// <summary>YouTube trailer URL, or empty if no official trailer published.</summary>
     public string TrailerUrl { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Edition tag parsed from the source filename (e.g. "Director's Cut",
+    /// "Extended", "IMAX", "4K Remaster"). Written to NFO as &lt;edition&gt;.
+    /// </summary>
+    public string Edition { get; set; } = string.Empty;
+
     public int Year => !string.IsNullOrEmpty(ReleaseDate) && DateTime.TryParse(ReleaseDate, out var date)
         ? date.Year
         : 0;

@@ -161,8 +161,26 @@ public sealed partial class ScrapingStep : UserControl
 
     private async void OnCardDoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
     {
-        if (sender is Border b && b.Tag is MovieFolderItem item)
+        if (sender is not Border b || b.Tag is not MovieFolderItem item) return;
+
+        // Context-aware: already-scraped folders open the details dialog so the
+        // user can verify what was scraped. Unscraped/failed folders open the
+        // TMDb search so they can pick a match.
+        if (item.IsScraped)
+            await ShowMovieDetailsAsync(item);
+        else
             await OpenTmdbDialogForAsync(item);
+    }
+
+    private async Task ShowMovieDetailsAsync(MovieFolderItem item)
+    {
+        var dialog = new MovieDetailsDialog();
+        if (!dialog.LoadFromFolder(item.FolderPath))
+        {
+            ToastService.Info("No metadata found for this folder yet — run Scrape first.");
+            return;
+        }
+        await dialog.ShowDialogAsync(App.MainWindow);
     }
 
     // -----------------------------------------------------------------
@@ -179,6 +197,12 @@ public sealed partial class ScrapingStep : UserControl
     {
         var item = GetContextRow(sender);
         if (item != null) await OpenTmdbDialogForAsync(item);
+    }
+
+    private async void OnContextViewDetailsClick(object sender, RoutedEventArgs e)
+    {
+        var item = GetContextRow(sender);
+        if (item != null) await ShowMovieDetailsAsync(item);
     }
 
     private void OnContextOpenClick(object sender, RoutedEventArgs e)
@@ -212,15 +236,14 @@ public sealed partial class ScrapingStep : UserControl
             return;
         }
 
-        var dialog = new TmdbSearchDialog(apiKey) { XamlRoot = this.XamlRoot };
+        var dialog = new TmdbSearchDialog(apiKey, _configService.GetScrapeLanguage());
         dialog.SetInitialQuery(item.MovieTitle, item.Year);
 
-        var result = await dialog.ShowAsync();
-        if (result == ContentDialogResult.Primary && dialog.SelectedItem != null)
+        var selected = await dialog.ShowDialogAsync(App.MainWindow);
+        if (selected != null)
         {
             await _viewModel.ScrapeWithTmdbIdAsync(
-                item, dialog.SelectedItem.TmdbId,
-                dialog.SelectedItem.Title, dialog.SelectedItem.Year);
+                item, selected.TmdbId, selected.Title, selected.Year);
 
             if (item.IsScraped)
                 ToastService.Success($"Scraped {item.DisplayName}");

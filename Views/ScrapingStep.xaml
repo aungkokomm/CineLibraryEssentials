@@ -91,6 +91,10 @@
                                         Tag="{Binding}">
                                 <Border.ContextFlyout>
                                     <MenuFlyout>
+                                        <MenuFlyoutItem Text="View details..."
+                                                        Click="OnContextViewDetailsClick">
+                                            <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE946;" /></MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
                                         <MenuFlyoutItem Text="Search TMDb..."
                                                         Click="OnContextScrapeClick">
                                             <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE721;" /></MenuFlyoutItem.Icon>
@@ -132,20 +136,26 @@
                                                       MinWidth="0"
                                                       Padding="0" />
                                         </Border>
-                                        <!-- Status pill bottom-left -->
-                                        <Border CornerRadius="8"
-                                                Padding="6,1"
-                                                HorizontalAlignment="Left"
-                                                VerticalAlignment="Bottom"
-                                                Margin="4">
-                                            <Border.Background>
-                                                <SolidColorBrush Color="{Binding Status, Converter={StaticResource ScrapingStatusColorConverter}}" />
-                                            </Border.Background>
-                                            <TextBlock Text="{Binding Status}"
-                                                       Foreground="White"
-                                                       FontWeight="SemiBold"
-                                                       FontSize="9" />
-                                        </Border>
+                                        <!-- Status pill bottom-left, with inline spinner while scraping -->
+                                        <StackPanel Orientation="Horizontal"
+                                                    Spacing="4"
+                                                    HorizontalAlignment="Left"
+                                                    VerticalAlignment="Bottom"
+                                                    Margin="4">
+                                            <ProgressRing Width="12" Height="12"
+                                                          IsActive="{Binding IsScraping}"
+                                                          Visibility="{Binding IsScraping, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                            <Border CornerRadius="8" Padding="6,1">
+                                                <Border.Background>
+                                                    <SolidColorBrush Color="{Binding Status, Converter={StaticResource ScrapingStatusColorConverter}}" />
+                                                </Border.Background>
+                                                <TextBlock Text="{Binding Status}"
+                                                           Foreground="White"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="9"
+                                                           ToolTipService.ToolTip="{Binding Status}" />
+                                            </Border>
+                                        </StackPanel>
                                     </Grid>
 
                                     <!-- Title + year -->
@@ -204,6 +214,9 @@
                             <Grid ColumnDefinitions="36,*,140,Auto">
                                 <Grid.ContextFlyout>
                                     <MenuFlyout>
+                                        <MenuFlyoutItem Text="View details..." Click="OnContextViewDetailsClick">
+                                            <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE946;" /></MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
                                         <MenuFlyoutItem Text="Search TMDb..." Click="OnContextScrapeClick">
                                             <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE721;" /></MenuFlyoutItem.Icon>
                                         </MenuFlyoutItem>
@@ -228,18 +241,23 @@
                                                TextTrimming="CharacterEllipsis"
                                                ToolTipService.ToolTip="{Binding FolderPath}" />
                                 </StackPanel>
-                                <Border Grid.Column="2"
-                                        CornerRadius="10"
-                                        Padding="8,2"
-                                        HorizontalAlignment="Left"
-                                        VerticalAlignment="Center">
-                                    <Border.Background>
-                                        <SolidColorBrush Color="{Binding Status, Converter={StaticResource ScrapingStatusColorConverter}}" />
-                                    </Border.Background>
-                                    <TextBlock Text="{Binding Status}"
-                                               Foreground="White"
-                                               FontWeight="SemiBold" FontSize="10" />
-                                </Border>
+                                <StackPanel Grid.Column="2"
+                                            Orientation="Horizontal"
+                                            Spacing="6"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center">
+                                    <ProgressRing Width="14" Height="14"
+                                                  IsActive="{Binding IsScraping}"
+                                                  Visibility="{Binding IsScraping, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                    <Border CornerRadius="10" Padding="8,2">
+                                        <Border.Background>
+                                            <SolidColorBrush Color="{Binding Status, Converter={StaticResource ScrapingStatusColorConverter}}" />
+                                        </Border.Background>
+                                        <TextBlock Text="{Binding Status}"
+                                                   Foreground="White"
+                                                   FontWeight="SemiBold" FontSize="10" />
+                                    </Border>
+                                </StackPanel>
                                 <StackPanel Grid.Column="3"
                                             Orientation="Horizontal"
                                             Spacing="2"

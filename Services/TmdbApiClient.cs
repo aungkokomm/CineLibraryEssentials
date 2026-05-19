@@ -9,13 +9,26 @@ public class TmdbApiClient
     private const int RequestDelay = 250; // milliseconds between requests
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
+    private readonly string _language;
     private DateTime _lastRequestTime = DateTime.MinValue;
 
-    public TmdbApiClient(string apiKey)
+    /// <summary>
+    /// Constructs a client with the user's preferred TMDb language. When the
+    /// requested language has data, titles/plots/posters come back localized;
+    /// otherwise TMDb falls back to English automatically.
+    /// </summary>
+    public TmdbApiClient(string apiKey, string language = "en")
     {
         _apiKey = apiKey;
+        _language = string.IsNullOrWhiteSpace(language) ? "en" : language;
         _httpClient = new HttpClient();
     }
+
+    /// <summary>Appends the configured TMDb language code to a request URL.</summary>
+    private string AppendLanguage(string url) =>
+        url.Contains("&language=") || url.Contains("?language=")
+            ? url
+            : $"{url}&language={_language}";
 
     public async Task<List<MovieMetadata>> SearchMovieAsync(string title, int? year = null)
     {
@@ -26,6 +39,8 @@ public class TmdbApiClient
 
         if (year.HasValue)
             url += $"&primary_release_year={year}";
+
+        url = AppendLanguage(url);
 
         try
         {
@@ -53,6 +68,7 @@ public class TmdbApiClient
         // MediaElch writes to the NFO in one request.
         var url = $"{BaseUrl}/movie/{tmdbId}?api_key={_apiKey}" +
                   $"&append_to_response=credits,release_dates,videos";
+        url = AppendLanguage(url);
 
         try
         {
@@ -224,7 +240,7 @@ public class TmdbApiClient
     {
         await RateLimitAsync();
 
-        var url = $"{BaseUrl}/movie/{tmdbId}/credits?api_key={_apiKey}";
+        var url = AppendLanguage($"{BaseUrl}/movie/{tmdbId}/credits?api_key={_apiKey}");
 
         try
         {

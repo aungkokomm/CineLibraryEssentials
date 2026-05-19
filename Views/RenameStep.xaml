@@ -245,11 +245,22 @@
                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                             </StackPanel>
 
-                            <TextBox Grid.Column="2"
-                                     Text="{Binding CleanedName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                     VerticalAlignment="Center"
-                                     Margin="4,0"
-                                     FontSize="12" />
+                            <StackPanel Grid.Column="2" Orientation="Vertical" Margin="4,0" VerticalAlignment="Center" Spacing="2">
+                                <TextBox Text="{Binding CleanedName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                         FontSize="12" />
+                                <!-- Edition chip — visible only when an edition was detected -->
+                                <Border CornerRadius="4"
+                                        Padding="6,1"
+                                        HorizontalAlignment="Left"
+                                        Background="{ThemeResource AccentFillColorTertiaryBrush}"
+                                        Visibility="{Binding Edition, Converter={StaticResource StringNonEmptyToVisibilityConverter}}"
+                                        ToolTipService.ToolTip="Detected edition — written to NFO as &lt;edition&gt;">
+                                    <TextBlock Text="{Binding Edition}"
+                                               Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                               FontWeight="SemiBold"
+                                               FontSize="10" />
+                                </Border>
+                            </StackPanel>
 
                             <Border Grid.Column="3"
                                     CornerRadius="8"

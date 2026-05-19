@@ -38,6 +38,9 @@ public sealed partial class MainWindow : Window
     {
         try
         {
+            // Respect the user's "Check for updates on startup" preference.
+            if (!_configService.GetAutoCheckForUpdates()) return;
+
             // Throttle: only check once every 24 hours so launches don't hit the
             // GitHub API every time.
             var lastCheck = _configService.GetLastUpdateCheck();
@@ -72,29 +75,101 @@ public sealed partial class MainWindow : Window
 
     private void ShowUpdateToast(UpdateService.UpdateInfo info)
     {
-        // Action toast: primary button opens the release page; the toast's built-in
-        // X dismisses for this session. The 24h throttle means it won't reappear
-        // again today even if the user just closes it.
+        // If the release ships a Setup .exe asset, the Download button does the
+        // full in-app flow: fetch → launch installer → exit. If no asset is found
+        // (rare; manual GitHub release without attached binary), fall back to
+        // opening the release page in the user's browser.
+        var hasInstallerAsset = !string.IsNullOrEmpty(info.InstallerUrl);
+
         ToastService.ShowAction(
-            message: $"Version {info.LatestVersion} is available — you're on {info.CurrentVersion}.",
+            message: hasInstallerAsset
+                ? $"Version {info.LatestVersion} is available — you're on {info.CurrentVersion}."
+                : $"Version {info.LatestVersion} is available — open the release page to download.",
             title: "Update available",
-            actionText: "Download",
+            actionText: hasInstallerAsset ? "Download and install" : "Open release page",
             onAction: () =>
             {
-                try
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = info.ReleaseUrl,
-                        UseShellExecute = true
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Open release URL failed: {ex.Message}");
-                }
+                if (hasInstallerAsset)
+                    _ = DownloadAndInstallAsync(info);
+                else
+                    OpenReleasePage(info.ReleaseUrl);
             },
-            autoDismissMs: 60000); // visible for one minute, then auto-fades
+            autoDismissMs: 60000);
+    }
+
+    /// <summary>
+    /// Downloads the release installer to %TEMP%, shows a progress toast while
+    /// it runs, then launches the installer and exits the app so the new build
+    /// can take over.
+    /// </summary>
+    private async Task DownloadAndInstallAsync(UpdateService.UpdateInfo info)
+    {
+        var progressToast = ToastService.ShowAction(
+            message: "Starting download — 0%",
+            title: $"Downloading v{info.LatestVersion}",
+            actionText: "Cancel",
+            onAction: () => { /* set by cancel token below */ },
+            autoDismissMs: int.MaxValue);
+
+        var cts = new CancellationTokenSource();
+        if (progressToast?.ActionButton is Microsoft.UI.Xaml.Controls.Button cancelBtn)
+        {
+            cancelBtn.Click += (_, _) => cts.Cancel();
+        }
+
+        var progress = new Progress<double>(pct =>
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (progressToast != null)
+                    progressToast.Message = $"Downloading… {pct * 100:F0}%";
+            });
+        });
+
+        try
+        {
+            var installerPath = await _updateService.DownloadInstallerAsync(info, progress, cts.Token);
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (progressToast != null)
+                {
+                    progressToast.Message = "Launching installer…";
+                    progressToast.IsOpen = false;
+                }
+            });
+
+            _updateService.LaunchInstallerAndExit(installerPath);
+        }
+        catch (OperationCanceledException)
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (progressToast != null) progressToast.IsOpen = false;
+                ToastService.Info("Update download cancelled.");
+            });
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Update download failed: {ex.Message}");
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (progressToast != null) progressToast.IsOpen = false;
+                ToastService.Error($"Update failed: {ex.Message}");
+            });
+        }
+    }
+
+    private static void OpenReleasePage(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Open release URL failed: {ex.Message}");
+        }
     }
 
     private void ConfigureTitleBar()

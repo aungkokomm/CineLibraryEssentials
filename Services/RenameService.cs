@@ -57,6 +57,7 @@ public class RenameService
                 OriginalFilePath = file,
                 FileSizeBytes = fileInfo.Length,
                 Year = parsed.Year,
+                Edition = parsed.Edition,
                 CleanedName = cleanedName,
                 Confidence = parsed.Confidence,
                 IsReviewed = false,
@@ -319,6 +320,7 @@ public class RenameService
                 OriginalFileName = preview.OriginalName,
                 CleanedTitle = parsed.Title,
                 Year = parsed.Year,
+                Edition = string.IsNullOrEmpty(preview.Edition) ? parsed.Edition : preview.Edition,
                 Confidence = preview.Confidence,
                 DestinationFolder = destinationFolder,
                 FinalFileName = preview.CleanedName

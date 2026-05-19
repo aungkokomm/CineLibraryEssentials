@@ -126,6 +126,21 @@ public class ConfigService
         SaveConfig();
     }
 
+    // ----- Settings page (v1.1.11) -----
+    public string GetScrapeLanguage() =>
+        string.IsNullOrWhiteSpace(_config.ScrapeLanguage) ? "en" : _config.ScrapeLanguage;
+    public void SetScrapeLanguage(string code)
+    {
+        _config.ScrapeLanguage = string.IsNullOrWhiteSpace(code) ? "en" : code;
+        SaveConfig();
+    }
+
+    public bool GetAutoCheckForUpdates() => _config.AutoCheckForUpdates;
+    public void SetAutoCheckForUpdates(bool v) { _config.AutoCheckForUpdates = v; SaveConfig(); }
+
+    public bool GetRecursiveScanDefault() => _config.RecursiveScanDefault;
+    public void SetRecursiveScanDefault(bool v) { _config.RecursiveScanDefault = v; SaveConfig(); }
+
     // ----- Persistence -----
     private AppConfig LoadConfig()
     {

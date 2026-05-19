@@ -82,6 +82,46 @@ public static class RegexPatterns
     private static readonly Regex SeparatorPattern = new(@"[\._]+", RegexOptions.Compiled);
     private static readonly Regex MultiWhitespacePattern = new(@"\s+", RegexOptions.Compiled);
 
+    // Edition tags — patterns and their canonical display form. Detected separately
+    // from the title (and BEFORE junk-stripping removes them) so the cleaned title
+    // is unchanged but the edition is surfaced as its own metadata field.
+    // Order matters: more-specific patterns come first so "4K Remaster" wins over
+    // bare "Remastered".
+    private static readonly (Regex Match, string Canonical)[] EditionPatterns = new (Regex, string)[]
+    {
+        (new(@"\b4K[\.\s_\-]?(?:Remaster(?:ed)?|Restoration)\b",         RegexOptions.IgnoreCase | RegexOptions.Compiled), "4K Remaster"),
+        (new(@"\bDirector(?:['']s|s)?\.?[\s_\.\-]?Cut\b",                RegexOptions.IgnoreCase | RegexOptions.Compiled), "Director's Cut"),
+        (new(@"\bExtended\.?[\s_\.\-]?(?:Cut|Edition|Version)\b",        RegexOptions.IgnoreCase | RegexOptions.Compiled), "Extended"),
+        (new(@"\bExtended\b",                                            RegexOptions.IgnoreCase | RegexOptions.Compiled), "Extended"),
+        (new(@"\bIMAX(?:\.?Enhanced)?\b",                                RegexOptions.IgnoreCase | RegexOptions.Compiled), "IMAX"),
+        (new(@"\bTheatrical(?:\.?[\s_\.\-]?(?:Cut|Version))?\b",         RegexOptions.IgnoreCase | RegexOptions.Compiled), "Theatrical"),
+        (new(@"\bUnrated\b",                                             RegexOptions.IgnoreCase | RegexOptions.Compiled), "Unrated"),
+        (new(@"\bUncut\b",                                               RegexOptions.IgnoreCase | RegexOptions.Compiled), "Uncut"),
+        (new(@"\bSpecial\.?[\s_\.\-]?Edition\b",                         RegexOptions.IgnoreCase | RegexOptions.Compiled), "Special Edition"),
+        (new(@"\bFinal\.?[\s_\.\-]?Cut\b",                               RegexOptions.IgnoreCase | RegexOptions.Compiled), "Final Cut"),
+        (new(@"\bUltimate\.?[\s_\.\-]?Edition\b",                        RegexOptions.IgnoreCase | RegexOptions.Compiled), "Ultimate Edition"),
+        (new(@"\bAnniversary\.?[\s_\.\-]?Edition\b",                     RegexOptions.IgnoreCase | RegexOptions.Compiled), "Anniversary Edition"),
+        (new(@"\bLimited\.?[\s_\.\-]?Edition\b",                         RegexOptions.IgnoreCase | RegexOptions.Compiled), "Limited Edition"),
+        (new(@"\bCollector(?:['']s|s)?\.?[\s_\.\-]?Edition\b",           RegexOptions.IgnoreCase | RegexOptions.Compiled), "Collector's Edition"),
+        (new(@"\bCriterion(?:\.?Collection)?\b",                         RegexOptions.IgnoreCase | RegexOptions.Compiled), "Criterion"),
+        (new(@"\bOpen\.?[\s_\.\-]?Matte\b",                              RegexOptions.IgnoreCase | RegexOptions.Compiled), "Open Matte"),
+        (new(@"\bRemaster(?:ed)?\b",                                     RegexOptions.IgnoreCase | RegexOptions.Compiled), "Remastered"),
+    };
+
+    /// <summary>
+    /// Scans a filename for an edition tag and returns the canonical form
+    /// ("Director's Cut", "Extended", "IMAX", "4K Remaster", …) or empty
+    /// if none is present. The first matching pattern wins; patterns are
+    /// ordered most-specific-first so e.g. "4K.Remaster" beats "Remastered".
+    /// </summary>
+    public static string DetectEdition(string filename)
+    {
+        if (string.IsNullOrEmpty(filename)) return string.Empty;
+        foreach (var (rx, canonical) in EditionPatterns)
+            if (rx.IsMatch(filename)) return canonical;
+        return string.Empty;
+    }
+
     // Words that should stay lowercase in title case
     private static readonly HashSet<string> SmallWords = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -94,10 +134,10 @@ public static class RegexPatterns
         @"^M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    public record FilenameParseResult(string Title, int Year, double Confidence);
+    public record FilenameParseResult(string Title, int Year, double Confidence, string Edition);
 
     /// <summary>
-    /// Parses a messy filename into title + year + confidence score.
+    /// Parses a messy filename into title + year + edition + confidence score.
     /// </summary>
     public static FilenameParseResult ParseFilename(string filename)
     {
@@ -109,6 +149,11 @@ public static class RegexPatterns
 
         // 0b. Normalize bracket-style years: [1996] / {1996} → (1996)
         working = BracketYearPattern.Replace(working, "($1)");
+
+        // 0c. Detect edition NOW (before junk-stripping eats the words). The edition
+        //     stays surfaced as a separate field even though the JunkTagPattern below
+        //     will remove the same text from the title.
+        var edition = DetectEdition(working);
 
         // 1. Strip tracker URLs at the start
         working = TrackerUrlPattern.Replace(working, " ");
@@ -170,7 +215,7 @@ public static class RegexPatterns
             confidence = 0.20;
         }
 
-        return new FilenameParseResult(title, year, confidence);
+        return new FilenameParseResult(title, year, confidence, edition);
     }
 
     /// <summary>

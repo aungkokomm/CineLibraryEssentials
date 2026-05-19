@@ -9,9 +9,9 @@ public class ScraperService
     private readonly NfoGeneratorService _nfoService;
     private readonly MediaProbeService _mediaProbe;
 
-    public ScraperService(string tmdbApiKey)
+    public ScraperService(string tmdbApiKey, string language = "en")
     {
-        _tmdbClient = new TmdbApiClient(tmdbApiKey);
+        _tmdbClient = new TmdbApiClient(tmdbApiKey, language);
         _imageService = new ImageDownloadService();
         _nfoService = new NfoGeneratorService();
         _mediaProbe = new MediaProbeService();
@@ -83,6 +83,16 @@ public class ScraperService
         // Find a video file in the folder to base poster/fanart filenames on
         var videoFile = Directory.GetFiles(movieFolderPath, "*.*")
             .FirstOrDefault(f => Utilities.FileFormatValidator.IsVideoFile(f));
+
+        // Edition tag detection — read straight off the video filename (Director's
+        // Cut / Extended / IMAX / 4K Remaster / etc.). Surfaces in the NFO as
+        // <edition> which Kodi/Plex/Jellyfin all recognise.
+        if (!string.IsNullOrEmpty(videoFile))
+        {
+            var detected = Utilities.RegexPatterns.DetectEdition(Path.GetFileName(videoFile));
+            if (!string.IsNullOrEmpty(detected))
+                details.Edition = detected;
+        }
 
         // Poster — pull TMDb's "original" upload (typically 1500–2000px tall).
         // The previous w500 default produced blurry results on any modern display.

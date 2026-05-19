@@ -41,4 +41,12 @@ public class AppConfig
     public long LastUpdateCheckUtcTicks { get; set; }
     /// <summary>Version the user clicked "Skip" on — don't bug them about it again until a newer one ships.</summary>
     public string SkippedUpdateVersion { get; set; } = string.Empty;
+
+    // ----- Settings page (v1.1.11) -----
+    /// <summary>ISO 639-1 language code for TMDb scrapes ("en", "my", "hi", …).</summary>
+    public string ScrapeLanguage { get; set; } = "en";
+    /// <summary>Whether the silent once-per-24h GitHub update check runs on startup.</summary>
+    public bool AutoCheckForUpdates { get; set; } = true;
+    /// <summary>Default "Recursive subfolders" toggle state in Step 1's source picker.</summary>
+    public bool RecursiveScanDefault { get; set; } = false;
 }

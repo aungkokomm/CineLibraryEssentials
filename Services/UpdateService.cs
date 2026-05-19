@@ -1,14 +1,15 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Reflection;
 using System.Text.Json;
 
 namespace CineLibraryEssentials.Services;
 
 /// <summary>
-/// Lightweight update checker. Polls the GitHub Releases API for the latest
-/// tag and compares it against the running assembly version. No auto-download —
-/// just tells the user "newer version available" and points to the releases page.
+/// Update checker + one-click installer downloader. Polls the GitHub Releases
+/// API, compares the latest tag against the running assembly version, and can
+/// download the attached installer .exe directly so the user gets a "Download
+/// and install" experience without leaving the app.
 /// </summary>
 public class UpdateService
 {
@@ -27,6 +28,11 @@ public class UpdateService
         public string ReleaseUrl { get; set; } = ReleasesPageUrl;
         public string? ReleaseNotes { get; set; }
         public string? Error { get; set; }
+
+        /// <summary>Direct download URL for the installer .exe asset, if present.</summary>
+        public string? InstallerUrl { get; set; }
+        public string? InstallerFileName { get; set; }
+        public long InstallerSizeBytes { get; set; }
     }
 
     /// <summary>
@@ -49,15 +55,7 @@ public class UpdateService
 
         try
         {
-            using var http = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(10)
-            };
-            // GitHub API requires a User-Agent header.
-            http.DefaultRequestHeaders.UserAgent.Add(
-                new ProductInfoHeaderValue("CineLibraryEssentials", info.CurrentVersion));
-            http.DefaultRequestHeaders.Accept.Add(
-                new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+            using var http = BuildHttpClient(info.CurrentVersion, TimeSpan.FromSeconds(10));
 
             using var resp = await http.GetAsync(LatestReleaseUrl);
             if (!resp.IsSuccessStatusCode)
@@ -82,6 +80,29 @@ public class UpdateService
             if (!string.IsNullOrEmpty(htmlUrl))
                 info.ReleaseUrl = htmlUrl;
             info.ReleaseNotes = body;
+
+            // Walk assets[] for the installer .exe (prefer the one whose name
+            // contains "Setup" — that's the Inno Setup output).
+            if (root.TryGetProperty("assets", out var assets))
+            {
+                foreach (var asset in assets.EnumerateArray())
+                {
+                    var name = asset.TryGetProperty("name", out var an) ? an.GetString() ?? "" : "";
+                    var url = asset.TryGetProperty("browser_download_url", out var au) ? au.GetString() ?? "" : "";
+                    var size = asset.TryGetProperty("size", out var asz) ? asz.GetInt64() : 0L;
+                    if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(url)) continue;
+                    if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    // Prefer Setup-named installers; fall back to first .exe found.
+                    if (info.InstallerUrl == null
+                        || name.Contains("Setup", StringComparison.OrdinalIgnoreCase))
+                    {
+                        info.InstallerUrl = url;
+                        info.InstallerFileName = name;
+                        info.InstallerSizeBytes = size;
+                    }
+                }
+            }
 
             // Pad to 4 parts so Version.Parse is happy: "1.1.5" -> "1.1.5.0".
             var paddedLatest = PadToFourParts(latestStr);
@@ -112,6 +133,88 @@ public class UpdateService
         }
 
         return info;
+    }
+
+    /// <summary>
+    /// Downloads the installer .exe attached to the latest GitHub release into
+    /// %TEMP% and returns the path. Reports progress as a fraction (0.0–1.0).
+    /// Throws on network or I/O failure so callers can show an error.
+    /// </summary>
+    public async Task<string> DownloadInstallerAsync(
+        UpdateInfo info,
+        IProgress<double>? progress = null,
+        CancellationToken cancel = default)
+    {
+        if (string.IsNullOrEmpty(info.InstallerUrl))
+            throw new InvalidOperationException("No installer asset attached to this release.");
+
+        var tempDir = Path.Combine(Path.GetTempPath(), "CineLibraryEssentials-Update");
+        Directory.CreateDirectory(tempDir);
+        var outPath = Path.Combine(tempDir,
+            info.InstallerFileName ?? $"CineLibraryEssentials_Setup_{info.LatestVersion}.exe");
+
+        // If we already downloaded this exact file (same size), reuse it.
+        if (File.Exists(outPath)
+            && info.InstallerSizeBytes > 0
+            && new FileInfo(outPath).Length == info.InstallerSizeBytes)
+        {
+            progress?.Report(1.0);
+            return outPath;
+        }
+
+        using var http = BuildHttpClient(info.CurrentVersion, TimeSpan.FromMinutes(10));
+        using var resp = await http.GetAsync(info.InstallerUrl,
+            HttpCompletionOption.ResponseHeadersRead, cancel);
+        resp.EnsureSuccessStatusCode();
+
+        var totalBytes = resp.Content.Headers.ContentLength
+                         ?? (info.InstallerSizeBytes > 0 ? info.InstallerSizeBytes : -1);
+
+        using (var src = await resp.Content.ReadAsStreamAsync(cancel))
+        using (var dst = new FileStream(outPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            var buffer = new byte[81920];
+            long downloaded = 0;
+            int read;
+            while ((read = await src.ReadAsync(buffer, cancel)) > 0)
+            {
+                await dst.WriteAsync(buffer.AsMemory(0, read), cancel);
+                downloaded += read;
+                if (totalBytes > 0)
+                    progress?.Report(Math.Min(1.0, downloaded / (double)totalBytes));
+            }
+        }
+
+        return outPath;
+    }
+
+    /// <summary>
+    /// Launches the downloaded installer and exits the current process so the
+    /// installer can overwrite the running .exe.
+    /// </summary>
+    public void LaunchInstallerAndExit(string installerPath)
+    {
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = installerPath,
+            UseShellExecute = true,
+            // /SILENT would run an unattended install; default behavior shows the
+            // usual Inno Setup wizard so the user sees what's happening.
+        });
+
+        // Give the installer a moment to spawn before we vanish.
+        Task.Delay(500).Wait();
+        Environment.Exit(0);
+    }
+
+    private static HttpClient BuildHttpClient(string version, TimeSpan timeout)
+    {
+        var http = new HttpClient { Timeout = timeout };
+        http.DefaultRequestHeaders.UserAgent.Add(
+            new ProductInfoHeaderValue("CineLibraryEssentials", version));
+        http.DefaultRequestHeaders.Accept.Add(
+            new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+        return http;
     }
 
     private static string PadToFourParts(string version)

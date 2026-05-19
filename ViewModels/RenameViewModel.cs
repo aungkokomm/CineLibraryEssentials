@@ -89,6 +89,7 @@ public partial class RenameViewModel : ObservableObject
         // Restore persisted settings
         cleanEmbeddedMetadata = _configService.GetCleanEmbeddedMetadata();
         outputTemplate = _configService.GetLastTemplate();
+        isRecursive = _configService.GetRecursiveScanDefault();
         var (col, desc) = _configService.GetStep1Sort();
         sortColumn = col;
         sortDescending = desc;
