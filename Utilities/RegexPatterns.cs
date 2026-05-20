@@ -87,14 +87,25 @@ public static class RegexPatterns
     // Capturing patterns, tried in order from most-specific to least.
     private static readonly Regex[] TvEpisodeCaptures = new[]
     {
-        // S01E01, s01.e01, S1E1
-        new Regex(@"[Ss](?<s>\d{1,2})[\._\-\s]?[Ee](?<e>\d{1,2})", RegexOptions.Compiled),
-        // 1x01, 12x34
-        new Regex(@"\b(?<s>\d{1,2})x(?<e>\d{1,2})\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
-        // Season 1 Episode 1 / Season.1.Episode.1
-        new Regex(@"Season[\.\s_]?(?<s>\d{1,2})[\.\s_]?Episode[\.\s_]?(?<e>\d{1,2})",
+        // S01E01, s01.e01, S1E1, S01E001
+        new Regex(@"[Ss](?<s>\d{1,2})[\._\-\s]?[Ee](?<e>\d{1,3})", RegexOptions.Compiled),
+        // 1x01, 12x345
+        new Regex(@"\b(?<s>\d{1,2})x(?<e>\d{1,3})\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        // "Season 01, Episode 01" / "Season 1 Episode 1" / "Season.1.Episode.1"
+        // / "Season 1 - Episode 1". The [\s\._,\-]* between the parts allows any
+        // mix of spaces, dots, underscores, commas and dashes (so the common
+        // "Season 01, Episode 01" parenthetical form matches).
+        new Regex(@"Season[\s\._,\-]*(?<s>\d{1,3})[\s\._,\-]*Episode[\s\._,\-]*(?<e>\d{1,3})",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        // Short forms: "Se01 Ep01", "Se 1 Ep 1"
+        new Regex(@"Se[\s\._]*(?<s>\d{1,2})[\s\._,\-]*Ep[\s\._]*(?<e>\d{1,3})",
             RegexOptions.IgnoreCase | RegexOptions.Compiled),
     };
+
+    // Stray bracket characters left over after splitting around the SxxExx marker
+    // (e.g. "Sherlock (" or "A Study in Pink)").
+    private static readonly Regex StrayBracketPattern = new(
+        @"[\(\)\[\]\{\}]", RegexOptions.Compiled);
 
     public record TvEpisodeParseResult(
         string ShowName,
@@ -127,10 +138,14 @@ public static class RegexPatterns
 
         // Show name = everything BEFORE the SxxExx marker.
         // Then strip junk tags + release-group prefix + brackets like the movie path.
+        // The marker may sit inside parentheses — e.g. "Sherlock (Season 01, Episode 01
+        // - A Study in Pink)" — which leaves a dangling "(" on the show side and ")"
+        // on the title side, so we explicitly remove stray bracket characters too.
         var showPart = working[..best.Index];
         showPart = LeadingPrefixPattern.Replace(showPart, " ");
         showPart = BracketsPattern.Replace(showPart, " ");
         showPart = JunkTagPattern.Replace(showPart, " ");
+        showPart = StrayBracketPattern.Replace(showPart, " ");
         showPart = SeparatorPattern.Replace(showPart, " ");
         showPart = MultiWhitespacePattern.Replace(showPart, " ").Trim(' ', '-', '_', '.');
         var showName = SmartTitleCase(showPart);
@@ -144,6 +159,7 @@ public static class RegexPatterns
         afterPart = BracketsPattern.Replace(afterPart, " ");
         afterPart = JunkTagPattern.Replace(afterPart, " ");
         afterPart = ReleaseGroupPattern.Replace(afterPart, " ");
+        afterPart = StrayBracketPattern.Replace(afterPart, " ");
         afterPart = SeparatorPattern.Replace(afterPart, " ");
         afterPart = MultiWhitespacePattern.Replace(afterPart, " ").Trim(' ', '-', '_', '.');
         var episodeTitle = string.IsNullOrEmpty(afterPart) ? string.Empty : SmartTitleCase(afterPart);
