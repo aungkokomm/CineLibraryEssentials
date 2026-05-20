@@ -109,6 +109,13 @@ public class ImageDownloadService
         return name + ".jpg";
     }
 
+    /// <summary>
+    /// Public wrapper around the retrying downloader for callers (TV scraper)
+    /// that need to fetch a single image at a known URL.
+    /// </summary>
+    public Task<bool> DownloadAnyImageAsync(string imageUrl, string outputPath)
+        => DownloadImageAsync(imageUrl, outputPath);
+
     private async Task<bool> DownloadImageAsync(string imageUrl, string outputPath)
     {
         for (int attempt = 0; attempt < MaxRetries; attempt++)

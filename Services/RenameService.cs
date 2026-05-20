@@ -10,10 +10,31 @@ public class RenameService
     /// <summary>Year-first sortable format.</summary>
     public const string TemplateYearFirst = "{Year} - {Title}";
 
+    /// <summary>
+    /// Builds the Kodi-standard TV episode filename. Format:
+    ///   "Show Name - S01E01 - Episode Title"   (when episode title is present)
+    ///   "Show Name - S01E01"                   (no title)
+    /// Used by both Step 1 (RenameService) and Step 2 (FileToFolderViewModel)
+    /// so the format stays consistent across the wizard.
+    /// </summary>
+    public static string BuildTvFileName(string showName, int season, int episode, string episodeTitle)
+    {
+        var basePart = $"{showName.Trim()} - S{season:D2}E{episode:D2}";
+        if (string.IsNullOrWhiteSpace(episodeTitle)) return basePart;
+        return $"{basePart} - {episodeTitle.Trim()}";
+    }
+
+    /// <summary>
+    /// Wizard mode passed in from the ViewModel — controls how each file is parsed.
+    /// "Auto" = per-file detection, "Movies" = force movie path, "TvShows" = force TV path.
+    /// </summary>
+    public enum Mode { Auto, Movies, TvShows }
+
     public List<FilePreview> AnalyzeFiles(
         string sourceFolder,
         bool recursive = false,
-        string template = TemplatePlex)
+        string template = TemplatePlex,
+        Mode mode = Mode.Auto)
     {
         var previews = new List<FilePreview>();
 
@@ -45,9 +66,41 @@ public class RenameService
             catch { continue; }
 
             var fileName = Path.GetFileName(file);
-            var parsed = RegexPatterns.ParseFilename(fileName);
             var extension = Path.GetExtension(file);
 
+            // TV path: if the file matches a TV episode pattern (and mode allows it),
+            // format the cleaned name as "Show - S01E01 - Episode Title.ext" (Kodi
+            // convention) and capture show/season/episode so Step 2 builds the
+            // Show/Season XX/ hierarchy. Mode.Movies disables this entirely so a
+            // movie called "Star Wars Episode IV" doesn't get misclassified.
+            var tv = mode == Mode.Movies ? null : RegexPatterns.ParseTvEpisode(fileName);
+            if (tv != null && !string.IsNullOrEmpty(tv.ShowName))
+            {
+                var tvCleanedName = PathSanitizer.SanitizeFileName(
+                    BuildTvFileName(tv.ShowName, tv.Season, tv.Episode, tv.EpisodeTitle)) + extension;
+
+                previews.Add(new FilePreview
+                {
+                    OriginalName = fileName,
+                    OriginalFilePath = file,
+                    FileSizeBytes = fileInfo.Length,
+                    CleanedName = tvCleanedName,
+                    Confidence = tv.Confidence,
+                    IsReviewed = false,
+                    IsSelected = true,
+                    IsTvEpisode = true,
+                    ShowName = tv.ShowName,
+                    Season = tv.Season,
+                    Episode = tv.Episode,
+                    EpisodeTitle = tv.EpisodeTitle,
+                });
+                continue;
+            }
+
+            // Movie path (also: TvShows-mode files that didn't match S/E — they get
+            // parsed as movies and shown with a warning that the user should edit
+            // the cleaned name manually to a "Show - S01E01" form).
+            var parsed = RegexPatterns.ParseFilename(fileName);
             var formatted = ApplyTemplate(parsed.Title, parsed.Year, template);
             var cleanedName = PathSanitizer.SanitizeFileName(formatted) + extension;
 
@@ -62,8 +115,15 @@ public class RenameService
                 Confidence = parsed.Confidence,
                 IsReviewed = false,
                 IsSelected = true,
-                IsTvEpisode = RegexPatterns.IsTvEpisode(fileName)
+                IsTvEpisode = false,
             };
+
+            // In TV mode, files without a parsed S/E pattern need attention.
+            if (mode == Mode.TvShows)
+            {
+                preview.HasWarning = true;
+                preview.WarningMessage = "No S/E pattern found — edit the name to match \"Show - S01E01\".";
+            }
 
             previews.Add(preview);
         }
@@ -103,7 +163,6 @@ public class RenameService
     {
         var previewsList = previews.ToList();
         var result = new ProcessingResult { Success = true };
-        var companionExtensions = new[] { ".srt", ".sub", ".ass", ".ssa", ".vtt", ".idx" };
         var metadataCleaner = cleanEmbeddedMetadata ? new MetadataCleanerService() : null;
 
         // ---- Pass 1: rename files in their current folder ----
@@ -166,24 +225,24 @@ public class RenameService
                 await Task.Run(() => File.Move(oldFilePath, newPath));
                 undoLog?.Add(new UndoService.RenameRecord(oldFilePath, newPath, IsDirectory: false));
 
-                // Rename companion files (same base name, different extension)
-                var oldBase = Path.GetFileNameWithoutExtension(oldFilePath);
-                var newBase = Path.GetFileNameWithoutExtension(p.CleanedName);
-                foreach (var ext in companionExtensions)
+                // Rename companion files (subtitles, language-suffixed subs, etc.).
+                // CompanionFileHelper handles base-name matches AND .en.srt /
+                // .en.forced.srt patterns, preserving the suffix.
+                foreach (var companion in Utilities.CompanionFileHelper.Find(oldFilePath, p.CleanedName))
                 {
-                    var oldCompanion = Path.Combine(dir, oldBase + ext);
-                    if (!File.Exists(oldCompanion)) continue;
-                    var newCompanion = Path.Combine(dir, newBase + ext);
-                    if (File.Exists(newCompanion)) continue;
+                    var newCompanion = Path.Combine(dir, companion.DestinationFileName);
+                    if (File.Exists(newCompanion)) continue; // merge — don't overwrite
+
                     try
                     {
-                        await Task.Run(() => File.Move(oldCompanion, newCompanion));
-                        undoLog?.Add(new UndoService.RenameRecord(oldCompanion, newCompanion, IsDirectory: false));
+                        var src = companion.SourcePath;
+                        await Task.Run(() => File.Move(src, newCompanion));
+                        undoLog?.Add(new UndoService.RenameRecord(src, newCompanion, IsDirectory: false));
                     }
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine(
-                            $"Companion rename failed: {oldCompanion} -> {newCompanion}: {ex.Message}");
+                            $"Companion rename failed: {companion.SourcePath} -> {newCompanion}: {ex.Message}");
                     }
                 }
 
@@ -303,6 +362,35 @@ public class RenameService
             if (!File.Exists(sourcePath))
                 continue;
 
+            // ---- TV episode path ----
+            // Kodi/Plex/Jellyfin all expect TV files at:
+            //     <output>/Show Name/Season 01/Show Name S01E01.ext
+            // (the "Show Name (Year)" form is also accepted but the simpler form
+            // matches what most users expect).
+            if (preview.IsTvEpisode && !string.IsNullOrEmpty(preview.ShowName) && preview.Season > 0)
+            {
+                var showFolder = PathSanitizer.SanitizeFolderName(preview.ShowName);
+                var seasonFolder = $"Season {preview.Season:D2}";
+                var destFolder = Path.Combine(outputFolder, showFolder, seasonFolder);
+
+                operations.Add(new FileOperation
+                {
+                    OriginalFilePath = sourcePath,
+                    OriginalFileName = preview.OriginalName,
+                    CleanedTitle = preview.ShowName,
+                    Year = 0,
+                    Confidence = preview.Confidence,
+                    DestinationFolder = destFolder,
+                    FinalFileName = preview.CleanedName,
+                    ShowName = preview.ShowName,
+                    Season = preview.Season,
+                    Episode = preview.Episode,
+                    EpisodeTitle = preview.EpisodeTitle,
+                });
+                continue;
+            }
+
+            // ---- Movie path (unchanged) ----
             // Folder name = filename without extension (sanitized)
             var folderName = Path.GetFileNameWithoutExtension(preview.CleanedName);
             if (string.IsNullOrWhiteSpace(folderName))

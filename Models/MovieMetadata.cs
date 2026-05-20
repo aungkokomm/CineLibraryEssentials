@@ -85,6 +85,112 @@ public class MovieMetadata
         : 0;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  TV-show metadata — separate top-level model so it doesn't have to fight
+//  MovieMetadata's movie-specific properties (release_date, runtime, etc.).
+//  The Kodi tvshow.nfo and episodedetails .nfo formats expect these fields.
+// ─────────────────────────────────────────────────────────────────────────────
+
+public class TvShowMetadata
+{
+    [JsonPropertyName("id")]
+    public int TmdbId { get; set; }
+
+    /// <summary>Populated externally from /tv/{id}/external_ids.</summary>
+    public string? ImdbId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("original_name")]
+    public string OriginalName { get; set; } = string.Empty;
+
+    [JsonPropertyName("tagline")]
+    public string Tagline { get; set; } = string.Empty;
+
+    [JsonPropertyName("overview")]
+    public string Overview { get; set; } = string.Empty;
+
+    [JsonPropertyName("first_air_date")]
+    public string FirstAirDate { get; set; } = string.Empty;
+
+    [JsonPropertyName("vote_average")]
+    public double Rating { get; set; }
+
+    [JsonPropertyName("vote_count")]
+    public int VoteCount { get; set; }
+
+    /// <summary>Typical episode runtime in minutes (TMDb returns an array; we average it).</summary>
+    public int EpisodeRunTime { get; set; }
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = string.Empty;
+
+    [JsonPropertyName("genres")]
+    public List<GenreInfo> Genres { get; set; } = new();
+
+    [JsonPropertyName("production_countries")]
+    public List<CountryInfo> ProductionCountries { get; set; } = new();
+
+    [JsonPropertyName("production_companies")]
+    public List<StudioInfo> ProductionCompanies { get; set; } = new();
+
+    [JsonPropertyName("networks")]
+    public List<StudioInfo> Networks { get; set; } = new();
+
+    [JsonPropertyName("poster_path")]
+    public string? PosterPath { get; set; }
+
+    [JsonPropertyName("backdrop_path")]
+    public string? BackdropPath { get; set; }
+
+    /// <summary>Cast list parsed from credits.cast (sorted by billing order).</summary>
+    public List<CastMember> Cast { get; set; } = new();
+
+    /// <summary>Crew creators / writers / etc. — Kodi tvshow.nfo writes them as &lt;credits&gt;.</summary>
+    public List<CrewMember> Creators { get; set; } = new();
+
+    /// <summary>Content rating ("TV-MA", "PG-13"). Falls back to first non-empty region.</summary>
+    public string ContentRating { get; set; } = string.Empty;
+
+    public int Year => !string.IsNullOrEmpty(FirstAirDate) && DateTime.TryParse(FirstAirDate, out var d)
+        ? d.Year : 0;
+}
+
+public class TvEpisodeMetadata
+{
+    [JsonPropertyName("id")]
+    public int TmdbId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("overview")]
+    public string Overview { get; set; } = string.Empty;
+
+    [JsonPropertyName("episode_number")]
+    public int EpisodeNumber { get; set; }
+
+    [JsonPropertyName("season_number")]
+    public int SeasonNumber { get; set; }
+
+    [JsonPropertyName("air_date")]
+    public string AirDate { get; set; } = string.Empty;
+
+    [JsonPropertyName("runtime")]
+    public int Runtime { get; set; }
+
+    [JsonPropertyName("vote_average")]
+    public double Rating { get; set; }
+
+    [JsonPropertyName("vote_count")]
+    public int VoteCount { get; set; }
+
+    /// <summary>TMDb path to the episode thumbnail (e.g. "/abc.jpg"). Empty if none.</summary>
+    [JsonPropertyName("still_path")]
+    public string? StillPath { get; set; }
+}
+
 public class GenreInfo
 {
     [JsonPropertyName("id")]

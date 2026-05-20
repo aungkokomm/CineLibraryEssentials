@@ -56,6 +56,10 @@ public partial class RenameViewModel : ObservableObject
     [ObservableProperty]
     private bool cleanEmbeddedMetadata;
 
+    /// <summary>"Auto", "Movies", or "TvShows" — wizard mode selector at the top of Step 1.</summary>
+    [ObservableProperty]
+    private string wizardMode = "Auto";
+
     /// <summary>
     /// When true, rows where CleanedName already matches OriginalName are hidden.
     /// Defaults to ON so users only see files that actually need renaming.
@@ -90,6 +94,7 @@ public partial class RenameViewModel : ObservableObject
         cleanEmbeddedMetadata = _configService.GetCleanEmbeddedMetadata();
         outputTemplate = _configService.GetLastTemplate();
         isRecursive = _configService.GetRecursiveScanDefault();
+        wizardMode = _configService.GetWizardMode();
         var (col, desc) = _configService.GetStep1Sort();
         sortColumn = col;
         sortDescending = desc;
@@ -110,7 +115,14 @@ public partial class RenameViewModel : ObservableObject
 
         var recursive = IsRecursive;
         var template = OutputTemplate;
-        var previews = await Task.Run(() => _renameService.AnalyzeFiles(folderPath, recursive, template));
+        var mode = WizardMode switch
+        {
+            "Movies"  => RenameService.Mode.Movies,
+            "TvShows" => RenameService.Mode.TvShows,
+            _         => RenameService.Mode.Auto,
+        };
+        var previews = await Task.Run(() =>
+            _renameService.AnalyzeFiles(folderPath, recursive, template, mode));
 
         _dispatcherQueue.TryEnqueue(() =>
         {
@@ -191,6 +203,15 @@ public partial class RenameViewModel : ObservableObject
         _configService.SetStep1Sort(SortColumn, value);
         ApplyFilter();
     }
+    partial void OnWizardModeChanged(string value)
+    {
+        _configService.SetWizardMode(value);
+        // Re-scan the current folder so the row list reflects the new mode
+        // (Movies-mode strips TV warnings, TvShows-mode flags non-S/E rows).
+        if (!string.IsNullOrEmpty(SourceFolderPath))
+            _ = LoadFilesAsync(SourceFolderPath);
+    }
+
     partial void OnCleanEmbeddedMetadataChanged(bool value)
         => _configService.SetCleanEmbeddedMetadata(value);
 

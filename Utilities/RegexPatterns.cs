@@ -60,9 +60,14 @@ public static class RegexPatterns
         @")\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    // Trailing release group like "-RARBG" — only if it follows a hyphen/underscore at the end
+    // Trailing release group like "-RARBG", "-NTb", "-EVO".
+    // The negative lookbehind (?<!\s) prevents this from eating " - Title"
+    // (TV episode title separator) — real release groups are written WITHOUT
+    // a space before the dash. So:
+    //   "Billions.S02E05.Title.1080p-RARBG"  →  strips "-RARBG"    ✓
+    //   "Billions - S02E05 - Currency"       →  leaves it alone    ✓
     private static readonly Regex ReleaseGroupPattern = new(
-        @"[\-_]\s*[A-Za-z0-9]{2,20}\s*$",
+        @"(?<!\s)[\-_][A-Za-z0-9]{2,20}\s*$",
         RegexOptions.Compiled);
 
     // Multi-part / sequel tags (CD1, Disc 2, Part 3, Vol 4)
@@ -77,6 +82,81 @@ public static class RegexPatterns
 
     public static bool IsTvEpisode(string filename)
         => !string.IsNullOrEmpty(filename) && TvEpisodePattern.IsMatch(filename);
+
+    // ── TV-episode parsing ───────────────────────────────────────────
+    // Capturing patterns, tried in order from most-specific to least.
+    private static readonly Regex[] TvEpisodeCaptures = new[]
+    {
+        // S01E01, s01.e01, S1E1
+        new Regex(@"[Ss](?<s>\d{1,2})[\._\-\s]?[Ee](?<e>\d{1,2})", RegexOptions.Compiled),
+        // 1x01, 12x34
+        new Regex(@"\b(?<s>\d{1,2})x(?<e>\d{1,2})\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        // Season 1 Episode 1 / Season.1.Episode.1
+        new Regex(@"Season[\.\s_]?(?<s>\d{1,2})[\.\s_]?Episode[\.\s_]?(?<e>\d{1,2})",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+    };
+
+    public record TvEpisodeParseResult(
+        string ShowName,
+        int Season,
+        int Episode,
+        string EpisodeTitle,
+        double Confidence);
+
+    /// <summary>
+    /// Parses a TV episode filename into show name, season number, episode number,
+    /// and episode title (when present after the SxxExx marker). Returns null if
+    /// the file doesn't look like a TV episode.
+    /// </summary>
+    public static TvEpisodeParseResult? ParseTvEpisode(string filename)
+    {
+        if (string.IsNullOrEmpty(filename)) return null;
+        var nameWithoutExt = Path.GetFileNameWithoutExtension(filename) ?? string.Empty;
+        var working = NormalizeUnicode(nameWithoutExt);
+
+        Match? best = null;
+        foreach (var rx in TvEpisodeCaptures)
+        {
+            var m = rx.Match(working);
+            if (m.Success) { best = m; break; }
+        }
+        if (best == null) return null;
+
+        if (!int.TryParse(best.Groups["s"].Value, out var season)) return null;
+        if (!int.TryParse(best.Groups["e"].Value, out var episode)) return null;
+
+        // Show name = everything BEFORE the SxxExx marker.
+        // Then strip junk tags + release-group prefix + brackets like the movie path.
+        var showPart = working[..best.Index];
+        showPart = LeadingPrefixPattern.Replace(showPart, " ");
+        showPart = BracketsPattern.Replace(showPart, " ");
+        showPart = JunkTagPattern.Replace(showPart, " ");
+        showPart = SeparatorPattern.Replace(showPart, " ");
+        showPart = MultiWhitespacePattern.Replace(showPart, " ").Trim(' ', '-', '_', '.');
+        var showName = SmartTitleCase(showPart);
+
+        // Episode title = whatever sits AFTER the marker, cleaned the same way as
+        // the title-side. Order matters: release-group strip runs BEFORE separator
+        // replacement so " - Currency" (TV title separator) is preserved while
+        // "-RARBG" (real release group) is still caught.
+        var afterStart = best.Index + best.Length;
+        var afterPart = afterStart < working.Length ? working[afterStart..] : string.Empty;
+        afterPart = BracketsPattern.Replace(afterPart, " ");
+        afterPart = JunkTagPattern.Replace(afterPart, " ");
+        afterPart = ReleaseGroupPattern.Replace(afterPart, " ");
+        afterPart = SeparatorPattern.Replace(afterPart, " ");
+        afterPart = MultiWhitespacePattern.Replace(afterPart, " ").Trim(' ', '-', '_', '.');
+        var episodeTitle = string.IsNullOrEmpty(afterPart) ? string.Empty : SmartTitleCase(afterPart);
+
+        // Confidence: high if we have a show name + plausible season/episode + maybe title
+        double confidence = 0.50;
+        if (!string.IsNullOrWhiteSpace(showName)) confidence += 0.30;
+        if (season is >= 1 and <= 50) confidence += 0.10;
+        if (episode is >= 1 and <= 200) confidence += 0.10;
+        confidence = Math.Min(confidence, 1.0);
+
+        return new TvEpisodeParseResult(showName, season, episode, episodeTitle, confidence);
+    }
 
     // Common separators
     private static readonly Regex SeparatorPattern = new(@"[\._]+", RegexOptions.Compiled);
@@ -194,11 +274,13 @@ public static class RegexPatterns
         //    almost always junk.
         titlePart = PartPattern.Replace(titlePart, " ");
 
-        // 7. Replace dots/underscores with spaces
-        titlePart = SeparatorPattern.Replace(titlePart, " ");
-
-        // 8. Strip trailing release group
+        // 7. Strip trailing release group — MUST happen before dots become spaces,
+        //    so "-RARBG" still has its dot-or-letter prefix and the lookbehind
+        //    correctly distinguishes it from a " - Title" episode separator.
         titlePart = ReleaseGroupPattern.Replace(titlePart, " ");
+
+        // 8. Replace dots/underscores with spaces
+        titlePart = SeparatorPattern.Replace(titlePart, " ");
 
         // 9. Collapse whitespace and trim
         titlePart = MultiWhitespacePattern.Replace(titlePart, " ").Trim(' ', '-', '_', '.');

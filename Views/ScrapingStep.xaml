@@ -46,6 +46,16 @@
                               ToolTipService.ToolTip="Switch to list view">
                     <FontIcon Glyph="&#xE8FD;" FontSize="13" />
                 </ToggleButton>
+                <ComboBox Grid.Column="4"
+                          SelectedItem="{Binding WizardMode, Mode=TwoWay}"
+                          VerticalAlignment="Center"
+                          MinWidth="110"
+                          Margin="40,0,0,0"
+                          ToolTipService.ToolTip="Filter cards: Auto shows everything, Movies hides TV shows, TvShows hides movies. Synced with Step 1's mode.">
+                    <x:String>Auto</x:String>
+                    <x:String>Movies</x:String>
+                    <x:String>TvShows</x:String>
+                </ComboBox>
                 <TextBlock Grid.Column="5"
                            x:Name="StatusText"
                            Text="{Binding StatusMessage}"
@@ -54,10 +64,14 @@
                            Margin="8,0,0,0"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                            TextTrimming="CharacterEllipsis" />
-                <Button Grid.Column="6"
-                        Content="Scrape Selected (auto)"
-                        Click="OnScrapeSelectedClick"
-                        ToolTipService.ToolTip="Auto-scrape every checked movie using the first TMDb match" />
+                <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="6">
+                    <Button Content="Fill gaps only"
+                            Click="OnScrapeGapsClick"
+                            ToolTipService.ToolTip="Verify library — auto-scrape every folder that's missing the NFO, poster, fanart, or actor photos. Skips folders that are already complete." />
+                    <Button Content="Scrape Selected (auto)"
+                            Click="OnScrapeSelectedClick"
+                            ToolTipService.ToolTip="Auto-scrape every checked movie using the first TMDb match" />
+                </StackPanel>
             </Grid>
 
             <!-- Content (card grid OR list OR empty state) -->

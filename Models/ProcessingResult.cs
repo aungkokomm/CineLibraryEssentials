@@ -22,6 +22,13 @@ public class FileOperation
     /// <summary>Detected edition tag (e.g. "Director's Cut", "IMAX"), empty if none.</summary>
     public string Edition { get; set; } = string.Empty;
 
+    // ---- TV episode metadata (populated only for TV episodes) ----
+    public string ShowName { get; set; } = string.Empty;
+    public int Season { get; set; }
+    public int Episode { get; set; }
+    public string EpisodeTitle { get; set; } = string.Empty;
+    public bool IsTvEpisode => Season > 0 && Episode > 0 && !string.IsNullOrEmpty(ShowName);
+
     /// <summary>Whether this operation will be executed when "Run File to Folder" is clicked.</summary>
     public bool IsSelected { get; set; } = true;
 }
@@ -43,6 +50,13 @@ public partial class FilePreview : ObservableObject
     /// <summary>Detected edition tag (e.g. "Director's Cut", "IMAX"), empty if none.</summary>
     [ObservableProperty]
     private string edition = string.Empty;
+
+    // ---- TV episode metadata (populated only when this file is a TV episode) ----
+    /// <summary>Parsed show name, e.g. "Breaking Bad". Empty for movies.</summary>
+    public string ShowName { get; set; } = string.Empty;
+    public int Season { get; set; }
+    public int Episode { get; set; }
+    public string EpisodeTitle { get; set; } = string.Empty;
 
     [ObservableProperty]
     private string cleanedName = string.Empty;
@@ -185,6 +199,21 @@ public partial class MovieFolderItem : ObservableObject
 
     [ObservableProperty]
     private string? overview;
+
+    // ---- Verify-library diagnostic flags ----
+    // These are populated by ScrapingViewModel.CreateMovieItem so the UI can
+    // surface a per-folder "what's missing" status and so "Scrape gaps only"
+    // knows which folders to skip.
+    [ObservableProperty] private bool hasNfo;
+    [ObservableProperty] private bool hasPoster;
+    [ObservableProperty] private bool hasFanart;
+    [ObservableProperty] private bool hasActorPhotos;
+
+    /// <summary>True when this folder is a TV show root (has Season XX subfolders).</summary>
+    [ObservableProperty] private bool isTvShow;
+
+    /// <summary>True when every asset (NFO + poster + fanart + actor photos) is present.</summary>
+    public bool IsComplete => HasNfo && HasPoster && HasFanart && HasActorPhotos;
 
     public string DisplayName => Year > 0 ? $"{MovieTitle} ({Year})" : MovieTitle;
 

@@ -102,6 +102,16 @@ public partial class FileToFolderViewModel : ObservableObject
             return;
         }
 
+        // TV path: <output>/Show Name/Season 01/. Preserves the Kodi layout
+        // even after the user changes the output folder mid-session.
+        if (op.IsTvEpisode)
+        {
+            var showFolder = PathSanitizer.SanitizeFolderName(op.ShowName);
+            op.DestinationFolder = Path.Combine(OutputFolderPath, showFolder, $"Season {op.Season:D2}");
+            return;
+        }
+
+        // Movie path: <output>/Title (Year)/
         var folderName = Path.GetFileNameWithoutExtension(op.FinalFileName);
         if (string.IsNullOrWhiteSpace(folderName))
             folderName = Path.GetFileNameWithoutExtension(op.OriginalFileName);
@@ -132,8 +142,35 @@ public partial class FileToFolderViewModel : ObservableObject
                 continue;
 
             var fileName = Path.GetFileName(path);
-            var parsed = RegexPatterns.ParseFilename(fileName);
             var ext = Path.GetExtension(path);
+
+            // TV detection — if the file is an episode, build a TV-shaped FileOperation
+            // so RecomputeDestination puts it into Show/Season XX/.
+            var tv = RegexPatterns.ParseTvEpisode(fileName);
+            if (tv != null && !string.IsNullOrEmpty(tv.ShowName))
+            {
+                var tvName = PathSanitizer.SanitizeFileName(
+                    RenameService.BuildTvFileName(tv.ShowName, tv.Season, tv.Episode, tv.EpisodeTitle)) + ext;
+                var tvOp = new FileOperation
+                {
+                    OriginalFilePath = path,
+                    OriginalFileName = fileName,
+                    CleanedTitle = tv.ShowName,
+                    Confidence = tv.Confidence,
+                    FinalFileName = tvName,
+                    IsSelected = true,
+                    ShowName = tv.ShowName,
+                    Season = tv.Season,
+                    Episode = tv.Episode,
+                    EpisodeTitle = tv.EpisodeTitle,
+                };
+                RecomputeDestination(tvOp);
+                OperationsPreview.Add(tvOp);
+                continue;
+            }
+
+            // Movie path (unchanged)
+            var parsed = RegexPatterns.ParseFilename(fileName);
             var formatted = RenameService.ApplyTemplate(parsed.Title, parsed.Year, _configService.GetLastTemplate());
             var cleanedName = PathSanitizer.SanitizeFileName(formatted) + ext;
 

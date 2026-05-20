@@ -24,6 +24,12 @@ public sealed partial class TmdbSearchDialog : Window
     private readonly TmdbApiClient _client;
     private TaskCompletionSource<TmdbSearchItem?>? _completionSource;
 
+    /// <summary>
+    /// When true, the dialog hits TMDb's /search/tv endpoint instead of /search/movie
+    /// — so picking from a TV show card shows TV results, not movies.
+    /// </summary>
+    public bool TvSearchMode { get; set; }
+
     private static readonly Regex YearInQuery = new(
         @"\b(19\d{2}|20[0-3]\d)\b",
         RegexOptions.Compiled);
@@ -39,10 +45,22 @@ public sealed partial class TmdbSearchDialog : Window
         _client = new TmdbApiClient(apiKey, language);
         ResultsList.ItemsSource = Results;
 
-        Title = "Search TMDb";
+        Title = TvSearchMode ? "Search TMDb (TV shows)" : "Search TMDb (movies)";
 
         // Default to a comfortably-large window. User can resize / move freely.
         AppWindow.Resize(new SizeInt32(760, 680));
+
+        // Match the app icon on the title bar / taskbar instead of the WinUI default.
+        try
+        {
+            var iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
+            if (System.IO.File.Exists(iconPath))
+                AppWindow.SetIcon(iconPath);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"SetIcon failed for TMDb search dialog: {ex.Message}");
+        }
 
         // If user closes via the title-bar X, treat as cancel.
         Closed += (_, _) => _completionSource?.TrySetResult(null);
@@ -56,6 +74,10 @@ public sealed partial class TmdbSearchDialog : Window
     public Task<TmdbSearchItem?> ShowDialogAsync(Window? owner = null)
     {
         _completionSource = new TaskCompletionSource<TmdbSearchItem?>();
+
+        // Re-apply title now that callers may have set TvSearchMode after the
+        // constructor ran.
+        Title = TvSearchMode ? "Search TMDb (TV shows)" : "Search TMDb (movies)";
 
         // Center on the owner window when one is provided so the picker pops up
         // in a sensible place instead of the top-left of the primary monitor.
@@ -137,34 +159,63 @@ public sealed partial class TmdbSearchDialog : Window
 
         Results.Clear();
         UseButton.IsEnabled = false;
+        var what = TvSearchMode ? "TV show" : "movie";
         StatusText.Text = year.HasValue
-            ? $"Searching TMDb for \"{queryForApi}\" ({year})..."
-            : $"Searching TMDb for \"{queryForApi}\"...";
+            ? $"Searching TMDb {what}s for \"{queryForApi}\" ({year})..."
+            : $"Searching TMDb {what}s for \"{queryForApi}\"...";
         SearchButton.IsEnabled = false;
 
         try
         {
-            var matches = await _client.SearchMovieAsync(queryForApi, year);
-            if (matches.Count == 0)
+            int resultCount = 0;
+            if (TvSearchMode)
             {
-                StatusText.Text = "No matches found.";
-                return;
-            }
-
-            foreach (var m in matches.Take(20))
-            {
-                Results.Add(new TmdbSearchItem
+                // TV: /search/tv returns (id, name, year, posterPath, overview)
+                var tvMatches = await _client.SearchTvAsync(queryForApi, year);
+                if (tvMatches.Count == 0)
                 {
-                    TmdbId = m.TmdbId,
-                    Title = m.Title,
-                    Year = m.Year,
-                    Overview = m.Overview ?? string.Empty,
-                    PosterImageUrl = string.IsNullOrEmpty(m.PosterPath)
-                        ? null
-                        : _client.GetImageUrl(m.PosterPath, "w185")
-                });
+                    StatusText.Text = "No TV-show matches found.";
+                    return;
+                }
+                foreach (var m in tvMatches.Take(20))
+                {
+                    Results.Add(new TmdbSearchItem
+                    {
+                        TmdbId = m.TmdbId,
+                        Title = m.Name,
+                        Year = m.Year,
+                        Overview = m.Overview ?? string.Empty,
+                        PosterImageUrl = string.IsNullOrEmpty(m.PosterPath)
+                            ? null
+                            : _client.GetImageUrl(m.PosterPath, "w185")
+                    });
+                }
+                resultCount = tvMatches.Count;
             }
-            StatusText.Text = $"{matches.Count} result(s). Pick one and click \"Use Selected\".";
+            else
+            {
+                var matches = await _client.SearchMovieAsync(queryForApi, year);
+                if (matches.Count == 0)
+                {
+                    StatusText.Text = "No movie matches found.";
+                    return;
+                }
+                foreach (var m in matches.Take(20))
+                {
+                    Results.Add(new TmdbSearchItem
+                    {
+                        TmdbId = m.TmdbId,
+                        Title = m.Title,
+                        Year = m.Year,
+                        Overview = m.Overview ?? string.Empty,
+                        PosterImageUrl = string.IsNullOrEmpty(m.PosterPath)
+                            ? null
+                            : _client.GetImageUrl(m.PosterPath, "w185")
+                    });
+                }
+                resultCount = matches.Count;
+            }
+            StatusText.Text = $"{resultCount} result(s). Pick one and click \"Use Selected\".";
         }
         catch (Exception ex)
         {

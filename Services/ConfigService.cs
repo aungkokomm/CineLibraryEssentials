@@ -141,6 +141,21 @@ public class ConfigService
     public bool GetRecursiveScanDefault() => _config.RecursiveScanDefault;
     public void SetRecursiveScanDefault(bool v) { _config.RecursiveScanDefault = v; SaveConfig(); }
 
+    /// <summary>Returns "Auto", "Movies", or "TvShows" (defaults to "Auto").</summary>
+    public string GetWizardMode() =>
+        string.IsNullOrEmpty(_config.WizardMode) ? "Auto" : _config.WizardMode;
+
+    public void SetWizardMode(string mode)
+    {
+        _config.WizardMode = mode switch
+        {
+            "Movies"  => "Movies",
+            "TvShows" => "TvShows",
+            _         => "Auto",
+        };
+        SaveConfig();
+    }
+
     // ----- Persistence -----
     private AppConfig LoadConfig()
     {

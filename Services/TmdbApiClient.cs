@@ -288,6 +288,188 @@ public class TmdbApiClient
         }
     }
 
+    // ═════════════════════════════════════════════════════════════════════
+    //  TV-show endpoints (parallel to the movie endpoints above)
+    // ═════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Searches TMDb for TV shows by name. Returns a list of (id, name, year) tuples
+    /// — the caller picks the best match (typically the first result).
+    /// </summary>
+    public async Task<List<(int TmdbId, string Name, int Year, string? PosterPath, string Overview)>>
+        SearchTvAsync(string title, int? firstAirYear = null)
+    {
+        await RateLimitAsync();
+        var query = System.Web.HttpUtility.UrlEncode(title);
+        var url = $"{BaseUrl}/search/tv?api_key={_apiKey}&query={query}";
+        if (firstAirYear.HasValue) url += $"&first_air_date_year={firstAirYear}";
+        url = AppendLanguage(url);
+
+        var list = new List<(int, string, int, string?, string)>();
+        try
+        {
+            var resp = await _httpClient.GetAsync(url);
+            resp.EnsureSuccessStatusCode();
+            var json = await resp.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("results", out var results)) return list;
+
+            foreach (var r in results.EnumerateArray().Take(20))
+            {
+                var id = r.TryGetProperty("id", out var i) ? i.GetInt32() : 0;
+                var name = r.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+                var firstAir = r.TryGetProperty("first_air_date", out var fa) ? fa.GetString() ?? "" : "";
+                var poster = r.TryGetProperty("poster_path", out var pp) ? pp.GetString() : null;
+                var overview = r.TryGetProperty("overview", out var ov) ? ov.GetString() ?? "" : "";
+                var year = DateTime.TryParse(firstAir, out var d) ? d.Year : 0;
+                list.Add((id, name, year, poster, overview));
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"SearchTvAsync error: {ex.Message}");
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// Fetches the full show details + cast + crew + external IDs (IMDb) +
+    /// content ratings in one batched call. Returns null on failure.
+    /// </summary>
+    public async Task<TvShowMetadata?> GetTvDetailsAsync(int tvId)
+    {
+        await RateLimitAsync();
+        var url = AppendLanguage(
+            $"{BaseUrl}/tv/{tvId}?api_key={_apiKey}" +
+            $"&append_to_response=credits,external_ids,content_ratings");
+
+        try
+        {
+            var resp = await _httpClient.GetAsync(url);
+            resp.EnsureSuccessStatusCode();
+            var json = await resp.Content.ReadAsStringAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var show = JsonSerializer.Deserialize<TvShowMetadata>(json, options);
+            if (show == null) return null;
+
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            // episode_run_time is an array — average it for a sensible single runtime.
+            if (root.TryGetProperty("episode_run_time", out var ertEl) && ertEl.ValueKind == JsonValueKind.Array)
+            {
+                int sum = 0, count = 0;
+                foreach (var v in ertEl.EnumerateArray())
+                {
+                    if (v.ValueKind == JsonValueKind.Number) { sum += v.GetInt32(); count++; }
+                }
+                show.EpisodeRunTime = count > 0 ? sum / count : 0;
+            }
+
+            if (root.TryGetProperty("credits", out var creditsEl))
+            {
+                show.Cast = ParseCast(creditsEl);
+                if (creditsEl.TryGetProperty("crew", out var crewArr))
+                {
+                    foreach (var m in crewArr.EnumerateArray())
+                    {
+                        var job = m.TryGetProperty("job", out var j) ? j.GetString() ?? "" : "";
+                        if (job.Equals("Creator", StringComparison.OrdinalIgnoreCase)
+                            || job.Equals("Executive Producer", StringComparison.OrdinalIgnoreCase))
+                        {
+                            show.Creators.Add(new CrewMember
+                            {
+                                Id = m.TryGetProperty("id", out var i) ? i.GetInt32() : 0,
+                                Name = m.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
+                                Job = job,
+                                Department = m.TryGetProperty("department", out var d) ? d.GetString() ?? "" : "",
+                            });
+                        }
+                    }
+                }
+            }
+
+            if (root.TryGetProperty("external_ids", out var extEl)
+                && extEl.TryGetProperty("imdb_id", out var imdb))
+            {
+                show.ImdbId = imdb.GetString();
+            }
+
+            if (root.TryGetProperty("content_ratings", out var crEl))
+                show.ContentRating = ParseTvContentRating(crEl);
+
+            return show;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"GetTvDetailsAsync error: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Fetches every episode for one season of a show. Returns the episodes
+    /// keyed by episode number for fast lookup by the scraper.
+    /// </summary>
+    public async Task<List<TvEpisodeMetadata>> GetTvSeasonAsync(int tvId, int seasonNumber)
+    {
+        await RateLimitAsync();
+        var url = AppendLanguage(
+            $"{BaseUrl}/tv/{tvId}/season/{seasonNumber}?api_key={_apiKey}");
+
+        try
+        {
+            var resp = await _httpClient.GetAsync(url);
+            resp.EnsureSuccessStatusCode();
+            var json = await resp.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("episodes", out var epsEl))
+                return new List<TvEpisodeMetadata>();
+
+            var list = new List<TvEpisodeMetadata>();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            foreach (var e in epsEl.EnumerateArray())
+            {
+                var ep = JsonSerializer.Deserialize<TvEpisodeMetadata>(e.GetRawText(), options);
+                if (ep != null) list.Add(ep);
+            }
+            return list;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"GetTvSeasonAsync error: {ex.Message}");
+            return new List<TvEpisodeMetadata>();
+        }
+    }
+
+    /// <summary>Picks the US TV content rating (TV-MA / TV-14 / …) from the bundled response.</summary>
+    private static string ParseTvContentRating(JsonElement crEl)
+    {
+        if (!crEl.TryGetProperty("results", out var results)) return string.Empty;
+
+        // First pass: US
+        foreach (var region in results.EnumerateArray())
+        {
+            if (!region.TryGetProperty("iso_3166_1", out var iso)) continue;
+            if (!string.Equals(iso.GetString(), "US", StringComparison.OrdinalIgnoreCase)) continue;
+            if (region.TryGetProperty("rating", out var r))
+            {
+                var s = r.GetString();
+                if (!string.IsNullOrWhiteSpace(s)) return s;
+            }
+        }
+        // Fallback: first non-empty
+        foreach (var region in results.EnumerateArray())
+        {
+            if (region.TryGetProperty("rating", out var r))
+            {
+                var s = r.GetString();
+                if (!string.IsNullOrWhiteSpace(s)) return s;
+            }
+        }
+        return string.Empty;
+    }
+
     /// <summary>
     /// Builds a TMDb image URL. Default is "original" (the full uploaded asset)
     /// because library scrapers (Plex/Kodi/Jellyfin) all expect full-resolution

@@ -267,8 +267,15 @@ public sealed partial class RenameStep : UserControl
             return;
         }
 
-        var dialog = new TmdbSearchDialog(apiKey, _configService.GetScrapeLanguage());
-        dialog.SetInitialQuery(preview.CleanedName);
+        var dialog = new TmdbSearchDialog(apiKey, _configService.GetScrapeLanguage())
+        {
+            // For TV episode rows, search the show name on /search/tv instead
+            // of /search/movie so the dialog returns the right kind of result.
+            TvSearchMode = preview.IsTvEpisode,
+        };
+        dialog.SetInitialQuery(preview.IsTvEpisode && !string.IsNullOrEmpty(preview.ShowName)
+            ? preview.ShowName
+            : preview.CleanedName);
 
         var selected = await dialog.ShowDialogAsync(App.MainWindow);
         if (selected != null)

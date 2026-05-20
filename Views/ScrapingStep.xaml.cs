@@ -111,6 +111,12 @@ public sealed partial class ScrapingStep : UserControl
             await _viewModel.ScrapeSelectedCommand.ExecuteAsync(null);
     }
 
+    private async void OnScrapeGapsClick(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel != null)
+            await _viewModel.ScrapeGapsOnlyCommand.ExecuteAsync(null);
+    }
+
     private void OnSelectAllClick(object sender, RoutedEventArgs e)
     {
         _viewModel?.SelectAllCommand.Execute(null);
@@ -236,7 +242,12 @@ public sealed partial class ScrapingStep : UserControl
             return;
         }
 
-        var dialog = new TmdbSearchDialog(apiKey, _configService.GetScrapeLanguage());
+        var dialog = new TmdbSearchDialog(apiKey, _configService.GetScrapeLanguage())
+        {
+            // Switch the dialog to /search/tv when the card is a TV show so the
+            // user sees TV results instead of an empty movie search.
+            TvSearchMode = item.IsTvShow,
+        };
         dialog.SetInitialQuery(item.MovieTitle, item.Year);
 
         var selected = await dialog.ShowDialogAsync(App.MainWindow);

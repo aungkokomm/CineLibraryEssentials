@@ -48,6 +48,15 @@
                     </SplitButton.Flyout>
                 </SplitButton>
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <!-- Wizard mode dropdown — controls how files are parsed -->
+                    <ComboBox SelectedItem="{Binding WizardMode, Mode=TwoWay}"
+                              VerticalAlignment="Center"
+                              MinWidth="110"
+                              ToolTipService.ToolTip="How files are parsed: Auto detects per-file, Movies forces all to be movies, TV Shows treats every file as an episode (rows without S/E patterns get flagged).">
+                        <x:String>Auto</x:String>
+                        <x:String>Movies</x:String>
+                        <x:String>TvShows</x:String>
+                    </ComboBox>
                     <CheckBox Content="Subfolders"
                               IsChecked="{Binding IsRecursive, Mode=TwoWay}"
                               ToolTipService.ToolTip="Recursively scan all subfolders" />

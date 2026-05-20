@@ -49,4 +49,8 @@ public class AppConfig
     public bool AutoCheckForUpdates { get; set; } = true;
     /// <summary>Default "Recursive subfolders" toggle state in Step 1's source picker.</summary>
     public bool RecursiveScanDefault { get; set; } = false;
+
+    // ----- Wizard mode (v1.2) -----
+    /// <summary>"Auto" / "Movies" / "TvShows" — controls how Step 1 parses + Step 2 lays out.</summary>
+    public string WizardMode { get; set; } = "Auto";
 }

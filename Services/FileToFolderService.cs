@@ -99,34 +99,26 @@ public class FileToFolderService
 
     private async Task MoveCompanionFilesAsync(string originalVideoPath, string destinationFolder, string renamedVideoFile)
     {
-        var sourceDir = Path.GetDirectoryName(originalVideoPath);
-        if (string.IsNullOrEmpty(sourceDir))
-            return;
-
-        var videoNameWithoutExt = Path.GetFileNameWithoutExtension(originalVideoPath);
-        var renamedVideoWithoutExt = Path.GetFileNameWithoutExtension(renamedVideoFile);
-        var companionExtensions = new[] { ".srt", ".sub", ".ass", ".ssa", ".vtt", ".idx" };
-
-        foreach (var ext in companionExtensions)
+        // CompanionFileHelper finds every subtitle / companion file in the source
+        // folder (including language-suffixed ones like .en.srt, .en.forced.srt)
+        // and computes the destination filename with that suffix preserved.
+        foreach (var move in Utilities.CompanionFileHelper.Find(originalVideoPath, renamedVideoFile))
         {
-            var companionFile = Path.Combine(sourceDir, $"{videoNameWithoutExt}{ext}");
-            if (!File.Exists(companionFile)) continue;
+            var destPath = Path.Combine(destinationFolder, move.DestinationFileName);
 
-            var destCompanionFile = Path.Combine(destinationFolder, $"{renamedVideoWithoutExt}{ext}");
-
-            // Merge case: a companion with the same name is already at the destination.
-            // Preserve the existing one (don't destroy data); leave the source alongside
-            // the source video so nothing is lost.
-            if (File.Exists(destCompanionFile))
+            // Merge: a companion with the same name is already at the destination —
+            // preserve it (don't destroy data), leave the source alongside the source
+            // video so nothing is lost.
+            if (File.Exists(destPath))
             {
                 System.Diagnostics.Debug.WriteLine(
-                    $"Companion already present at destination, leaving source in place: {destCompanionFile}");
+                    $"Companion already present at destination, leaving source in place: {destPath}");
                 continue;
             }
 
             try
             {
-                File.Move(companionFile, destCompanionFile, overwrite: false);
+                File.Move(move.SourcePath, destPath, overwrite: false);
             }
             catch (Exception ex)
             {
