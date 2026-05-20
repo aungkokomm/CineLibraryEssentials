@@ -359,7 +359,7 @@ What's remembered between sessions:
 No. It only renames files (a metadata-level operation) and moves them between folders. Even the "Clean metadata" feature only rewrites tags in the file container — no audio or video data is touched. Operations are near-instant regardless of file size.
 
 **Q: Does it work with TV shows?**
-Movies are the primary target. The app *detects* TV episode patterns (`S01E03`, `1x03`, etc.) and shows a warning, but it doesn't have show/season-aware naming. Use [FileBot](https://www.filebot.net/) or [tinyMediaManager](https://www.tinymediamanager.org/) for TV.
+Yes — fully. As of v1.2.0 TV shows are a first-class workflow alongside movies. The app detects episode patterns (`S01E03`, `1x03`, `Season 1 Episode 3`), renames them to the Kodi convention `Show - S01E01 - Title`, organizes them into `Show/Season XX/` folders, and scrapes a `tvshow.nfo` + show poster/fanart/cast plus a per-episode `.nfo` and thumbnail for every episode. A **Mode** selector (Auto / Movies / TV Shows) lets you force or filter the type, and flat "Season Complete" folders are recognized too.
 
 **Q: What about my movie's existing subtitles?**
 Companion files with the same base name (`.srt`, `.sub`, `.ass`, `.ssa`, `.vtt`, `.idx`) are renamed alongside the video automatically. They get moved into the `Title (Year)/` folder along with the video in Step 2.
