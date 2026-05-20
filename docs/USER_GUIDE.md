@@ -65,6 +65,34 @@ You can skip steps in either direction at any time.
 
 ---
 
+## Movies and TV shows
+
+CineLibrary Essentials handles **both** in the same wizard. A **Mode** selector at the top of Step 1 (and Step 3) decides how files are treated:
+
+| Mode | Behavior |
+|---|---|
+| **Auto** *(default)* | Each file is detected individually — anything matching `S01E01`, `1x01`, or `Season 1 Episode 1` is treated as a TV episode; everything else as a movie. |
+| **Movies** | TV detection is disabled — every file is treated as a movie (so *"Star Wars Episode IV"* won't be mistaken for TV). |
+| **TV Shows** | Every file is treated as an episode; files that don't match an S/E pattern are flagged so you can fix them. In Step 3 the dropdown also acts as a filter — show only movies, only TV shows, or all. |
+
+The mode is shared between Step 1 and Step 3 and is remembered between sessions.
+
+### How each is organized
+
+- **Movies** → `Output/Title (Year)/Title (Year).ext`
+- **TV episodes** → `Output/Show Name/Season 01/Show Name - S01E01 - Episode Title.ext`
+
+TV episodes are renamed to the Kodi/Plex convention `Show - S01E01 - Title`, and all episodes of a season live together in one `Season XX` folder.
+
+### How each is scraped (Step 3)
+
+- **Movies** → `Title (Year).nfo`, original-resolution poster + fanart, `.actors/` cast photos
+- **TV shows** → `tvshow.nfo` + show poster/fanart/cast at the show root, plus a per-episode `.nfo` and episode thumbnail for every episode inside each season
+
+Flat single-season folders (e.g. `Breaking Bad Season 1 Complete/` with episodes directly inside) are recognized too — the show name is read from the episode filenames, not the folder name.
+
+---
+
 ## Step 1 — Clean Names
 
 ![Step 1 screenshot](https://github.com/user-attachments/assets/e5cdd96c-c8f6-42bc-a279-a48f3c24811d)
@@ -194,12 +222,12 @@ If you change the output folder, every destination preview updates automatically
 
 Tick / untick rows you want to skip, then click **Run File to Folder**. The app:
 
-1. Creates a `Title (Year)/` folder under the output for each movie.
+1. Creates a `Title (Year)/` folder (movies) or `Show/Season XX/` folders (TV) under the output.
 2. Moves the video into it.
-3. Moves any matching subtitle files alongside.
+3. Moves any matching subtitle files alongside — including language-tagged ones like `Movie.en.forced.srt`.
 4. After success, advances to Step 3 automatically.
 
-If a destination already exists or there's a collision, that row is skipped and reported. The rest of the batch still processes.
+**Folder merging:** if a destination folder already exists, files are merged into it instead of erroring. Existing files are never overwritten — and any subtitles from the source still move into the destination. The status line reports e.g. *"3 organized · 2 merged into existing folder(s)"*.
 
 ---
 
@@ -239,7 +267,15 @@ Click **Scrape** on any card → the same TMDb search dialog as Step 1 opens, pr
 
 ### Bulk auto-scrape
 
-Click **Scrape Selected (auto)** at the top → every checked card is processed sequentially using the **first TMDb match** for each one. Fast for batch processing, less precise than per-movie. Use it after you've eyeballed the list and trust the auto-match.
+Click **Scrape Selected (auto)** at the top → every checked card is processed sequentially using the **first TMDb match** for each one (movie or TV show, depending on the card). Fast for batch processing, less precise than per-card. Use it after you've eyeballed the list and trust the auto-match.
+
+### Fill gaps only (verify a library)
+
+Click **Fill gaps only** → the app sweeps **every** folder in the list and scrapes only the ones missing something (NFO, poster, fanart, or actor photos). Complete folders are skipped, so it's safe to re-run on an existing library — it just patches the holes. Ignores the row checkboxes. Each card's status shows exactly what's missing, e.g. *"Missing: poster · fanart"* or *"Complete"*.
+
+### TV shows in Step 3
+
+TV folders show one card per show with a status like *"TV · 3 seasons · Complete"*. Scraping a TV card writes `tvshow.nfo` + show artwork at the root and a per-episode `.nfo` + thumbnail for every episode. Right-click → **Search TMDb** searches the **TV** database (not movies) for TV cards.
 
 ### Other things you can do
 
