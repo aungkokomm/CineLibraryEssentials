@@ -209,7 +209,15 @@ public class UpdateService
 
     private static HttpClient BuildHttpClient(string version, TimeSpan timeout)
     {
-        var http = new HttpClient { Timeout = timeout };
+        // GitHub's API also gzip-compresses responses — decompress transparently
+        // so the release JSON parses correctly.
+        var handler = new HttpClientHandler
+        {
+            AutomaticDecompression = System.Net.DecompressionMethods.GZip
+                                   | System.Net.DecompressionMethods.Deflate
+                                   | System.Net.DecompressionMethods.Brotli
+        };
+        var http = new HttpClient(handler) { Timeout = timeout };
         http.DefaultRequestHeaders.UserAgent.Add(
             new ProductInfoHeaderValue("CineLibraryEssentials", version));
         http.DefaultRequestHeaders.Accept.Add(

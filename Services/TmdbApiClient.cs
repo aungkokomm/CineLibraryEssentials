@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http;
 using System.Text.Json;
 using CineLibraryEssentials.Models;
 
@@ -21,7 +23,19 @@ public class TmdbApiClient
     {
         _apiKey = apiKey;
         _language = string.IsNullOrWhiteSpace(language) ? "en" : language;
-        _httpClient = new HttpClient();
+
+        // TMDb's CDN now returns gzip-compressed responses even when we don't
+        // request them. Without AutomaticDecompression the HttpClient hands back
+        // raw gzip bytes, JSON parsing fails, and every search silently returns
+        // zero results. Enabling decompression makes the client transparently
+        // inflate gzip/deflate/brotli responses.
+        var handler = new HttpClientHandler
+        {
+            AutomaticDecompression = DecompressionMethods.GZip
+                                   | DecompressionMethods.Deflate
+                                   | DecompressionMethods.Brotli
+        };
+        _httpClient = new HttpClient(handler);
     }
 
     /// <summary>Appends the configured TMDb language code to a request URL.</summary>

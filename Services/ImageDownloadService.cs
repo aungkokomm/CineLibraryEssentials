@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http;
 using CineLibraryEssentials.Models;
 
 namespace CineLibraryEssentials.Services;
@@ -9,7 +11,15 @@ public class ImageDownloadService
 
     public ImageDownloadService()
     {
-        _httpClient = new HttpClient();
+        // Enable automatic decompression for consistency with the rest of the app
+        // (harmless for already-compressed JPEGs; the CDN simply passes them through).
+        var handler = new HttpClientHandler
+        {
+            AutomaticDecompression = DecompressionMethods.GZip
+                                   | DecompressionMethods.Deflate
+                                   | DecompressionMethods.Brotli
+        };
+        _httpClient = new HttpClient(handler);
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
     }
 
