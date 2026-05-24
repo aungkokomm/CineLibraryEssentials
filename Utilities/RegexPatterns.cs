@@ -85,6 +85,8 @@ public static class RegexPatterns
 
     // ── TV-episode parsing ───────────────────────────────────────────
     // Capturing patterns, tried in order from most-specific to least.
+    // Earlier patterns are more reliable; later ones are fallbacks that handle
+    // anime / weirdly-named releases. The first one that matches wins.
     private static readonly Regex[] TvEpisodeCaptures = new[]
     {
         // S01E01, s01.e01, S1E1, S01E001
@@ -100,7 +102,34 @@ public static class RegexPatterns
         // Short forms: "Se01 Ep01", "Se 1 Ep 1"
         new Regex(@"Se[\s\._]*(?<s>\d{1,2})[\s\._,\-]*Ep[\s\._]*(?<e>\d{1,3})",
             RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        // Period-style "Show 1.01 - Title" / "Show.1.01.Title". The season and
+        // episode are surrounded by separator-or-boundary characters so it
+        // doesn't catch version numbers like "v2.0".
+        new Regex(@"(?:^|[\s\._\-])(?<s>\d{1,2})\.(?<e>\d{2,3})(?=[\s\._\-]|$)",
+            RegexOptions.Compiled),
+        // Episode-only forms: "Show E01" / "Show Ep01" / "Show.E001". Defaults
+        // season to 1. Requires an E/Ep prefix so plain numbers (years, parts)
+        // aren't mistaken for episodes.
+        new Regex(@"(?:^|[\s\._\-])[Ee]p?(?<e>\d{2,3})\b(?<s>)",
+            RegexOptions.Compiled),
     };
+
+    /// <summary>
+    /// Episode-only / anime patterns don't capture a season — defaults to 1
+    /// when we hit the parser's int.TryParse on an empty group.
+    /// </summary>
+    private const int DefaultSeasonForEpisodeOnly = 1;
+
+    // Match "(2010)" / " 2010 " inside the show-name portion so we can strip
+    // a release year from the show name — keeping it would produce filenames
+    // like "Doctor Who 2005 - S01E01.mkv" which Plex sometimes mis-matches.
+    private static readonly Regex YearInShowNamePattern = new(
+        @"[\(\[]?\b(19\d{2}|20[0-3]\d)\b[\)\]]?", RegexOptions.Compiled);
+
+    // Anime release-group prefix like "[HorribleSubs] " / "[SubsPlease] ".
+    // The general LeadingPrefixPattern catches known scene groups but not these.
+    private static readonly Regex AnimeGroupPrefixPattern = new(
+        @"^\s*\[[^\]]{2,30}\]\s*", RegexOptions.Compiled);
 
     // Stray bracket characters left over after splitting around the SxxExx marker
     // (e.g. "Sherlock (" or "A Study in Pink)").
@@ -125,6 +154,12 @@ public static class RegexPatterns
         var nameWithoutExt = Path.GetFileNameWithoutExtension(filename) ?? string.Empty;
         var working = NormalizeUnicode(nameWithoutExt);
 
+        // Strip a leading anime release-group bracket like "[HorribleSubs] " so
+        // the show name parser sees the actual show name first. Doing this here
+        // (before pattern matching) keeps best.Index relative to the cleaned
+        // string instead of the raw bracketed form.
+        working = AnimeGroupPrefixPattern.Replace(working, string.Empty);
+
         Match? best = null;
         foreach (var rx in TvEpisodeCaptures)
         {
@@ -133,18 +168,26 @@ public static class RegexPatterns
         }
         if (best == null) return null;
 
-        if (!int.TryParse(best.Groups["s"].Value, out var season)) return null;
+        // Some patterns (episode-only, anime absolute) don't capture a season.
+        // In that case the regex still defines the named group `s` so the
+        // engine returns an empty string — fall back to season 1.
+        var seasonText = best.Groups["s"].Value;
+        var season = string.IsNullOrEmpty(seasonText)
+            ? DefaultSeasonForEpisodeOnly
+            : (int.TryParse(seasonText, out var s) ? s : DefaultSeasonForEpisodeOnly);
+
         if (!int.TryParse(best.Groups["e"].Value, out var episode)) return null;
 
         // Show name = everything BEFORE the SxxExx marker.
-        // Then strip junk tags + release-group prefix + brackets like the movie path.
-        // The marker may sit inside parentheses — e.g. "Sherlock (Season 01, Episode 01
-        // - A Study in Pink)" — which leaves a dangling "(" on the show side and ")"
-        // on the title side, so we explicitly remove stray bracket characters too.
+        // Then strip release-group prefix + brackets + junk + stray brackets +
+        // release year (if it's part of the show name like "Sherlock (2010)") so
+        // the result is the cleanest show name we can produce.
         var showPart = working[..best.Index];
+        showPart = AnimeGroupPrefixPattern.Replace(showPart, " ");  // strip [HorribleSubs] etc.
         showPart = LeadingPrefixPattern.Replace(showPart, " ");
         showPart = BracketsPattern.Replace(showPart, " ");
         showPart = JunkTagPattern.Replace(showPart, " ");
+        showPart = YearInShowNamePattern.Replace(showPart, " ");    // strip "(2010)" / "2010"
         showPart = StrayBracketPattern.Replace(showPart, " ");
         showPart = SeparatorPattern.Replace(showPart, " ");
         showPart = MultiWhitespacePattern.Replace(showPart, " ").Trim(' ', '-', '_', '.');
