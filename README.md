@@ -1,7 +1,9 @@
 <div align="center">
   <img src="Assets/AppIcon.ico" width="80" height="80" alt="CineLibrary Essentials" />
   <h1>CineLibrary Essentials</h1>
-  <p><b>Drag your movie folder into CineLibrary Essentials and let the Magic begin! Clean up messy movie downloads. Rename, organize, and prep them for scraping, fast. 
+  <p><b>Drag your movie folder into CineLibrary Essentials and let the Magic begin! 
+    Clean up messy movie downloads. <p><b>
+    <p><b>Rename, Organize, and Scrapes, everything in one App.  
      </b></p>
   <p>
     A Windows desktop tool (WinUI 3) that takes the chaos out of your downloads folder.
@@ -76,7 +78,8 @@ This is the **Plex / Kodi / Jellyfin / MediaElch** standard layout — readable 
 └────────────────────────────────┘    └──────────────────────────┘
 ```
 
-CineLibrary Essentials is now an **all-in-one** preparation tool — clean filenames, organize into the correct folder structure, and scrape a complete Kodi-standard NFO with poster, fanart, full cast photos, and (for TV) per-episode metadata + thumbnails. No second tool required.
+CineLibrary Essentials is now an **all-in-one** preparation toolbox 
+— clean filenames, organize into the correct folder structure, and scrape a complete Kodi-standard NFO with poster, fanart, full cast photos, and (for TV) per-episode metadata + thumbnails. One-Stop-Solution.
 
 - **[CineLibrary](https://github.com/aungkokomm/CineLibraryCS)** — scan the prepared library and browse it across multiple drives.
 - **[MediaElch](https://www.mediaelch.de/)** — still optional if you want to layer in extra sources or edition-specific artwork; it reads the same folders Essentials produces.
