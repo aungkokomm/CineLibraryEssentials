@@ -19,6 +19,7 @@ public sealed partial class MainWindow : Window
         SetWindowIcon();
         RestoreWindowBounds();
         WireWindowPersistence();
+        LaunchMaximized();
 
         // Register the toast host so any page can call ToastService.Info/Success/...
         ToastService.Register(ToastHost, DispatcherQueue);
@@ -176,6 +177,23 @@ public sealed partial class MainWindow : Window
     {
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
+    }
+
+    /// <summary>
+    /// Opens the window maximized. The restored bounds above still apply as the
+    /// "restore down" size, so un-maximizing returns to a sensible windowed size.
+    /// </summary>
+    private void LaunchMaximized()
+    {
+        try
+        {
+            if (AppWindow.Presenter is OverlappedPresenter presenter)
+                presenter.Maximize();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Maximize failed: {ex.Message}");
+        }
     }
 
     private void SetWindowIcon()
