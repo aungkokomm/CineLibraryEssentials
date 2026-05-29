@@ -46,6 +46,10 @@ public sealed partial class RenameStep : UserControl
         };
         UpdateSortIndicators();
         SyncMasterCheckBoxes();
+
+        // Re-open the last-used source folder on startup so the user doesn't have
+        // to re-pick it every launch. Fire-and-forget; no-op if there's no history.
+        _ = viewModel.TryLoadLastFolderAsync();
     }
 
     private void SyncMasterCheckBoxes()
@@ -368,6 +372,13 @@ public sealed partial class RenameStep : UserControl
             return;
         }
 
+        // Metadata cleaning rewrites each file's container in place — it's the
+        // slow part of the operation, so warn the user up front when it's on.
+        var cleaningMetadata = _viewModel.CleanEmbeddedMetadata;
+        const string patienceNote =
+            "\n\n⏳ Cleaning embedded metadata rewrites each file and can take a while " +
+            "for large videos — please be patient and don't close the app until it finishes.";
+
         // Build a dialog message that reflects what's actually about to happen.
         string title, content, primary;
         if (cleanOnly)
@@ -376,7 +387,7 @@ public sealed partial class RenameStep : UserControl
             content = $"All {selectedCount} selected file(s) are already named correctly. " +
                       $"This will scrub their embedded title, comment, tags, track names and " +
                       $"attachments (e.g. logo images) using the bundled mkvpropedit.\n\n" +
-                      $"The video/audio data itself is not touched.";
+                      $"The video/audio data itself is not touched." + patienceNote;
             primary = "Clean Metadata";
         }
         else
@@ -385,6 +396,7 @@ public sealed partial class RenameStep : UserControl
             content = $"This will rename {pending} file(s) on disk. " +
                       $"Companion subtitles (.srt etc) will be renamed too.\n\n" +
                       $"You'll have ~30 seconds to undo from a toast notification.";
+            if (cleaningMetadata) content += patienceNote;
             primary = "Rename";
         }
 
@@ -400,6 +412,11 @@ public sealed partial class RenameStep : UserControl
 
         var result = await confirm.ShowAsync();
         if (result != ContentDialogResult.Primary) return;
+
+        // A persistent "working" toast while metadata cleaning runs, so the app
+        // doesn't look frozen during the slow part.
+        if (cleaningMetadata)
+            ToastService.Info("Cleaning metadata… this can take a moment for large files.", "Working", autoDismissMs: 60000);
 
         var opResult = await _viewModel.RenameInPlaceAsync();
 

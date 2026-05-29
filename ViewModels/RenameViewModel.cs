@@ -104,6 +104,22 @@ public partial class RenameViewModel : ObservableObject
     //  Loading
     // -----------------------------------------------------------------
 
+    /// <summary>
+    /// On startup, re-open the most recently used source folder (if it still
+    /// exists). Does nothing if there's no history or the folder is gone, and
+    /// never overrides a folder the user has already picked this session.
+    /// </summary>
+    public async Task TryLoadLastFolderAsync()
+    {
+        if (!string.IsNullOrEmpty(SourceFolderPath)) return;  // user already picked one
+
+        var recent = _configService.GetRecentSourceFolders();
+        var last = recent.FirstOrDefault(Directory.Exists);
+        if (string.IsNullOrEmpty(last)) return;
+
+        await LoadFilesAsync(last);
+    }
+
     public async Task LoadFilesAsync(string folderPath)
     {
         if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
