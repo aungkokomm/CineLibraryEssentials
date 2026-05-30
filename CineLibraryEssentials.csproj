@@ -15,9 +15,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
-    <Version>1.2.4</Version>
-    <AssemblyVersion>1.2.4.0</AssemblyVersion>
-    <FileVersion>1.2.4.0</FileVersion>
+    <Version>1.2.5</Version>
+    <AssemblyVersion>1.2.5.0</AssemblyVersion>
+    <FileVersion>1.2.5.0</FileVersion>
+
+    <!-- ReadyToRun (R2R): precompile IL to native code at publish time so the app
+         starts fast instead of JIT-compiling on first run. Only takes effect during
+         `dotnet publish` with a RID — normal `dotnet build` is unaffected.
+         TieredCompilation stays on, so any methods R2R didn't cover are still
+         optimized by the JIT in the background while the app runs. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredCompilation>true</TieredCompilation>
   </PropertyGroup>
 
   <ItemGroup>

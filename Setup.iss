@@ -14,7 +14,7 @@
 ; ============================================================================
 
 #define MyAppName "CineLibrary Essentials"
-#define MyAppVersion "1.2.4"
+#define MyAppVersion "1.2.5"
 #define MyAppPublisher "Aung Ko Ko Myint"
 #define MyAppURL "https://github.com/aungkokomm"
 #define MyAppExeName "CineLibraryEssentials.exe"
