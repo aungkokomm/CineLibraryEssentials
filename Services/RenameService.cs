@@ -87,7 +87,7 @@ public class RenameService
                     CleanedName = tvCleanedName,
                     Confidence = tv.Confidence,
                     IsReviewed = false,
-                    IsSelected = true,
+                    IsSelected = false,   // deselected by default — user picks what to rename
                     IsTvEpisode = true,
                     ShowName = tv.ShowName,
                     Season = tv.Season,
@@ -114,7 +114,7 @@ public class RenameService
                 CleanedName = cleanedName,
                 Confidence = parsed.Confidence,
                 IsReviewed = false,
-                IsSelected = true,
+                IsSelected = false,   // deselected by default — user picks what to rename
                 IsTvEpisode = false,
             };
 
@@ -154,20 +154,32 @@ public class RenameService
     /// folder for any video that lives in its own subfolder (single-video folder, not
     /// the source root).
     /// </summary>
+    /// <summary>Progress callback payload: how many files done, the total, and the current filename.</summary>
+    public record RenameProgress(int Done, int Total, string CurrentFile);
+
     public async Task<ProcessingResult> RenameInPlaceAsync(
         IEnumerable<FilePreview> previews,
         bool renameParentFolders = false,
         string? sourceFolder = null,
         bool cleanEmbeddedMetadata = false,
-        List<UndoService.RenameRecord>? undoLog = null)
+        List<UndoService.RenameRecord>? undoLog = null,
+        IProgress<RenameProgress>? progress = null)
     {
         var previewsList = previews.ToList();
         var result = new ProcessingResult { Success = true };
         var metadataCleaner = cleanEmbeddedMetadata ? new MetadataCleanerService() : null;
+        var total = previewsList.Count;
+        var doneCount = 0;
 
         // ---- Pass 1: rename files in their current folder ----
         foreach (var p in previewsList)
         {
+            // Report BEFORE processing this file so the label shows the file that's
+            // currently being worked on (especially useful for the slow metadata pass).
+            // Increment immediately so the count is accurate across every code path
+            // below (including the early-`continue` skips).
+            progress?.Report(new RenameProgress(doneCount, total, p.OriginalName));
+            doneCount++;
             if (string.IsNullOrEmpty(p.OriginalFilePath))
             {
                 result.Errors.Add($"{p.OriginalName}: missing source path");
@@ -271,6 +283,9 @@ public class RenameService
             }
         }
 
+        // Final 100% tick so the bar fills completely before it disappears.
+        progress?.Report(new RenameProgress(total, total, string.Empty));
+
         // ---- Pass 2: rename containing folder (only if requested) ----
         if (renameParentFolders)
         {
@@ -343,10 +358,18 @@ public class RenameService
         return result;
     }
 
+    /// <summary>
+    /// Builds Step 2 "File to Folder" operations. Each loose video file is wrapped
+    /// into a folder created IN PLACE — right beside the file, in its current
+    /// directory. There is no separate output folder:
+    ///   • Movie: &lt;file's dir&gt;/Title (Year)/Title (Year).ext
+    ///   • TV:    &lt;file's dir&gt;/Show Name/Season 01/Show - S01E01 - Title.ext
+    /// Files that are already in their own correctly-named folder are skipped by
+    /// the caller (FileToFolderViewModel.IsAlreadyInPlace).
+    /// </summary>
     public List<FileOperation> CreateFileOperations(
         string sourceFolder,
-        List<FilePreview> previews,
-        string outputFolder)
+        List<FilePreview> previews)
     {
         var operations = new List<FileOperation>();
 
@@ -362,16 +385,15 @@ public class RenameService
             if (!File.Exists(sourcePath))
                 continue;
 
-            // ---- TV episode path ----
-            // Kodi/Plex/Jellyfin all expect TV files at:
-            //     <output>/Show Name/Season 01/Show Name S01E01.ext
-            // (the "Show Name (Year)" form is also accepted but the simpler form
-            // matches what most users expect).
+            // The folder we create is always rooted at the file's CURRENT directory.
+            var baseDir = Path.GetDirectoryName(sourcePath) ?? sourceFolder;
+
+            // ---- TV episode path → <fileDir>/Show/Season XX/ ----
             if (preview.IsTvEpisode && !string.IsNullOrEmpty(preview.ShowName) && preview.Season > 0)
             {
                 var showFolder = PathSanitizer.SanitizeFolderName(preview.ShowName);
                 var seasonFolder = $"Season {preview.Season:D2}";
-                var destFolder = Path.Combine(outputFolder, showFolder, seasonFolder);
+                var destFolder = Path.Combine(baseDir, showFolder, seasonFolder);
 
                 operations.Add(new FileOperation
                 {
@@ -390,17 +412,14 @@ public class RenameService
                 continue;
             }
 
-            // ---- Movie path (unchanged) ----
-            // Folder name = filename without extension (sanitized)
+            // ---- Movie path → <fileDir>/Title (Year)/ ----
             var folderName = Path.GetFileNameWithoutExtension(preview.CleanedName);
             if (string.IsNullOrWhiteSpace(folderName))
                 folderName = Path.GetFileNameWithoutExtension(preview.OriginalName);
             folderName = PathSanitizer.SanitizeFolderName(folderName);
 
-            // Re-extract title/year from the (possibly user-edited) cleaned name
             var parsed = RegexPatterns.ParseFilename(preview.CleanedName);
-
-            var destinationFolder = Path.Combine(outputFolder, folderName);
+            var destinationFolder = Path.Combine(baseDir, folderName);
 
             operations.Add(new FileOperation
             {

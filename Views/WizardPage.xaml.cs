@@ -111,30 +111,68 @@ public sealed partial class WizardPage : Page
         else if (step == 2) ScrapingStepView.RefreshFromOrganized();
     }
 
+    // Per-step identity colors: green → Clean Names, amber → Organize, orange → Scrape.
+    private static readonly Color Step1Color = Color.FromArgb(0xFF, 0x16, 0xA3, 0x4A); // green
+    private static readonly Color Step2Color = Color.FromArgb(0xFF, 0xD9, 0xA4, 0x06); // amber
+    private static readonly Color Step3Color = Color.FromArgb(0xFF, 0xEA, 0x58, 0x0C); // orange
+
     private void UpdatePillStates()
     {
-        StyleStepButton(Step1Button, Step1Bullet, _viewModel.CurrentStep == 0);
-        StyleStepButton(Step2Button, Step2Bullet, _viewModel.CurrentStep == 1);
-        StyleStepButton(Step3Button, Step3Bullet, _viewModel.CurrentStep == 2);
+        var step = _viewModel.CurrentStep;
+        // A pill is "done" once you've moved past it — show a check + keep its
+        // color tint so completed steps read as finished, not just inactive.
+        StyleStepButton(Step1Button, Step1Bullet, Step1Color, isActive: step == 0, isDone: step > 0,
+            activeTextDark: false, bulletText: "1");
+        StyleStepButton(Step2Button, Step2Bullet, Step2Color, isActive: step == 1, isDone: step > 1,
+            activeTextDark: true, bulletText: "2");   // amber needs dark text for legibility
+        StyleStepButton(Step3Button, Step3Bullet, Step3Color, isActive: step == 2, isDone: false,
+            activeTextDark: false, bulletText: "3");
 
         PreviousButton.IsEnabled = _viewModel.CurrentStep > 0;
     }
 
-    private void StyleStepButton(Button btn, Border? bullet, bool isActive)
+    private void StyleStepButton(
+        Button btn, Border? bullet, Color stepColor,
+        bool isActive, bool isDone, bool activeTextDark, string bulletText)
     {
+        var bulletLabel = bullet?.Child as TextBlock;
+
         if (isActive)
         {
-            btn.Background = (SolidColorBrush)App.Current.Resources["AccentFillColorDefaultBrush"];
-            btn.Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 255, 255));
+            // Filled pill in the step's color.
+            btn.Background = new SolidColorBrush(stepColor);
+            var textColor = activeTextDark
+                ? Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A)
+                : Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF);
+            btn.Foreground = new SolidColorBrush(textColor);
             if (bullet != null)
-                bullet.Background = new SolidColorBrush(Color.FromArgb(0x33, 255, 255, 255));
+                bullet.Background = new SolidColorBrush(Color.FromArgb(0x44, 0xFF, 0xFF, 0xFF));
+            if (bulletLabel != null)
+            {
+                bulletLabel.Text = bulletText;
+                bulletLabel.Foreground = new SolidColorBrush(textColor);
+            }
         }
         else
         {
+            // Inactive / done: transparent pill, but the bullet keeps the step
+            // color so each step has a consistent identity. Done steps show ✓.
             btn.Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0));
             btn.Foreground = (SolidColorBrush)App.Current.Resources["TextFillColorPrimaryBrush"];
             if (bullet != null)
-                bullet.Background = (SolidColorBrush)App.Current.Resources["ControlFillColorTertiaryBrush"];
+            {
+                // Tint the bullet with a soft version of the step color.
+                bullet.Background = new SolidColorBrush(
+                    Color.FromArgb(isDone ? (byte)0xFF : (byte)0x33, stepColor.R, stepColor.G, stepColor.B));
+            }
+            if (bulletLabel != null)
+            {
+                bulletLabel.Text = isDone ? "✓" : bulletText;   // ✓ for completed
+                bulletLabel.Foreground = new SolidColorBrush(
+                    isDone ? Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)
+                           : (App.Current.Resources["TextFillColorPrimaryBrush"] as SolidColorBrush)?.Color
+                             ?? Color.FromArgb(0xFF, 0, 0, 0));
+            }
         }
     }
 

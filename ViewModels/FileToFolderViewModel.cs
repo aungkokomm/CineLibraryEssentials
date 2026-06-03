@@ -15,9 +15,6 @@ public partial class FileToFolderViewModel : ObservableObject
     private readonly WizardViewModel _parentViewModel;
 
     [ObservableProperty]
-    private string outputFolderPath = string.Empty;
-
-    [ObservableProperty]
     private ObservableCollection<FileOperation> operationsPreview = new();
 
     [ObservableProperty]
@@ -26,27 +23,74 @@ public partial class FileToFolderViewModel : ObservableObject
     [ObservableProperty]
     private string statusMessage = string.Empty;
 
+    /// <summary>
+    /// How many files were left out of the list because they're already sitting
+    /// in the folder Step 2 would move them to (e.g. a recursive Step 1 scan of a
+    /// library that's already organized). Shown in the status line.
+    /// </summary>
+    private int _alreadyOrganizedCount;
+
     public FileToFolderViewModel(WizardViewModel parentViewModel, ConfigService? configService = null)
     {
         _parentViewModel = parentViewModel;
         _configService = configService ?? new ConfigService();
+
+        // Track per-row selection so the master "select all" checkbox reflects
+        // the true state (all / none / partial).
+        OperationsPreview.CollectionChanged += (_, e) =>
+        {
+            if (e.NewItems != null)
+                foreach (FileOperation op in e.NewItems)
+                    op.PropertyChanged += OnOperationPropertyChanged;
+            if (e.OldItems != null)
+                foreach (FileOperation op in e.OldItems)
+                    op.PropertyChanged -= OnOperationPropertyChanged;
+            RaiseSelectionState();
+        };
+    }
+
+    private void OnOperationPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(FileOperation.IsSelected))
+        {
+            RaiseSelectionState();
+            UpdateStatusMessage();
+        }
+    }
+
+    private void RaiseSelectionState()
+    {
+        OnPropertyChanged(nameof(IsAllSelected));
+        OnPropertyChanged(nameof(IsNoneSelected));
+    }
+
+    /// <summary>True when every row is selected. Drives the master checkbox's checked state.</summary>
+    public bool IsAllSelected => OperationsPreview.Count > 0 && OperationsPreview.All(op => op.IsSelected);
+
+    /// <summary>True when no row is selected. Drives the master checkbox's unchecked state.</summary>
+    public bool IsNoneSelected => OperationsPreview.Count == 0 || OperationsPreview.All(op => !op.IsSelected);
+
+    [RelayCommand]
+    public void SelectAll()
+    {
+        foreach (var op in OperationsPreview) op.IsSelected = true;
+        RaiseSelectionState();
+        UpdateStatusMessage();
+    }
+
+    [RelayCommand]
+    public void SelectNone()
+    {
+        foreach (var op in OperationsPreview) op.IsSelected = false;
+        RaiseSelectionState();
+        UpdateStatusMessage();
     }
 
     /// <summary>
-    /// Auto-populates the operation list from Step 1's renamed previews.
-    /// Defaults the output folder to the source folder so the preview is meaningful
-    /// the moment the user lands on Step 2.
+    /// Auto-populates the operation list from Step 1's renamed previews when the
+    /// user arrives from Step 1.
     /// </summary>
-    public void RefreshFromRenameStep()
-    {
-        if (string.IsNullOrEmpty(OutputFolderPath)
-            && !string.IsNullOrEmpty(_parentViewModel.SelectedSourceFolder))
-        {
-            OutputFolderPath = _parentViewModel.SelectedSourceFolder;
-        }
-
-        LoadPreview();
-    }
+    public void RefreshFromRenameStep() => LoadPreview();
 
     [RelayCommand]
     public void LoadPreview()
@@ -58,12 +102,10 @@ public partial class FileToFolderViewModel : ObservableObject
         // preserving any manually-added rows that weren't in RenamePreview)
         if (_parentViewModel.RenamePreview.Count > 0)
         {
+            // Destinations are computed IN PLACE (each file's own directory).
             var operations = _renameService.CreateFileOperations(
                 _parentViewModel.SelectedSourceFolder ?? string.Empty,
-                _parentViewModel.RenamePreview,
-                string.IsNullOrEmpty(OutputFolderPath)
-                    ? "(awaiting output folder)"
-                    : OutputFolderPath);
+                _parentViewModel.RenamePreview);
 
             // Replace existing rename-step rows but keep manually-added ones
             var manuallyAdded = OperationsPreview
@@ -72,59 +114,84 @@ public partial class FileToFolderViewModel : ObservableObject
                 .ToList();
 
             OperationsPreview.Clear();
+            _alreadyOrganizedCount = 0;
             foreach (var op in operations)
             {
+                // Skip files already sitting in their own correctly-named folder —
+                // Step 2 only wraps LOOSE files, in place.
+                if (IsAlreadyInPlace(op)) { _alreadyOrganizedCount++; continue; }
+
                 op.IsSelected = true;
                 OperationsPreview.Add(op);
             }
             foreach (var op in manuallyAdded)
             {
-                // Recompute destination with the (possibly new) output folder
-                RecomputeDestination(op);
+                if (IsAlreadyInPlace(op)) { _alreadyOrganizedCount++; continue; }
                 OperationsPreview.Add(op);
             }
-        }
-        else
-        {
-            // Recompute destinations for all manual operations
-            foreach (var op in OperationsPreview)
-                RecomputeDestination(op);
         }
 
         UpdateStatusMessage();
     }
 
-    private void RecomputeDestination(FileOperation op)
+    /// <summary>
+    /// True when the file already sits in its own correctly-named folder, so Step 2
+    /// has nothing to do for it. This is independent of the output folder — a file is
+    /// "already organized" purely based on where it lives now:
+    ///   • Movie: its parent folder name already equals the cleaned "Title (Year)".
+    ///   • TV: its parent folder is a "Season XX" folder (the show/season layout).
+    /// </summary>
+    private static bool IsAlreadyInPlace(FileOperation op)
     {
-        if (string.IsNullOrEmpty(OutputFolderPath))
+        var srcDir = Path.GetDirectoryName(op.OriginalFilePath);
+        if (string.IsNullOrEmpty(srcDir)) return false;
+        var parentName = Path.GetFileName(srcDir.TrimEnd('\\'));
+        if (string.IsNullOrEmpty(parentName)) return false;
+
+        if (op.IsTvEpisode)
         {
-            op.DestinationFolder = "(awaiting output folder)";
+            // Already in a "Season 01" (or "Season 1" / "Specials") folder.
+            return System.Text.RegularExpressions.Regex.IsMatch(
+                parentName, @"^(?:Season|Specials?)[\s_\.]?\d*$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+
+        // Movie: parent folder name matches the cleaned "Title (Year)".
+        var targetFolder = PathSanitizer.SanitizeFolderName(
+            Path.GetFileNameWithoutExtension(op.FinalFileName));
+        return string.Equals(
+            PathSanitizer.SanitizeFolderName(parentName),
+            targetFolder,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Computes the IN-PLACE destination: a folder created in the file's own
+    /// current directory. No separate output folder is involved.
+    ///   • Movie: &lt;fileDir&gt;/Title (Year)/
+    ///   • TV:    &lt;fileDir&gt;/Show/Season XX/
+    /// </summary>
+    private static void RecomputeDestination(FileOperation op)
+    {
+        var baseDir = Path.GetDirectoryName(op.OriginalFilePath);
+        if (string.IsNullOrEmpty(baseDir))
+        {
+            op.DestinationFolder = string.Empty;
             return;
         }
 
-        // TV path: <output>/Show Name/Season 01/. Preserves the Kodi layout
-        // even after the user changes the output folder mid-session.
         if (op.IsTvEpisode)
         {
             var showFolder = PathSanitizer.SanitizeFolderName(op.ShowName);
-            op.DestinationFolder = Path.Combine(OutputFolderPath, showFolder, $"Season {op.Season:D2}");
+            op.DestinationFolder = Path.Combine(baseDir, showFolder, $"Season {op.Season:D2}");
             return;
         }
 
-        // Movie path: <output>/Title (Year)/
         var folderName = Path.GetFileNameWithoutExtension(op.FinalFileName);
         if (string.IsNullOrWhiteSpace(folderName))
             folderName = Path.GetFileNameWithoutExtension(op.OriginalFileName);
         folderName = PathSanitizer.SanitizeFolderName(folderName);
-        op.DestinationFolder = Path.Combine(OutputFolderPath, folderName);
-    }
-
-    partial void OnOutputFolderPathChanged(string value)
-    {
-        if (!string.IsNullOrEmpty(value))
-            _configService.AddRecentOutputFolder(value);
-        if (OperationsPreview.Count > 0)
-            LoadPreview();
+        op.DestinationFolder = Path.Combine(baseDir, folderName);
     }
 
     /// <summary>
@@ -133,6 +200,7 @@ public partial class FileToFolderViewModel : ObservableObject
     /// </summary>
     public void AddFiles(IEnumerable<string> filePaths)
     {
+        _alreadyOrganizedCount = 0;
         foreach (var path in filePaths)
         {
             if (!File.Exists(path)) continue;
@@ -165,11 +233,13 @@ public partial class FileToFolderViewModel : ObservableObject
                     EpisodeTitle = tv.EpisodeTitle,
                 };
                 RecomputeDestination(tvOp);
+                // Skip files already sitting in a Season folder of their own show.
+                if (IsAlreadyInPlace(tvOp)) { _alreadyOrganizedCount++; continue; }
                 OperationsPreview.Add(tvOp);
                 continue;
             }
 
-            // Movie path (unchanged)
+            // Movie path
             var parsed = RegexPatterns.ParseFilename(fileName);
             var formatted = RenameService.ApplyTemplate(parsed.Title, parsed.Year, _configService.GetLastTemplate());
             var cleanedName = PathSanitizer.SanitizeFileName(formatted) + ext;
@@ -185,6 +255,8 @@ public partial class FileToFolderViewModel : ObservableObject
                 IsSelected = true,
             };
             RecomputeDestination(op);
+            // Skip files already in their own correctly-named folder.
+            if (IsAlreadyInPlace(op)) { _alreadyOrganizedCount++; continue; }
             OperationsPreview.Add(op);
         }
         UpdateStatusMessage();
@@ -214,18 +286,22 @@ public partial class FileToFolderViewModel : ObservableObject
 
     private void UpdateStatusMessage()
     {
+        // Note when files were hidden because they're already organized — explains
+        // why the list may be shorter than what Step 1 showed.
+        var organizedNote = _alreadyOrganizedCount > 0
+            ? $" · {_alreadyOrganizedCount} already in folders (skipped)"
+            : string.Empty;
+
         if (OperationsPreview.Count == 0)
         {
-            StatusMessage = "No files yet — drop a folder, click + Add Files, or come back from Step 1.";
-        }
-        else if (string.IsNullOrEmpty(OutputFolderPath))
-        {
-            StatusMessage = "Pick an output folder above to enable Run.";
+            StatusMessage = _alreadyOrganizedCount > 0
+                ? $"All {_alreadyOrganizedCount} file(s) are already in their own folders — nothing to organize here."
+                : "No loose files — drop a folder, click + Add Files / + Add Folder, or come back from Step 1.";
         }
         else
         {
             var selected = OperationsPreview.Count(op => op.IsSelected);
-            StatusMessage = $"{selected} of {OperationsPreview.Count} file(s) ready to organize into {OutputFolderPath}";
+            StatusMessage = $"{selected} of {OperationsPreview.Count} loose file(s) will each get their own folder{organizedNote}";
         }
     }
 
@@ -236,15 +312,7 @@ public partial class FileToFolderViewModel : ObservableObject
     {
         var toRun = OperationsPreview.Where(op => op.IsSelected).ToList();
         if (toRun.Count == 0)
-            return new ProcessingResult { Success = true, Message = "No operations selected." };
-
-        if (string.IsNullOrEmpty(OutputFolderPath))
-            return new ProcessingResult
-            {
-                Success = false,
-                Message = "Output folder is not set.",
-                Errors = { "Output folder is not set." }
-            };
+            return new ProcessingResult { Success = true, Message = "No files selected." };
 
         IsLoading = true;
         try
@@ -257,10 +325,12 @@ public partial class FileToFolderViewModel : ObservableObject
             if (result.Success)
             {
                 _parentViewModel.SetFileOperations(toRun);
-                _parentViewModel.SelectedOutputFolder = OutputFolderPath;
+                // Files were wrapped in place — tell Step 3 to look at the source
+                // root so it can find the newly-created movie folders.
+                _parentViewModel.SelectedOutputFolder = _parentViewModel.SelectedSourceFolder ?? string.Empty;
                 var suffix = cleanMetadata ? " (with metadata cleanup)" : string.Empty;
                 // result.Message already includes merge counts ("N organized · M merged…")
-                StatusMessage = $"✓ {result.Message} → {OutputFolderPath}{suffix}";
+                StatusMessage = $"✓ {result.Message}{suffix}";
             }
             else
             {

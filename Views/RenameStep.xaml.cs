@@ -55,8 +55,12 @@ public sealed partial class RenameStep : UserControl
     private void SyncMasterCheckBoxes()
     {
         if (_viewModel == null) return;
-        AllCheckBox.IsChecked = _viewModel.IsAllSelected;
-        NoneCheckBox.IsChecked = _viewModel.IsNoneSelected;
+        // Tri-state: all → checked, none → unchecked, partial → indeterminate (dash).
+        SelectAllCheckBox.IsChecked = _viewModel.IsAllSelected
+            ? true
+            : _viewModel.IsNoneSelected
+                ? false
+                : (bool?)null;
     }
 
     private void OnWarningInfoBarClosed(InfoBar sender, object args)
@@ -198,15 +202,16 @@ public sealed partial class RenameStep : UserControl
     //  Toolbar buttons
     // -----------------------------------------------------------------
 
-    private void OnSelectAllClick(object sender, RoutedEventArgs e)
+    private void OnSelectAllToggle(object sender, RoutedEventArgs e)
     {
-        _viewModel?.SelectAllCommand.Execute(null);
-        SyncMasterCheckBoxes();
-    }
-
-    private void OnSelectNoneClick(object sender, RoutedEventArgs e)
-    {
-        _viewModel?.SelectNoneCommand.Execute(null);
+        if (_viewModel == null) return;
+        // If everything is already selected, clicking clears all; otherwise
+        // (none or partial) it selects all. SyncMasterCheckBoxes then overrides
+        // whatever the checkbox's default toggle did with the true state.
+        if (_viewModel.IsAllSelected)
+            _viewModel.SelectNoneCommand.Execute(null);
+        else
+            _viewModel.SelectAllCommand.Execute(null);
         SyncMasterCheckBoxes();
     }
     private void OnApplyTitleCaseClick(object sender, RoutedEventArgs e) => _viewModel?.ApplyTitleCaseCommand.Execute(null);
@@ -245,7 +250,14 @@ public sealed partial class RenameStep : UserControl
 
     private void OnAcceleratorSelectAll(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
-        _viewModel?.SelectAllCommand.Execute(null);
+        // Ctrl+A toggles, same as clicking the master checkbox: select all, or
+        // deselect all if everything is already selected.
+        if (_viewModel == null) return;
+        if (_viewModel.IsAllSelected)
+            _viewModel.SelectNoneCommand.Execute(null);
+        else
+            _viewModel.SelectAllCommand.Execute(null);
+        SyncMasterCheckBoxes();
         args.Handled = true;
     }
 
@@ -413,11 +425,9 @@ public sealed partial class RenameStep : UserControl
         var result = await confirm.ShowAsync();
         if (result != ContentDialogResult.Primary) return;
 
-        // A persistent "working" toast while metadata cleaning runs, so the app
-        // doesn't look frozen during the slow part.
-        if (cleaningMetadata)
-            ToastService.Info("Cleaning metadata… this can take a moment for large files.", "Working", autoDismissMs: 60000);
-
+        // The determinate progress bar in the footer (bound to IsProcessing /
+        // ProgressValue) now communicates the slow metadata pass, so no toast
+        // is needed here.
         var opResult = await _viewModel.RenameInPlaceAsync();
 
         if (opResult.Success && opResult.Errors.Count == 0)

@@ -9,14 +9,17 @@ public class ProcessingResult
     public List<string> Errors { get; set; } = new();
 }
 
-public class FileOperation
+public partial class FileOperation : ObservableObject
 {
     public string OriginalFilePath { get; set; } = string.Empty;
     public string OriginalFileName { get; set; } = string.Empty;
     public string CleanedTitle { get; set; } = string.Empty;
     public int Year { get; set; }
     public double Confidence { get; set; }
-    public string DestinationFolder { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    private string destinationFolder = string.Empty;
+
     public string FinalFileName { get; set; } = string.Empty;
 
     /// <summary>Detected edition tag (e.g. "Director's Cut", "IMAX"), empty if none.</summary>
@@ -30,7 +33,8 @@ public class FileOperation
     public bool IsTvEpisode => Season > 0 && Episode > 0 && !string.IsNullOrEmpty(ShowName);
 
     /// <summary>Whether this operation will be executed when "Run File to Folder" is clicked.</summary>
-    public bool IsSelected { get; set; } = true;
+    [ObservableProperty]
+    private bool isSelected = true;
 }
 
 /// <summary>One token of the original filename, marked as kept or removed by the cleaner.</summary>

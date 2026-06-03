@@ -11,32 +11,16 @@
     <Grid>
         <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="8">
 
-            <!-- Output folder picker (single compact row) -->
-            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-                <TextBlock Text="Output"
-                           VerticalAlignment="Center"
-                           FontSize="13"
-                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                <TextBox Grid.Column="1"
-                         x:Name="OutputFolderText"
-                         IsReadOnly="True"
-                         Text="{Binding OutputFolderPath, Mode=OneWay}"
-                         PlaceholderText="No folder selected"
-                         VerticalAlignment="Center" />
-                <SplitButton Grid.Column="2"
-                             x:Name="ChangeOutputButton"
-                             Click="OnBrowseClick"
-                             VerticalAlignment="Center"
-                             ToolTipService.ToolTip="Pick output folder. Click ▾ for recent folders.">
-                    <FontIcon Glyph="&#xE838;" FontSize="14" />
-                    <SplitButton.Flyout>
-                        <MenuFlyout x:Name="RecentOutputFlyout" Placement="Bottom" />
-                    </SplitButton.Flyout>
-                </SplitButton>
-            </Grid>
+            <!-- Explainer: Step 2 wraps loose files into their own folder, in place -->
+            <InfoBar Grid.Row="0"
+                     IsOpen="True"
+                     IsClosable="False"
+                     Severity="Informational"
+                     Title="File to Folder"
+                     Message="Each loose video gets its own &quot;Title (Year)&quot; folder created right where it sits. Files already in their own folder are skipped automatically." />
 
-            <!-- Manual add buttons -->
-            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+            <!-- Manual add buttons + master select -->
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <Button Click="OnAddFilesClick"
                         ToolTipService.ToolTip="Add individual video files">
                     <StackPanel Orientation="Horizontal" Spacing="4">
@@ -58,6 +42,15 @@
                         <TextBlock Text="Clear" FontSize="12" />
                     </StackPanel>
                 </Button>
+
+                <!-- Tri-state master select: checked = all, unchecked = none, dash = some -->
+                <CheckBox x:Name="SelectAllCheckBox"
+                          Content="Select all"
+                          IsThreeState="True"
+                          Click="OnSelectAllToggle"
+                          VerticalAlignment="Center"
+                          Margin="8,0,0,0"
+                          ToolTipService.ToolTip="Select / deselect all rows" />
             </StackPanel>
 
             <!-- Side-by-side preview list OR empty state -->

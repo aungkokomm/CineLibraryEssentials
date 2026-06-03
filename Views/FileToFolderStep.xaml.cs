@@ -21,15 +21,48 @@ public sealed partial class FileToFolderStep : UserControl
     public FileToFolderStep()
     {
         InitializeComponent();
-        Loaded += (_, _) => RebuildRecentOutputFlyout();
     }
 
     public void SetViewModel(FileToFolderViewModel viewModel)
     {
         _viewModel = viewModel;
         DataContext = viewModel;
-        viewModel.OperationsPreview.CollectionChanged += (_, _) => UpdateEmptyState();
+        viewModel.OperationsPreview.CollectionChanged += (_, _) =>
+        {
+            UpdateEmptyState();
+            SyncSelectAllCheckBox();
+        };
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(FileToFolderViewModel.IsAllSelected)
+                || e.PropertyName == nameof(FileToFolderViewModel.IsNoneSelected))
+            {
+                SyncSelectAllCheckBox();
+            }
+        };
         UpdateEmptyState();
+        SyncSelectAllCheckBox();
+    }
+
+    private void SyncSelectAllCheckBox()
+    {
+        if (_viewModel == null) return;
+        // Tri-state: all → checked, none → unchecked, partial → indeterminate.
+        SelectAllCheckBox.IsChecked = _viewModel.IsAllSelected
+            ? true
+            : _viewModel.IsNoneSelected
+                ? false
+                : (bool?)null;
+    }
+
+    private void OnSelectAllToggle(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel == null) return;
+        if (_viewModel.IsAllSelected)
+            _viewModel.SelectNoneCommand.Execute(null);
+        else
+            _viewModel.SelectAllCommand.Execute(null);
+        SyncSelectAllCheckBox();
     }
 
     private void UpdateEmptyState()
@@ -45,60 +78,6 @@ public sealed partial class FileToFolderStep : UserControl
     {
         _viewModel?.RefreshFromRenameStep();
         UpdateEmptyState();
-    }
-
-    // -----------------------------------------------------------------
-    //  Output folder picker + recent folders
-    // -----------------------------------------------------------------
-
-    private async void OnBrowseClick(SplitButton sender, SplitButtonClickEventArgs args)
-    {
-        try
-        {
-            var picker = new FolderPicker();
-            var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, hWnd);
-            picker.FileTypeFilter.Add("*");
-
-            var folder = await picker.PickSingleFolderAsync();
-            if (folder != null && _viewModel != null)
-            {
-                _viewModel.OutputFolderPath = folder.Path;
-                RebuildRecentOutputFlyout();
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error: {ex.Message}");
-        }
-    }
-
-    private void RebuildRecentOutputFlyout()
-    {
-        RecentOutputFlyout.Items.Clear();
-        var recents = _configService.GetRecentOutputFolders();
-        if (recents.Count == 0)
-        {
-            RecentOutputFlyout.Items.Add(new MenuFlyoutItem { Text = "(no recent folders)", IsEnabled = false });
-            return;
-        }
-        foreach (var path in recents)
-        {
-            var mfi = new MenuFlyoutItem { Text = path };
-            mfi.Click += (_, _) =>
-            {
-                if (_viewModel != null && Directory.Exists(path))
-                {
-                    _viewModel.OutputFolderPath = path;
-                    RebuildRecentOutputFlyout();
-                }
-                else if (!Directory.Exists(path))
-                {
-                    ToastService.Warning($"Folder no longer exists: {path}");
-                }
-            };
-            RecentOutputFlyout.Items.Add(mfi);
-        }
     }
 
     // -----------------------------------------------------------------
@@ -241,12 +220,6 @@ public sealed partial class FileToFolderStep : UserControl
     private async void OnRunClick(object sender, RoutedEventArgs e)
     {
         if (_viewModel == null) return;
-
-        if (string.IsNullOrEmpty(_viewModel.OutputFolderPath))
-        {
-            ToastService.Warning("Please pick an output folder first.");
-            return;
-        }
 
         var anyChecked = _viewModel.OperationsPreview.Any(op => op.IsSelected);
         if (!anyChecked)

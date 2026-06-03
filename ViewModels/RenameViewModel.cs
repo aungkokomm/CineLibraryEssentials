@@ -32,6 +32,23 @@ public partial class RenameViewModel : ObservableObject
     [ObservableProperty]
     private bool isLoading;
 
+    // ---- Rename / clean progress bar (Step 1 footer) ----
+    /// <summary>True while a rename/clean batch is running — shows the progress bar.</summary>
+    [ObservableProperty]
+    private bool isProcessing;
+
+    /// <summary>0..ProgressMax — current file count completed.</summary>
+    [ObservableProperty]
+    private double progressValue;
+
+    /// <summary>Total number of files in the current batch.</summary>
+    [ObservableProperty]
+    private double progressMax = 1;
+
+    /// <summary>Label under the bar, e.g. "Cleaning 3 of 12 — Movie.mkv".</summary>
+    [ObservableProperty]
+    private string progressText = string.Empty;
+
     [ObservableProperty]
     private string searchText = string.Empty;
 
@@ -155,6 +172,12 @@ public partial class RenameViewModel : ObservableObject
             ValidateAll();
             ApplyFilter();
             IsLoading = false;
+
+            // Newly-loaded rows default to selected — push the master selection
+            // state so the header "select all" checkbox reflects reality instead
+            // of keeping its empty-list value.
+            OnPropertyChanged(nameof(IsAllSelected));
+            OnPropertyChanged(nameof(IsNoneSelected));
         });
     }
 
@@ -504,6 +527,25 @@ public partial class RenameViewModel : ObservableObject
             return new ProcessingResult { Success = true, Message = "No files selected." };
 
         IsLoading = true;
+
+        // Show a determinate progress bar for the batch. Cleaning metadata is the
+        // slow part, so an obvious "N of M — filename" readout reassures the user
+        // the app is working and not frozen.
+        var verb = CleanEmbeddedMetadata ? "Cleaning" : "Renaming";
+        ProgressValue = 0;
+        ProgressMax = toRename.Count;
+        ProgressText = $"{verb} 0 of {toRename.Count}…";
+        IsProcessing = true;
+
+        var progress = new Progress<RenameService.RenameProgress>(p =>
+        {
+            ProgressValue = p.Done;
+            ProgressMax = p.Total <= 0 ? 1 : p.Total;
+            ProgressText = string.IsNullOrEmpty(p.CurrentFile)
+                ? $"{verb} {p.Done} of {p.Total}…"
+                : $"{verb} {Math.Min(p.Done + 1, p.Total)} of {p.Total} — {p.CurrentFile}";
+        });
+
         try
         {
             var undoLog = new List<UndoService.RenameRecord>();
@@ -512,7 +554,8 @@ public partial class RenameViewModel : ObservableObject
                 renameParentFolders: RenameParentFolder,
                 sourceFolder: SourceFolderPath,
                 cleanEmbeddedMetadata: CleanEmbeddedMetadata,
-                undoLog: undoLog);
+                undoLog: undoLog,
+                progress: progress);
 
             // Push the batch onto the undo stack so the UI can offer a 30s undo toast
             if (undoLog.Count > 0)
@@ -529,6 +572,8 @@ public partial class RenameViewModel : ObservableObject
         finally
         {
             IsLoading = false;
+            IsProcessing = false;
+            ProgressText = string.Empty;
         }
     }
 

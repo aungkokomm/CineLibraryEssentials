@@ -84,18 +84,15 @@
                          Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          MinWidth="180"
                          VerticalAlignment="Center" />
+                <!-- Single tri-state master checkbox: checked = all selected,
+                     unchecked = none, dash = some. Clicking toggles all/none. -->
                 <CheckBox Grid.Column="1"
-                          x:Name="AllCheckBox"
-                          Content="All"
-                          Click="OnSelectAllClick"
+                          x:Name="SelectAllCheckBox"
+                          Content="Select all"
+                          IsThreeState="True"
+                          Click="OnSelectAllToggle"
                           VerticalAlignment="Center"
-                          ToolTipService.ToolTip="Select all rows (Ctrl+A)" />
-                <CheckBox Grid.Column="2"
-                          x:Name="NoneCheckBox"
-                          Content="None"
-                          Click="OnSelectNoneClick"
-                          VerticalAlignment="Center"
-                          ToolTipService.ToolTip="Deselect all rows" />
+                          ToolTipService.ToolTip="Select / deselect all rows (Ctrl+A)" />
 
                 <ComboBox Grid.Column="4"
                           SelectedItem="{Binding ConfidenceFilter, Mode=TwoWay}"
@@ -309,12 +306,32 @@
                 </ListView.ItemTemplate>
             </ListView>
 
-            <!-- ============ Footer: stats + Rename button ============ -->
+            <!-- ============ Footer: stats / progress + Rename button ============ -->
             <Grid Grid.Row="5" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,4,0,0">
-                <TextBlock Text="{Binding StatsSummary}"
-                           FontSize="11"
-                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                           VerticalAlignment="Center" />
+
+                <!-- Left column: either the stats line OR (while processing) a
+                     determinate progress bar with a "N of M — file" label. -->
+                <Grid VerticalAlignment="Center">
+                    <TextBlock Text="{Binding StatsSummary}"
+                               FontSize="11"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               VerticalAlignment="Center"
+                               Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVisibilityReverseConverter}}" />
+
+                    <StackPanel Spacing="3"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <ProgressBar Value="{Binding ProgressValue}"
+                                     Maximum="{Binding ProgressMax}"
+                                     Minimum="0"
+                                     Height="6" />
+                        <TextBlock Text="{Binding ProgressText}"
+                                   FontSize="11"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Grid>
+
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                     <ProgressRing IsActive="{Binding IsLoading}" Width="18" Height="18"
                                   VerticalAlignment="Center" />

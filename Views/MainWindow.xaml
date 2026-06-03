@@ -10,7 +10,7 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid RowDefinitions="32,*,Auto">
+    <Grid RowDefinitions="32,*">
         <!-- Custom title bar -->
         <Grid x:Name="AppTitleBar"
               Grid.Row="0"
@@ -28,16 +28,22 @@
                        VerticalAlignment="Center" />
         </Grid>
 
-        <!-- Content -->
-        <Frame x:Name="ContentFrame" Grid.Row="1" />
+        <!-- Content + toast overlay share the same row so toasts FLOAT over the
+             page (bottom-right) instead of occupying their own layout row and
+             stealing working area. -->
+        <Grid Grid.Row="1">
+            <Frame x:Name="ContentFrame" />
 
-        <!-- Toast host (notifications stack up at the bottom-right) -->
-        <StackPanel x:Name="ToastHost"
-                    Grid.Row="2"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Bottom"
-                    Margin="16,0,16,16"
-                    MaxWidth="420"
-                    Spacing="0" />
+            <!-- Toast host overlays the content; IsHitTestVisible stays default so
+                 the toast buttons remain clickable, but the empty panel area
+                 doesn't block the page underneath (StackPanel only occupies its
+                 children's bounds at bottom-right). -->
+            <StackPanel x:Name="ToastHost"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        Margin="16,0,16,16"
+                        MaxWidth="420"
+                        Spacing="0" />
+        </Grid>
     </Grid>
 </Window>
