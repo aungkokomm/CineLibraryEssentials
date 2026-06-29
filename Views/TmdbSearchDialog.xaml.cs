@@ -141,7 +141,18 @@ public sealed partial class TmdbSearchDialog : Window
         var rawQuery = QueryBox.Text?.Trim();
         if (string.IsNullOrEmpty(rawQuery))
         {
-            StatusText.Text = "Enter a movie title to search.";
+            StatusText.Text = "Enter a title, or paste a TMDb ID / link.";
+            return;
+        }
+
+        // ---- Direct TMDb ID / URL shortcut ----
+        // If the box contains a bare number ("27205"), a "tmdb:27205" prefix, or a
+        // pasted TMDb URL (https://www.themoviedb.org/movie/27205-inception), fetch
+        // that exact entry instead of doing a title search. A life-saver when the
+        // title search returns the wrong match or the film is obscure.
+        if (TryParseDirectId(rawQuery, out var directId, out var urlIsTv))
+        {
+            await FetchByIdAsync(directId, urlIsTv);
             return;
         }
 
@@ -220,6 +231,115 @@ public sealed partial class TmdbSearchDialog : Window
         catch (Exception ex)
         {
             StatusText.Text = $"Search failed: {ex.Message}";
+        }
+        finally
+        {
+            SearchButton.IsEnabled = true;
+        }
+    }
+
+    // Matches a TMDb URL and captures whether it's /movie/ or /tv/ plus the id:
+    //   https://www.themoviedb.org/movie/27205-inception
+    //   themoviedb.org/tv/1396
+    private static readonly Regex TmdbUrlPattern = new(
+        @"themoviedb\.org/(?<kind>movie|tv)/(?<id>\d+)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // "tmdb:27205" or "tmdb 27205"
+    private static readonly Regex TmdbPrefixPattern = new(
+        @"^tmdb[:\s]+(?<id>\d+)$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Detects a direct TMDb id in the query. Returns the id, and (for URLs only)
+    /// whether the URL pointed at a TV show — which lets a pasted /tv/ link force
+    /// the TV lookup even if the dialog opened in movie mode.
+    /// </summary>
+    private static bool TryParseDirectId(string query, out int id, out bool? urlIsTv)
+    {
+        id = 0;
+        urlIsTv = null;
+
+        // TMDb URL — most specific, also tells us movie vs tv.
+        var url = TmdbUrlPattern.Match(query);
+        if (url.Success && int.TryParse(url.Groups["id"].Value, out id))
+        {
+            urlIsTv = url.Groups["kind"].Value.Equals("tv", StringComparison.OrdinalIgnoreCase);
+            return true;
+        }
+
+        // "tmdb:27205"
+        var prefixed = TmdbPrefixPattern.Match(query);
+        if (prefixed.Success && int.TryParse(prefixed.Groups["id"].Value, out id))
+            return true;
+
+        // Bare number — treat as an id. (Year-like 4-digit values are ambiguous,
+        // but a user typing just "1994" almost certainly means the TMDb id; a real
+        // title search would include words.)
+        if (Regex.IsMatch(query, @"^\d{1,7}$") && int.TryParse(query, out id))
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// Fetches a single TMDb entry by id and shows it as the only result. Honors
+    /// the dialog's TV/movie mode, but a pasted /tv/ or /movie/ URL overrides it.
+    /// </summary>
+    private async Task FetchByIdAsync(int id, bool? urlIsTv)
+    {
+        var asTv = urlIsTv ?? TvSearchMode;
+        Results.Clear();
+        UseButton.IsEnabled = false;
+        SearchButton.IsEnabled = false;
+        StatusText.Text = $"Fetching TMDb {(asTv ? "TV show" : "movie")} #{id}...";
+
+        try
+        {
+            if (asTv)
+            {
+                var show = await _client.GetTvDetailsAsync(id);
+                if (show == null)
+                {
+                    StatusText.Text = $"No TV show found with TMDb id {id}.";
+                    return;
+                }
+                Results.Add(new TmdbSearchItem
+                {
+                    TmdbId = show.TmdbId,
+                    Title = show.Name,
+                    Year = show.Year,
+                    Overview = show.Overview ?? string.Empty,
+                    PosterImageUrl = string.IsNullOrEmpty(show.PosterPath)
+                        ? null : _client.GetImageUrl(show.PosterPath, "w185")
+                });
+            }
+            else
+            {
+                var movie = await _client.GetMovieDetailsAsync(id);
+                if (movie == null)
+                {
+                    StatusText.Text = $"No movie found with TMDb id {id}.";
+                    return;
+                }
+                Results.Add(new TmdbSearchItem
+                {
+                    TmdbId = movie.TmdbId,
+                    Title = movie.Title,
+                    Year = movie.Year,
+                    Overview = movie.Overview ?? string.Empty,
+                    PosterImageUrl = string.IsNullOrEmpty(movie.PosterPath)
+                        ? null : _client.GetImageUrl(movie.PosterPath, "w185")
+                });
+            }
+
+            // Auto-select the single result so the user can just hit "Use Selected".
+            ResultsList.SelectedIndex = 0;
+            StatusText.Text = "Found by TMDb id. Click \"Use Selected\" to confirm.";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Lookup failed: {ex.Message}";
         }
         finally
         {

@@ -12,7 +12,7 @@
         <!-- Search row -->
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
             <TextBox x:Name="QueryBox"
-                     PlaceholderText="Movie title..."
+                     PlaceholderText="Title, or paste a TMDb ID / link…"
                      KeyDown="OnQueryKeyDown" />
             <Button Grid.Column="1"
                     x:Name="SearchButton"
