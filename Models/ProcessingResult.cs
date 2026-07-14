@@ -44,12 +44,32 @@ public class DiffSegment
     public bool IsRemoved { get; set; }
 }
 
+/// <summary>
+/// Shared, observable column widths for Step 1's Original / Cleaned columns.
+/// A single instance is bound by the header AND every row, so the draggable
+/// divider updates all rows at once.
+/// </summary>
+public partial class ColumnLayout : ObservableObject
+{
+    [ObservableProperty]
+    private Microsoft.UI.Xaml.GridLength originalWidth =
+        new(1, Microsoft.UI.Xaml.GridUnitType.Star);
+
+    [ObservableProperty]
+    private Microsoft.UI.Xaml.GridLength cleanedWidth =
+        new(1, Microsoft.UI.Xaml.GridUnitType.Star);
+}
+
 public partial class FilePreview : ObservableObject
 {
     public string OriginalName { get; set; } = string.Empty;
     public string OriginalFilePath { get; set; } = string.Empty;
     public long FileSizeBytes { get; set; }
     public int Year { get; set; }
+
+    /// <summary>Shared column layout (same instance for every row) so the header's
+    /// draggable divider resizes all rows together. Bound as Columns.OriginalWidth.</summary>
+    public ColumnLayout? Columns { get; set; }
 
     /// <summary>Detected edition tag (e.g. "Director's Cut", "IMAX"), empty if none.</summary>
     [ObservableProperty]

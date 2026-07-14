@@ -14,20 +14,10 @@
     </UserControl.KeyboardAccelerators>
 
     <Grid>
-        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" RowSpacing="8">
-
-            <!-- ============ Warning InfoBar ============ -->
-            <InfoBar Grid.Row="0"
-                     x:Name="WarningInfoBar"
-                     Severity="Informational"
-                     Title="Tip"
-                     Message="Already-clean files are hidden by default — toggle 'Modified only' off to see them. Review Low / Medium confidence rows carefully; you have a 30-second Undo after each rename batch."
-                     IsOpen="True"
-                     IsClosable="True"
-                     CloseButtonClick="OnWarningInfoBarClosed" />
+        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="4">
 
             <!-- ============ Source folder + recursive + format (single compact row) ============ -->
-            <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
                 <TextBlock Text="Source"
                            VerticalAlignment="Center"
                            FontSize="13"
@@ -78,7 +68,7 @@
             </Grid>
 
             <!-- ============ Toolbar: search, filter, find/replace ============ -->
-            <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
                 <TextBox Grid.Column="0"
                          PlaceholderText="🔍 Search"
                          Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -145,14 +135,23 @@
                 </Button>
             </Grid>
 
-            <!-- ============ Sortable column headers ============ -->
-            <Grid Grid.Row="3"
-                  ColumnDefinitions="36,*,*,80,32,32"
+            <!-- ============ Sortable column headers + draggable divider ============ -->
+            <Grid Grid.Row="2"
+                  x:Name="HeaderGrid"
                   Padding="10,6"
                   Background="{ThemeResource LayerFillColorDefaultBrush}"
                   BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                   BorderThickness="1,1,1,0"
                   CornerRadius="4,4,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="36" />
+                    <ColumnDefinition Width="{Binding Columns.OriginalWidth}" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="{Binding Columns.CleanedWidth}" />
+                    <ColumnDefinition Width="80" />
+                    <ColumnDefinition Width="32" />
+                    <ColumnDefinition Width="32" />
+                </Grid.ColumnDefinitions>
                 <TextBlock Text="" />
                 <Button Grid.Column="1"
                         x:Name="SortByOriginalButton"
@@ -168,7 +167,22 @@
                         <FontIcon x:Name="SortOriginalIcon" Glyph="" FontSize="10" />
                     </StackPanel>
                 </Button>
-                <Button Grid.Column="2"
+
+                <!-- Draggable column divider -->
+                <Border Grid.Column="2"
+                        x:Name="ColumnDivider"
+                        Background="Transparent"
+                        HorizontalAlignment="Stretch"
+                        ManipulationMode="TranslateX"
+                        ManipulationDelta="OnColumnDividerDrag"
+                        PointerEntered="OnDividerPointerEntered"
+                        PointerExited="OnDividerPointerExited">
+                    <Rectangle Width="1"
+                               HorizontalAlignment="Center"
+                               Fill="{ThemeResource ControlStrokeColorDefaultBrush}" />
+                </Border>
+
+                <Button Grid.Column="3"
                         x:Name="SortByCleanedButton"
                         Background="Transparent"
                         BorderThickness="0"
@@ -182,7 +196,7 @@
                         <FontIcon x:Name="SortCleanedIcon" Glyph="" FontSize="10" />
                     </StackPanel>
                 </Button>
-                <Button Grid.Column="3"
+                <Button Grid.Column="4"
                         x:Name="SortByConfidenceButton"
                         Background="Transparent"
                         BorderThickness="0"
@@ -199,7 +213,7 @@
             </Grid>
 
             <!-- ============ File list ============ -->
-            <ListView Grid.Row="4"
+            <ListView Grid.Row="3"
                       x:Name="FilePreviewList"
                       SelectionMode="None"
                       ItemsSource="{Binding FilePreviews}"
@@ -209,13 +223,22 @@
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem">
                         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                        <Setter Property="Padding" Value="6,2" />
-                        <Setter Property="MinHeight" Value="48" />
+                        <Setter Property="Padding" Value="4,1" />
+                        <Setter Property="MinHeight" Value="0" />
                     </Style>
                 </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate>
-                        <Grid ColumnDefinitions="36,*,*,80,32,32">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="36" />
+                                <ColumnDefinition Width="{Binding Columns.OriginalWidth}" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="{Binding Columns.CleanedWidth}" />
+                                <ColumnDefinition Width="80" />
+                                <ColumnDefinition Width="32" />
+                                <ColumnDefinition Width="32" />
+                            </Grid.ColumnDefinitions>
                             <Grid.ContextFlyout>
                                 <MenuFlyout>
                                     <MenuFlyoutItem Text="Search TMDb..."
@@ -251,7 +274,7 @@
                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                             </StackPanel>
 
-                            <StackPanel Grid.Column="2" Orientation="Vertical" Margin="4,0" VerticalAlignment="Center" Spacing="2">
+                            <StackPanel Grid.Column="3" Orientation="Vertical" Margin="4,0" VerticalAlignment="Center" Spacing="2">
                                 <TextBox Text="{Binding CleanedName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                                          FontSize="12" />
                                 <!-- Edition chip — visible only when an edition was detected -->
@@ -268,7 +291,7 @@
                                 </Border>
                             </StackPanel>
 
-                            <Border Grid.Column="3"
+                            <Border Grid.Column="4"
                                     CornerRadius="8"
                                     Padding="6,1"
                                     HorizontalAlignment="Left"
@@ -283,7 +306,7 @@
                                            FontSize="10" />
                             </Border>
 
-                            <FontIcon Grid.Column="4"
+                            <FontIcon Grid.Column="5"
                                       Glyph="&#xE7BA;"
                                       FontSize="14"
                                       Foreground="{ThemeResource SystemFillColorCautionBrush}"
@@ -292,7 +315,7 @@
                                       Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibilityConverter}}"
                                       ToolTipService.ToolTip="{Binding WarningMessage}" />
 
-                            <Button Grid.Column="5"
+                            <Button Grid.Column="6"
                                     Tag="{Binding}"
                                     Click="OnTmdbSearchClick"
                                     Width="28" Height="28"
@@ -306,12 +329,19 @@
                 </ListView.ItemTemplate>
             </ListView>
 
-            <!-- ============ Footer: stats / progress + Rename button ============ -->
-            <Grid Grid.Row="5" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,4,0,0">
+            <!-- ============ Footer: Back · stats/progress · Rename (single compact row) ============ -->
+            <Grid Grid.Row="4" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Margin="0,2,0,0">
 
-                <!-- Left column: either the stats line OR (while processing) a
-                     determinate progress bar with a "N of M — file" label. -->
-                <Grid VerticalAlignment="Center">
+                <!-- Back (merged in from the wizard nav so there's only one bottom bar) -->
+                <Button Grid.Column="0"
+                        x:Name="BackButton"
+                        Content="← Back"
+                        IsEnabled="False"
+                        Click="OnBackClick"
+                        VerticalAlignment="Center" />
+
+                <!-- Middle: stats line OR (while processing) a progress bar + label -->
+                <Grid Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Text="{Binding StatsSummary}"
                                FontSize="11"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -332,7 +362,7 @@
                     </StackPanel>
                 </Grid>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
                     <ProgressRing IsActive="{Binding IsLoading}" Width="18" Height="18"
                                   VerticalAlignment="Center" />
                     <Button x:Name="RenameButton"

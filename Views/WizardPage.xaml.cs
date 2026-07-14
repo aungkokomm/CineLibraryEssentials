@@ -31,6 +31,11 @@ public sealed partial class WizardPage : Page
         // After "Run File to Folder" completes, advance to Step 3 automatically
         FileToFolderStepView.OperationCompleted += (_, _) => GoToStep(2);
 
+        // Each step's footer "← Back" button routes here.
+        RenameStepView.BackRequested += (_, _) => GoBack();
+        FileToFolderStepView.BackRequested += (_, _) => GoBack();
+        ScrapingStepView.BackRequested += (_, _) => GoBack();
+
         GoToStep(0);
     }
 
@@ -71,7 +76,7 @@ public sealed partial class WizardPage : Page
         _viewModel.SetRenamePreview(selected);
     }
 
-    private void OnPreviousClick(object sender, RoutedEventArgs e)
+    private void GoBack()
     {
         if (_viewModel.CurrentStep > 0) GoToStep(_viewModel.CurrentStep - 1);
     }
@@ -127,8 +132,6 @@ public sealed partial class WizardPage : Page
             activeTextDark: true, bulletText: "2");   // amber needs dark text for legibility
         StyleStepButton(Step3Button, Step3Bullet, Step3Color, isActive: step == 2, isDone: false,
             activeTextDark: false, bulletText: "3");
-
-        PreviousButton.IsEnabled = _viewModel.CurrentStep > 0;
     }
 
     private void StyleStepButton(

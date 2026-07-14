@@ -13,6 +13,11 @@ public sealed partial class ScrapingStep : UserControl
     private ScrapingViewModel? _viewModel;
     private readonly ConfigService _configService = new();
 
+    /// <summary>Raised when the footer "← Back" is clicked.</summary>
+    public event EventHandler? BackRequested;
+
+    private void OnBackClick(object sender, RoutedEventArgs e) => BackRequested?.Invoke(this, EventArgs.Empty);
+
     public ScrapingStep()
     {
         InitializeComponent();

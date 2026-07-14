@@ -18,6 +18,11 @@ public sealed partial class FileToFolderStep : UserControl
     /// <summary>Raised after a successful "Run File to Folder" so the wizard can advance.</summary>
     public event EventHandler? OperationCompleted;
 
+    /// <summary>Raised when the footer "← Back" is clicked.</summary>
+    public event EventHandler? BackRequested;
+
+    private void OnBackClick(object sender, RoutedEventArgs e) => BackRequested?.Invoke(this, EventArgs.Empty);
+
     public FileToFolderStep()
     {
         InitializeComponent();

@@ -6,12 +6,20 @@ using CineLibraryEssentials.Utilities;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
 
 namespace CineLibraryEssentials.ViewModels;
 
 public partial class RenameViewModel : ObservableObject
 {
     private readonly RenameService _renameService = new();
+
+    /// <summary>
+    /// Shared column widths for the Original / Cleaned columns. The header, the
+    /// draggable divider, and every row all bind to THIS ONE instance, so moving
+    /// the divider updates all rows at once (one PropertyChanged, N bindings react).
+    /// </summary>
+    public ColumnLayout Columns { get; } = new();
     private readonly ConfigService _configService;
     private readonly UndoService _undoService = new();
     private readonly WizardViewModel _parentViewModel;
@@ -165,6 +173,7 @@ public partial class RenameViewModel : ObservableObject
 
             foreach (var p in previews)
             {
+                p.Columns = Columns;   // share the one layout so all rows resize together
                 p.PropertyChanged += OnPreviewPropertyChanged;
                 AllPreviews.Add(p);
             }

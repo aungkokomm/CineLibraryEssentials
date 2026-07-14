@@ -15,16 +15,42 @@ public sealed partial class RenameStep : UserControl
     private RenameViewModel? _viewModel;
     private readonly ConfigService _configService = new();
     private const string WarningId = "step1.rename-warning";
+    private bool _tipShown;
+
+    /// <summary>Raised when the footer "← Back" is clicked. The wizard handles it.</summary>
+    public event EventHandler? BackRequested;
 
     public RenameStep()
     {
         InitializeComponent();
 
-        // Hide the warning if user has previously dismissed it
-        if (_configService.IsWarningDismissed(WarningId))
-            WarningInfoBar.IsOpen = false;
+        Loaded += (_, _) =>
+        {
+            RebuildRecentFoldersFlyout();
+            ShowTipToastOnce();
+        };
+    }
 
-        Loaded += (_, _) => RebuildRecentFoldersFlyout();
+    /// <summary>
+    /// Shows the Step 1 tip as a floating toast (once per session, unless the user
+    /// dismissed it permanently). Replaces the old fixed InfoBar row so it costs
+    /// zero layout space.
+    /// </summary>
+    private void ShowTipToastOnce()
+    {
+        if (_tipShown) return;
+        _tipShown = true;
+        if (_configService.IsWarningDismissed(WarningId)) return;
+
+        var bar = ToastService.ShowAction(
+            message: "Already-clean files are hidden — turn off \"Modified only\" to see them. " +
+                     "Review Low / Medium rows carefully; you get a 30-second Undo after each rename.",
+            title: "Tip",
+            actionText: "Don't show again",
+            onAction: () => _configService.DismissWarning(WarningId),
+            autoDismissMs: 12000);
+        // Nothing else to wire — the action button records the dismissal.
+        _ = bar;
     }
 
     public void SetViewModel(RenameViewModel viewModel)
@@ -63,10 +89,44 @@ public sealed partial class RenameStep : UserControl
                 : (bool?)null;
     }
 
-    private void OnWarningInfoBarClosed(InfoBar sender, object args)
+    private void OnBackClick(object sender, RoutedEventArgs e) => BackRequested?.Invoke(this, EventArgs.Empty);
+
+    // -----------------------------------------------------------------
+    //  Draggable column divider (Original ↔ Cleaned)
+    // -----------------------------------------------------------------
+
+    private void OnColumnDividerDrag(object sender, Microsoft.UI.Xaml.Input.ManipulationDeltaRoutedEventArgs e)
     {
-        // Permanently dismiss when user explicitly closes
-        _configService.DismissWarning(WarningId);
+        if (_viewModel == null) return;
+
+        // Convert the pixel drag into a change in the star ratio between the two
+        // flexible columns. Fixed columns total 36 + 8(divider) + 80 + 32 + 32 = 188.
+        var flexible = HeaderGrid.ActualWidth - 188;
+        if (flexible <= 0) return;
+
+        var cols = _viewModel.Columns;
+        var origStar = cols.OriginalWidth.Value;   // current star weights (sum ~2)
+        var cleanStar = cols.CleanedWidth.Value;
+        var total = origStar + cleanStar;
+        if (total <= 0) return;
+
+        // Current original pixel width, shifted by the drag.
+        var origPx = flexible * (origStar / total) + e.Delta.Translation.X;
+        var ratio = Math.Clamp(origPx / flexible, 0.15, 0.85);
+
+        cols.OriginalWidth = new GridLength(ratio, GridUnitType.Star);
+        cols.CleanedWidth = new GridLength(1 - ratio, GridUnitType.Star);
+    }
+
+    private void OnDividerPointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(
+            Microsoft.UI.Input.InputSystemCursorShape.SizeWestEast);
+    }
+
+    private void OnDividerPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        this.ProtectedCursor = null;
     }
 
     // -----------------------------------------------------------------
