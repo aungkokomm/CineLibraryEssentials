@@ -138,7 +138,7 @@
             <!-- ============ Sortable column headers + draggable divider ============ -->
             <Grid Grid.Row="2"
                   x:Name="HeaderGrid"
-                  Padding="10,6"
+                  Padding="8,5"
                   Background="{ThemeResource LayerFillColorDefaultBrush}"
                   BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                   BorderThickness="1,1,1,0"
@@ -223,13 +223,19 @@
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem">
                         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                        <Setter Property="Padding" Value="4,1" />
+                        <Setter Property="Padding" Value="0" />
                         <Setter Property="MinHeight" Value="0" />
                     </Style>
                 </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate>
-                        <Grid>
+                        <!-- Excel-style grid row: flat, thin horizontal gridline, a
+                             vertical divider between Original/Cleaned, and a subtle
+                             accent fill when the row is selected. -->
+                        <Grid Padding="8,3"
+                              Background="{Binding IsSelected, Converter={StaticResource BoolToRowHighlightConverter}}"
+                              BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                              BorderThickness="0,0,0,1">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="36" />
                                 <ColumnDefinition Width="{Binding Columns.OriginalWidth}" />
@@ -260,6 +266,11 @@
                                     </MenuFlyoutItem>
                                 </MenuFlyout>
                             </Grid.ContextFlyout>
+
+                            <!-- Vertical gridline between Original and Cleaned -->
+                            <Rectangle Grid.Column="2" Width="1"
+                                       HorizontalAlignment="Center"
+                                       Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
 
                             <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                       VerticalAlignment="Center" />

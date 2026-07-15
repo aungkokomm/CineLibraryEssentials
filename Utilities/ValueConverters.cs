@@ -5,6 +5,27 @@ using Windows.UI;
 namespace CineLibraryEssentials.Utilities;
 
 /// <summary>
+/// Selected-row highlight: a subtle accent tint when the row is checked, else
+/// transparent. Gives the list a professional "selected card" look.
+/// </summary>
+public class BoolToRowHighlightConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        var selected = value is bool b && b;
+        if (!selected) return new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent);
+
+        var accent = (Color)Application.Current.Resources["SystemAccentColor"];
+        // ~14% opacity tint — visible but not loud, works in light + dark.
+        return new Microsoft.UI.Xaml.Media.SolidColorBrush(
+            Color.FromArgb(0x24, accent.R, accent.G, accent.B));
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+        => throw new NotImplementedException();
+}
+
+/// <summary>
 /// Maps "High" / "Medium" / "Low" labels to a chip background color.
 /// </summary>
 public class ConfidenceColorConverter : IValueConverter
