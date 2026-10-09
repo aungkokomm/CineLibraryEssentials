@@ -150,6 +150,18 @@ public partial class RenameViewModel : ObservableObject
         if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
             return;
 
+        // A genuinely new folder starts fresh in "Auto" detection, so a forced
+        // Movies / TvShows mode left over from a previous folder can't mis-format
+        // the new one (e.g. movie run → then a TV folder). Re-analyzing the SAME
+        // folder keeps whatever mode the user picked.
+        var isNewFolder = !string.Equals(folderPath, SourceFolderPath, StringComparison.OrdinalIgnoreCase);
+        if (isNewFolder && WizardMode != "Auto")
+        {
+            _suppressModeReload = true;      // we're already loading — don't re-trigger
+            WizardMode = "Auto";
+            _suppressModeReload = false;
+        }
+
         IsLoading = true;
         SourceFolderPath = folderPath;
         _configService.AddRecentSourceFolder(folderPath);
@@ -251,9 +263,14 @@ public partial class RenameViewModel : ObservableObject
         _configService.SetStep1Sort(SortColumn, value);
         ApplyFilter();
     }
+    // Set while LoadFilesAsync resets the mode for a new folder, so the mode-change
+    // doesn't kick off a second redundant (re-entrant) load.
+    private bool _suppressModeReload;
+
     partial void OnWizardModeChanged(string value)
     {
         _configService.SetWizardMode(value);
+        if (_suppressModeReload) return;
         // Re-scan the current folder so the row list reflects the new mode
         // (Movies-mode strips TV warnings, TvShows-mode flags non-S/E rows).
         if (!string.IsNullOrEmpty(SourceFolderPath))

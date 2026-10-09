@@ -128,9 +128,14 @@
 
                                     <!-- Poster (or placeholder) -->
                                     <Grid Grid.Row="0">
-                                        <Image Source="{Binding PosterPath}"
-                                               Stretch="UniformToFill"
-                                               Visibility="{Binding PosterPath, Converter={StaticResource StringNonEmptyToVisibilityConverter}}" />
+                                        <!-- Border with CornerRadius clips the UniformToFill
+                                             image to the frame so a tall poster can't bleed
+                                             past the card into the title area. -->
+                                        <Border CornerRadius="4,4,0,0"
+                                                Visibility="{Binding PosterPath, Converter={StaticResource StringNonEmptyToVisibilityConverter}}">
+                                            <Image Source="{Binding PosterPath}"
+                                                   Stretch="UniformToFill" />
+                                        </Border>
                                         <Border Background="{ThemeResource ControlFillColorTertiaryBrush}"
                                                 Visibility="{Binding PosterPath, Converter={StaticResource StringEmptyToVisibilityConverter}}">
                                             <FontIcon Glyph="&#xE8B2;"

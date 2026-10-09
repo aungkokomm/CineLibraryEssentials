@@ -38,10 +38,13 @@
                  the toast buttons remain clickable, but the empty panel area
                  doesn't block the page underneath (StackPanel only occupies its
                  children's bounds at bottom-right). -->
+            <!-- Bottom margin clears the per-step footer action bar (Rename / Run /
+                 Done buttons live bottom-right), so toasts float just above them
+                 instead of overlapping. -->
             <StackPanel x:Name="ToastHost"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Bottom"
-                        Margin="16,0,16,16"
+                        Margin="16,0,16,64"
                         MaxWidth="420"
                         Spacing="0" />
         </Grid>
