@@ -187,4 +187,4 @@ Output: `release\CineLibraryEssentials_Setup_<version>.exe`
 
 ---
 
-<p align="center"><sub>© 2026 Aung Ko Ko · <a href="https://aungkokomm.github.io/">more of my apps</a></sub></p>
+<p align="center"><sub>MIT licensed · © 2026 Aung Ko Ko · <a href="https://aungkokomm.github.io/">more of my apps</a></sub></p>
