@@ -1,14 +1,14 @@
 <div align="center">
   <img src="Assets/AppIcon.ico" width="80" height="80" alt="CineLibrary Essentials" />
   <h1>CineLibrary Essentials</h1>
-  <p><b>Drag your movie folder into CineLibrary Essentials and let the Magic begin! 
-    Clean up messy movie downloads. <p><b>
-    <p><b>Rename, Organize, and Scrapes, everything in one App.  
-     </b></p>
+  <p>
+    <b>Drag your movie folder in and let the magic begin!</b><br/>
+    Clean up messy movie downloads — rename, organize, and scrape, all in one app.
+  </p>
   <p>
     A Windows desktop tool (WinUI 3) that takes the chaos out of your downloads folder.
-    Recommended as the <b>preparation step</b> for
-    <a href="https://github.com/aungkokomm/CineLibraryCS"><b>CineLibrary</b></a>.
+    Recommended as the preparation step for
+    <a href="https://github.com/aungkokomm/CineLibraryCS">CineLibrary</a>.
   </p>
 </div>
 <img width="1983" height="793" alt="May 29, 2026, 11_30_50 AM" src="https://github.com/user-attachments/assets/4456435d-40d2-481b-aaf6-e679ac51966a" />
