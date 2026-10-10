@@ -3,7 +3,7 @@
   <h1>CineLibrary Essentials</h1>
   <p>
     <b>Drag your movie folder in and let the magic begin!</b><br/>
-    Clean up messy movie downloads — rename, organize, and scrape, all in one app.
+    Clean up messy movie downloads - rename, organize, and scrape, all in one app.
   </p>
   <p>
     A Windows desktop tool (WinUI 3) that takes the chaos out of your downloads folder.
@@ -28,7 +28,7 @@ UnTouch.The.Kerala.Story.2.2026.1080p.WEB-HDRip.Hindi.DDP5.1.MULTi.x264.ESub-ind
 Breaking.Bad.S01E03.And.the.Bags.in.the.River.1080p.BluRay.x265-RARBG.mkv
 ```
 
-CineLibrary Essentials cleans them, organizes them into the right folder structure, and scrapes full metadata — for **both movies and TV shows**:
+CineLibrary Essentials cleans them, organizes them into the right folder structure, and scrapes full metadata - for **both movies and TV shows**:
 
 **Movies** → `Title (Year)/`
 
@@ -60,22 +60,22 @@ TV/
         └── ...
 ```
 
-This is the **Plex / Kodi / Jellyfin / MediaElch** standard layout — readable by every major media player and library manager.
+This is the **Plex / Kodi / Jellyfin / MediaElch** standard layout - readable by every major media player and library manager.
 
 ---
 <p align="center">
-  <img width="1600" alt="Step 1 — Clean Names" src="https://github.com/user-attachments/assets/e5cdd96c-c8f6-42bc-a279-a48f3c24811d" /><br/>
-  <em><b>Step 1 · Clean Names</b> — messy filenames cleaned in place, with a red-strikethrough diff of what was removed and a confidence chip per row.</em>
+  <img width="1600" alt="Step 1 - Clean Names" src="https://github.com/user-attachments/assets/e5cdd96c-c8f6-42bc-a279-a48f3c24811d" /><br/>
+  <em><b>Step 1 · Clean Names</b> - messy filenames cleaned in place, with a red-strikethrough diff of what was removed and a confidence chip per row.</em>
 </p>
 
 <p align="center">
-  <img width="1600" alt="Step 2 — Organize" src="https://github.com/user-attachments/assets/7f262903-9bba-4182-8acf-08f6fd257b66" /><br/>
-  <em><b>Step 2 · Organize</b> — each cleaned file is wrapped into its own <code>Title (Year)/</code> folder, with a live "Will Move To" preview before you run it.</em>
+  <img width="1600" alt="Step 2 - Organize" src="https://github.com/user-attachments/assets/7f262903-9bba-4182-8acf-08f6fd257b66" /><br/>
+  <em><b>Step 2 · Organize</b> - each cleaned file is wrapped into its own <code>Title (Year)/</code> folder, with a live "Will Move To" preview before you run it.</em>
 </p>
 
 <p align="center">
-  <img width="1600" alt="Step 3 — Scrape" src="https://github.com/user-attachments/assets/a7b59a10-ea91-4adf-819a-8e80d51ec23e" /><br/>
-  <em><b>Step 3 · Scrape</b> — posters, fanart, cast photos and a full Kodi NFO downloaded for every folder; double-tap a card for the rich details view.</em>
+  <img width="1600" alt="Step 3 - Scrape" src="https://github.com/user-attachments/assets/a7b59a10-ea91-4adf-819a-8e80d51ec23e" /><br/>
+  <em><b>Step 3 · Scrape</b> - posters, fanart, cast photos and a full Kodi NFO downloaded for every folder; double-tap a card for the rich details view.</em>
 </p>
 
 ## Workflow
@@ -88,20 +88,20 @@ This is the **Plex / Kodi / Jellyfin / MediaElch** standard layout — readable 
 ```
 
 CineLibrary Essentials is now an **all-in-one** preparation toolbox 
-— clean filenames, organize into the correct folder structure, and scrape a complete Kodi-standard NFO with poster, fanart, full cast photos, and (for TV) per-episode metadata + thumbnails. One-Stop-Solution.
+ -  clean filenames, organize into the correct folder structure, and scrape a complete Kodi-standard NFO with poster, fanart, full cast photos, and (for TV) per-episode metadata + thumbnails. One-Stop-Solution.
 
-- **[CineLibrary](https://github.com/aungkokomm/CineLibraryCS)** — scan the prepared library and browse it across multiple drives.
-- **[MediaElch](https://www.mediaelch.de/)** — still optional if you want to layer in extra sources or edition-specific artwork; it reads the same folders Essentials produces.
+- **[CineLibrary](https://github.com/aungkokomm/CineLibraryCS)** - scan the prepared library and browse it across multiple drives.
+- **[MediaElch](https://www.mediaelch.de/)** - still optional if you want to layer in extra sources or edition-specific artwork; it reads the same folders Essentials produces.
 
 ---
 
 ## User Guide
 
-📖 **User guide:** [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — covers every feature, edge case, and troubleshooting tip.
+📖 **User guide:** [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) - covers every feature, edge case, and troubleshooting tip.
 
 📖 **Full detailed user guide** [In my GitHub.io **CineLibrary Essentials page**] (https://aungkokomm.github.io/cinelibraryessentials/guide/)
 
-Short version below — the app is a **3-step wizard**. The header pills (`① Clean Names → ② Organize → ③ Scrape`) show where you are.
+Short version below - the app is a **3-step wizard**. The header pills (`① Clean Names → ② Organize → ③ Scrape`) show where you are.
 
 A **Mode** selector (Auto · Movies · TV Shows) lets you tell the app what you're processing. **Auto** detects each file; **Movies** / **TV Shows** force one type. A **⚙ Settings** dialog (gear icon, top-right) holds your output template, scrape language, default toggles, and update preferences.
 
@@ -109,12 +109,12 @@ A **Mode** selector (Auto · Movies · TV Shows) lets you tell the app what you'
 
 Pick a folder (or **drag-and-drop** one onto the window).
 
-- **Auto-detect** — extracts title + year for movies, or show + season + episode for TV, and strips technical tags (`1080p`, `x265`, `BluRay`, `WEB-HDRip`, `Atmos`, release-group prefixes, etc.)
+- **Auto-detect** - extracts title + year for movies, or show + season + episode for TV, and strips technical tags (`1080p`, `x265`, `BluRay`, `WEB-HDRip`, `Atmos`, release-group prefixes, etc.)
 - **TV episodes** → `Show - S01E01 - Episode Title` (Kodi convention); **Movies** → `Title (Year)`
-- **Edition detection** — Director's Cut, Extended, IMAX, 4K Remaster, Theatrical, Unrated, Criterion … shown as a chip and written to the NFO
-- **Diff highlight** — original filename shows kept tokens in grey, removed tokens in **red strikethrough**
+- **Edition detection** - Director's Cut, Extended, IMAX, 4K Remaster, Theatrical, Unrated, Criterion … shown as a chip and written to the NFO
+- **Diff highlight** - original filename shows kept tokens in grey, removed tokens in **red strikethrough**
 - **Confidence chip**, editable rows, bulk Find & Replace / Title Case / Reset, search + filters
-- **Per-row 🔍 Scrape** — search TMDb (movies or TV) to confirm the exact match
+- **Per-row 🔍 Scrape** - search TMDb (movies or TV) to confirm the exact match
 - Subtitles (incl. language-tagged like `.en.forced.srt`) follow the rename automatically
 
 ### Step 2 · Organize
@@ -123,8 +123,8 @@ Files carry over from Step 1. The output folder defaults to your source folder.
 
 - **Movies** → `Title (Year)/Title (Year).ext`
 - **TV** → `Show/Season XX/Show - S01E01 - Title.ext`
-- **Folder merging** — if a destination already exists, files merge in instead of erroring (nothing overwritten)
-- Click **Run File to Folder** — moves everything (subtitles included), then auto-advances to Step 3
+- **Folder merging** - if a destination already exists, files merge in instead of erroring (nothing overwritten)
+- Click **Run File to Folder** - moves everything (subtitles included), then auto-advances to Step 3
 
 ### Step 3 · Scrape
 
@@ -133,9 +133,9 @@ Folders from Step 2 are auto-listed. You can also **+ Add Folder** for any exist
 - **Movies** → downloads `Title (Year).nfo`, original-resolution poster + fanart, and a `.actors/` folder with the full cast's photos
 - **TV shows** → downloads `tvshow.nfo` + show poster/fanart/cast, then per-episode `.nfo` + episode thumbnail for every episode
 - **Double-tap a scraped card** → a rich **Movie Details** window (hero fanart, poster, plot, color-coded crew/studio/country/genres/IDs/file-info, scrollable cast)
-- **Scrape Selected (auto)** — batch-scrape everything checked
-- **Fill gaps only** — *Verify-library* sweep: scrapes only folders missing the NFO, poster, fanart, or actor photos; skips complete ones
-- **16 languages** — set the scrape language in Settings (English, Burmese, Hindi, Tamil, Telugu, Thai, Chinese, Japanese, Korean, and more)
+- **Scrape Selected (auto)** - batch-scrape everything checked
+- **Fill gaps only** - *Verify-library* sweep: scrapes only folders missing the NFO, poster, fanart, or actor photos; skips complete ones
+- **16 languages** - set the scrape language in Settings (English, Burmese, Hindi, Tamil, Telugu, Thai, Chinese, Japanese, Korean, and more)
 
 ---
 
@@ -144,13 +144,13 @@ Folders from Step 2 are auto-listed. You can also **+ Add Folder** for any exist
 
 Download the latest installer from [Releases](../../releases) and run:
 
-- `CineLibraryEssentials_Setup_<version>.exe` (~63 MB, self-contained — no prerequisites)
+- `CineLibraryEssentials_Setup_<version>.exe` (~63 MB, self-contained - no prerequisites)
 - Per-user install, no admin required
 - Optional desktop / Start Menu shortcut
 
 **Minimum:** Windows 10 build 17763 (1809) or newer · x64
 
-Once installed, the app **checks for updates on startup** (once per day) and offers to download + install new versions for you — no need to come back here.
+Once installed, the app **checks for updates on startup** (once per day) and offers to download + install new versions for you - no need to come back here.
 
 ---
 
@@ -175,7 +175,7 @@ Output: `release\CineLibraryEssentials_Setup_<version>.exe`
 - **WinUI 3** (Windows App SDK 2.0)
 - **.NET 10**
 - **CommunityToolkit.Mvvm** for MVVM
-- **TMDb API** for metadata (key embedded — get your own at [themoviedb.org](https://www.themoviedb.org/settings/api) if you want to swap it)
+- **TMDb API** for metadata (key embedded - get your own at [themoviedb.org](https://www.themoviedb.org/settings/api) if you want to swap it)
 
 ---
 
@@ -184,3 +184,7 @@ Output: `release\CineLibraryEssentials_Setup_<version>.exe`
 - Built by [@aungkokomm](https://github.com/aungkokomm)
 - Movie metadata by [TMDb](https://www.themoviedb.org/) (this product is not endorsed or certified by TMDb)
 - Companion to [CineLibrary](https://github.com/aungkokomm/CineLibraryCS)
+
+---
+
+<p align="center"><sub>© 2026 Aung Ko Ko · <a href="https://aungkokomm.github.io/">more of my apps</a></sub></p>
