@@ -63,12 +63,20 @@ TV/
 This is the **Plex / Kodi / Jellyfin / MediaElch** standard layout — readable by every major media player and library manager.
 
 ---
-<img width="1600" height="952" alt="rename" src="https://github.com/user-attachments/assets/e5cdd96c-c8f6-42bc-a279-a48f3c24811d" />
+<p align="center">
+  <img width="1600" alt="Step 1 — Clean Names" src="https://github.com/user-attachments/assets/e5cdd96c-c8f6-42bc-a279-a48f3c24811d" /><br/>
+  <em><b>Step 1 · Clean Names</b> — messy filenames cleaned in place, with a red-strikethrough diff of what was removed and a confidence chip per row.</em>
+</p>
 
+<p align="center">
+  <img width="1600" alt="Step 2 — Organize" src="https://github.com/user-attachments/assets/7f262903-9bba-4182-8acf-08f6fd257b66" /><br/>
+  <em><b>Step 2 · Organize</b> — each cleaned file is wrapped into its own <code>Title (Year)/</code> folder, with a live "Will Move To" preview before you run it.</em>
+</p>
 
-<img width="1600" height="952" alt="f2f" src="https://github.com/user-attachments/assets/7f262903-9bba-4182-8acf-08f6fd257b66" />
-
-<img width="960" height="499" alt="image" src="https://github.com/user-attachments/assets/a7b59a10-ea91-4adf-819a-8e80d51ec23e" />
+<p align="center">
+  <img width="1600" alt="Step 3 — Scrape" src="https://github.com/user-attachments/assets/a7b59a10-ea91-4adf-819a-8e80d51ec23e" /><br/>
+  <em><b>Step 3 · Scrape</b> — posters, fanart, cast photos and a full Kodi NFO downloaded for every folder; double-tap a card for the rich details view.</em>
+</p>
 
 ## Workflow
 
