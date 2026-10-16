@@ -70,6 +70,57 @@ public static class RegexPatterns
         @"(?<!\s)[\-_][A-Za-z0-9]{2,20}\s*$",
         RegexOptions.Compiled);
 
+    // The user's "Words to always remove" list (Settings). Null when empty.
+    private static volatile Regex? _customRemovePattern;
+
+    /// <summary>
+    /// Sets the user's "Words to always remove" list. Matching is case-insensitive
+    /// and whole-word only ("ION10" goes, but a word never loses part of itself).
+    /// A leading or trailing "-", "_" or "." typed by the user is ignored.
+    /// </summary>
+    public static void SetCustomRemoveWords(IEnumerable<string> words)
+    {
+        var list = words
+            .Select(w => w.Trim().Trim('-', '_', '.', ' '))
+            .Where(w => w.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(w => w.Length)          // longest first: "ION265" before "ION"
+            .ToList();
+        if (list.Count == 0) { _customRemovePattern = null; return; }
+
+        // A word boundary is any character that isn't a letter or digit (works for
+        // non-Latin titles too). Only required on sides where the word itself
+        // starts/ends with a letter or digit, so "[EZTVx.to]" can still match.
+        static string Part(string w)
+            => (char.IsLetterOrDigit(w[0]) ? @"(?<=^|[^\p{L}\p{N}])" : "")
+               + Regex.Escape(w)
+               + (char.IsLetterOrDigit(w[^1]) ? @"(?=$|[^\p{L}\p{N}])" : "");
+
+        _customRemovePattern = new Regex(
+            string.Join("|", list.Select(Part)),
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    }
+
+    private static string RemoveCustomWords(string text)
+        => _customRemovePattern?.Replace(text, " ") ?? text;
+
+    /// <summary>
+    /// Strips a trailing release group, but only when the token looks like one:
+    /// all caps ("-RARBG"), contains a digit ("-ION10") or has an inner capital
+    /// ("-NTb", "-mSD"). A plain word is part of the title ("Spider-Man",
+    /// "Monster-in-Law", "X-Men"), so it stays.
+    /// </summary>
+    private static string StripReleaseGroup(string text)
+        => ReleaseGroupPattern.Replace(text, m => LooksLikeReleaseGroup(m.Value.Trim().TrimStart('-', '_')) ? " " : m.Value);
+
+    private static bool LooksLikeReleaseGroup(string token)
+    {
+        if (token.Length < 2) return false;
+        if (token.Any(char.IsDigit)) return true;
+        if (token.All(c => !char.IsLetter(c) || char.IsUpper(c))) return true;   // RARBG
+        return token.Skip(1).Any(char.IsUpper);                                   // NTb, mSD
+    }
+
     // Multi-part / sequel tags (CD1, Disc 2, Part 3, Vol 4)
     private static readonly Regex PartPattern = new(
         @"\b(?:CD|Disc|Disk|Part|Pt|Vol(?:ume)?)\s*[0-9]+\b",
@@ -136,6 +187,23 @@ public static class RegexPatterns
     private static readonly Regex StrayBracketPattern = new(
         @"[\(\)\[\]\{\}]", RegexOptions.Compiled);
 
+    // First unambiguous technical tag after the SxxExx marker (resolution, codec,
+    // release source, audio format, streaming service). A real episode title sits
+    // BEFORE this tag; everything from it onward is release noise, e.g.
+    //   "Lost.in.Space.S03E01.WEBRip.x264-ION10"  → title is empty, not "Ion10"
+    // Deliberately narrower than JunkTagPattern: words like "Final Cut", "English"
+    // or "Extended" can be real episode titles, so they don't end the title here.
+    // Streaming tags and bare WEB are matched case-sensitively (uppercase only).
+    private static readonly Regex TechAnchorPattern = new(
+        @"(?:^|[\s\._\-\[\(])(?:" +
+        @"\d{3,4}[pi]|4k|UHD" +
+        @"|[xh]\.?26[45]|HEVC|AVC|XviD|DivX|AV1|VP9|10\-?bit|8\-?bit" +
+        @"|WEB[\-\.]?DL|WEB[\-\.]?Rip|Blu[\-\.]?Ray|BDRip|BRRip|HDTV|HDRip|DVDRip|REMUX|PDTV|HDCAM" +
+        @"|DDP?\d|E?AC3|AAC|DTS|TrueHD|Atmos|HDR(?:10)?" +
+        @"|(?-i:WEB|AMZN|NF|DSNP|HMAX|ATVP|HULU|PCOK)" +
+        @")(?=$|[\s\._\-\]\)])",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     public record TvEpisodeParseResult(
         string ShowName,
         int Season,
@@ -152,7 +220,7 @@ public static class RegexPatterns
     {
         if (string.IsNullOrEmpty(filename)) return null;
         var nameWithoutExt = Path.GetFileNameWithoutExtension(filename) ?? string.Empty;
-        var working = NormalizeUnicode(nameWithoutExt);
+        var working = RemoveCustomWords(NormalizeUnicode(nameWithoutExt));   // + Settings "words to always remove"
 
         // Strip a leading anime release-group bracket like "[HorribleSubs] " so
         // the show name parser sees the actual show name first. Doing this here
@@ -193,15 +261,21 @@ public static class RegexPatterns
         showPart = MultiWhitespacePattern.Replace(showPart, " ").Trim(' ', '-', '_', '.');
         var showName = SmartTitleCase(showPart);
 
-        // Episode title = whatever sits AFTER the marker, cleaned the same way as
-        // the title-side. Order matters: release-group strip runs BEFORE separator
-        // replacement so " - Currency" (TV title separator) is preserved while
-        // "-RARBG" (real release group) is still caught.
+        // Episode title = the text between the marker and the first technical tag,
+        // cleaned the same way as the title-side. Order matters:
+        //  1) cut at the first tech tag, so trailing release groups ("-ION10",
+        //     "-mSD", "AMZN") can never become the title;
+        //  2) strip the release group BEFORE junk tags. Junk stripping turns
+        //     "x264" into a space, and the release-group pattern deliberately
+        //     won't match a dash with a space before it (that's how it preserves
+        //     " - Currency"), so running it second let "-ION10" survive.
         var afterStart = best.Index + best.Length;
         var afterPart = afterStart < working.Length ? working[afterStart..] : string.Empty;
+        var anchor = TechAnchorPattern.Match(afterPart);
+        if (anchor.Success) afterPart = afterPart[..anchor.Index];
         afterPart = BracketsPattern.Replace(afterPart, " ");
+        afterPart = StripReleaseGroup(afterPart);
         afterPart = JunkTagPattern.Replace(afterPart, " ");
-        afterPart = ReleaseGroupPattern.Replace(afterPart, " ");
         afterPart = StrayBracketPattern.Replace(afterPart, " ");
         afterPart = SeparatorPattern.Replace(afterPart, " ");
         afterPart = MultiWhitespacePattern.Replace(afterPart, " ").Trim(' ', '-', '_', '.');
@@ -284,7 +358,7 @@ public static class RegexPatterns
         var working = nameWithoutExt;
 
         // 0a. Unicode normalization — replace fancy dashes / smart quotes with ASCII
-        working = NormalizeUnicode(working);
+        working = RemoveCustomWords(NormalizeUnicode(working));   // + Settings "words to always remove"
 
         // 0b. Normalize bracket-style years: [1996] / {1996} → (1996)
         working = BracketYearPattern.Replace(working, "($1)");
@@ -306,15 +380,25 @@ public static class RegexPatterns
 
         // Split title from junk based on the chosen year
         string titlePart;
+        bool endsAtYear = false;
         if (year > 0)
         {
             var beforeYear = working[..yearStart];
             var afterYear = working[(yearStart + yearLength)..];
-            titlePart = beforeYear.Trim().Length >= 3 ? beforeYear : afterYear;
+            endsAtYear = beforeYear.Trim().Length >= 3;
+            titlePart = endsAtYear ? beforeYear : afterYear;
         }
         else
         {
             titlePart = working;
+        }
+
+        // When the year didn't end the title, the first technical tag does:
+        // "Some.Movie.1080p.WEB-DL.x264-GRP" → "Some.Movie."
+        if (!endsAtYear)
+        {
+            var anchor = TechAnchorPattern.Match(titlePart);
+            if (anchor.Success && anchor.Index > 0) titlePart = titlePart[..anchor.Index];
         }
 
         // 3. Strip leading release-group prefix
@@ -322,6 +406,14 @@ public static class RegexPatterns
 
         // 4. Strip remaining bracketed content
         titlePart = BracketsPattern.Replace(titlePart, " ");
+
+        // 4b. Strip a trailing release group, but never from text that ended at
+        //     the year: a group doesn't sit before the year, and stripping there
+        //     turned "Spider-Man (2002)" into "Spider". Runs before the junk-tag
+        //     strip, which would otherwise turn "x264-GRP" into " -GRP" and hide
+        //     the group from the pattern (it skips a dash with a space before it).
+        if (!endsAtYear)
+            titlePart = StripReleaseGroup(titlePart);
 
         // 5. Strip technical junk tags
         titlePart = JunkTagPattern.Replace(titlePart, " ");
@@ -332,11 +424,6 @@ public static class RegexPatterns
         //    (Kill Bill Vol. 1, etc). PartPattern still strips CD/Disc which are
         //    almost always junk.
         titlePart = PartPattern.Replace(titlePart, " ");
-
-        // 7. Strip trailing release group — MUST happen before dots become spaces,
-        //    so "-RARBG" still has its dot-or-letter prefix and the lookbehind
-        //    correctly distinguishes it from a " - Title" episode separator.
-        titlePart = ReleaseGroupPattern.Replace(titlePart, " ");
 
         // 8. Replace dots/underscores with spaces
         titlePart = SeparatorPattern.Replace(titlePart, " ");
@@ -465,9 +552,18 @@ public static class RegexPatterns
         if (RomanNumeralPattern.IsMatch(word))
             return word.ToUpperInvariant();
 
-        // Handle hyphens (Spider-Man → each part capitalized)
+        // Handle hyphens (Spider-Man → each part capitalized), but keep small
+        // words in the MIDDLE of a compound lowercase: "Monster-in-Law",
+        // "Jack-in-the-Box". The last part stays capitalized, since there the
+        // hyphen is often a separator: "Dhurandhar-The Revenge", "Hands-On".
         if (word.Contains('-'))
-            return string.Join('-', word.Split('-').Select(CapitalizeWord));
+        {
+            var parts = word.Split('-');
+            return string.Join('-', parts.Select((part, idx) =>
+                idx > 0 && idx < parts.Length - 1 && SmallWords.Contains(part)
+                    ? part.ToLowerInvariant()
+                    : CapitalizeWord(part)));
+        }
 
         // Apostrophe handling: capitalize first letter only, keep rest as-is for
         // names like O'Brien / Marvel's

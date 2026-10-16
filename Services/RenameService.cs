@@ -122,7 +122,7 @@ public class RenameService
             if (mode == Mode.TvShows)
             {
                 preview.HasWarning = true;
-                preview.WarningMessage = "No S/E pattern found — edit the name to match \"Show - S01E01\".";
+                preview.WarningMessage = "No S/E pattern found. Edit the name to match \"Show - S01E01\".";
             }
 
             previews.Add(preview);

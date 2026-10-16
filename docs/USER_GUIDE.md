@@ -1,4 +1,4 @@
-# CineLibrary Essentials — User Guide
+# CineLibrary Essentials · User Guide
 
 > **In a nutshell:** drop a folder of messy movie downloads, the app cleans the filenames, organises them into `Title (Year)/` folders, and (optionally) downloads metadata. Designed as the **prep step** before [CineLibrary](https://github.com/aungkokomm/CineLibraryCS).
 
@@ -7,19 +7,26 @@
 ## Table of contents
 
 - [Install & first launch](#install--first-launch)
-- [The big picture — 3-stage workflow](#the-big-picture--3-stage-workflow)
-- [Step 1 — Clean Names](#step-1--clean-names)
+- [The big picture · 3-stage workflow](#the-big-picture--3-stage-workflow)
+- [Step 1 · Clean Names](#step-1--clean-names)
   - [Loading files](#loading-files)
   - [Understanding each row](#understanding-each-row)
   - [Editing & bulk tools](#editing--bulk-tools)
+  - [Keyboard shortcuts](#keyboard-shortcuts)
+  - [Words to always remove](#words-to-always-remove)
   - [Filters & search](#filters--search)
   - [Sorting](#sorting)
   - [Per-row TMDb search](#per-row-tmdb-search)
   - [Top-row toggles explained](#top-row-toggles-explained)
   - [Hitting the Rename button](#hitting-the-rename-button)
   - [Undo](#undo)
-- [Step 2 — Organize](#step-2--organize)
-- [Step 3 — Scrape](#step-3--scrape)
+- [Step 2 · Organize](#step-2--organize)
+- [Step 3 · Scrape](#step-3--scrape)
+  - [Episode titles in file names](#episode-titles-in-file-names)
+  - [Ratings: IMDb and TMDb](#ratings-imdb-and-tmdb)
+  - [Episodes and missing episodes](#episodes-and-missing-episodes)
+  - [Edit NFO](#edit-nfo)
+  - [Bulk edit](#bulk-edit)
 - [Settings page](#settings-page)
 - [Persistence](#persistence)
 - [Tips & tricks](#tips--tricks)
@@ -34,13 +41,13 @@
 2. Run it. The installer is **per-user** (no admin required), self-contained (no .NET / WindowsAppSDK to install separately), and roughly 58 MB.
 3. Pick an install location (default is fine), tick whether you want a desktop / Start Menu shortcut, and finish.
 
-When the app launches you'll see three "step pills" at the top — `① Clean Names › ② Organize › ③ Scrape`. Click any pill to jump to that step. The pill that's currently active is filled with the accent colour.
+When the app launches you'll see three "step pills" at the top - `① Clean Names › ② Organize › ③ Scrape`. Click any pill to jump to that step. The pill that's currently active is filled with the accent colour.
 
-There's no setup screen — the TMDb API key is embedded, so the app is **ready to use immediately**.
+There's no setup screen - the TMDb API key is embedded, so the app is **ready to use immediately**.
 
 ---
 
-## The big picture — 3-stage workflow
+## The big picture · 3-stage workflow
 
 CineLibrary Essentials is meant to fit **between** your downloads and your final media library. The complete pipeline:
 
@@ -71,33 +78,35 @@ CineLibrary Essentials handles **both** in the same wizard. A **Mode** selector 
 
 | Mode | Behavior |
 |---|---|
-| **Auto** *(default)* | Each file is detected individually — anything matching `S01E01`, `1x01`, or `Season 1 Episode 1` is treated as a TV episode; everything else as a movie. |
-| **Movies** | TV detection is disabled — every file is treated as a movie (so *"Star Wars Episode IV"* won't be mistaken for TV). |
-| **TV Shows** | Every file is treated as an episode; files that don't match an S/E pattern are flagged so you can fix them. In Step 3 the dropdown also acts as a filter — show only movies, only TV shows, or all. |
+| **Auto** *(default)* | Each file is detected individually - anything matching `S01E01`, `1x01`, or `Season 1 Episode 1` is treated as a TV episode; everything else as a movie. |
+| **Movies** | TV detection is disabled - every file is treated as a movie (so *"Star Wars Episode IV"* won't be mistaken for TV). |
+| **TV Shows** | Every file is treated as an episode; files that don't match an S/E pattern are flagged so you can fix them. In Step 3 the dropdown also acts as a filter - show only movies, only TV shows, or all. |
 
-The mode is shared between Step 1 and Step 3 and is remembered between sessions.
+The mode is shared between Step 1 and Step 3. When you load a different folder, the mode switches back to **Auto**, so a mode you forced for one folder doesn't carry over to the next.
 
 ### How each is organized
 
-- **Movies** → `Output/Title (Year)/Title (Year).ext`
-- **TV episodes** → `Output/Show Name/Season 01/Show Name - S01E01 - Episode Title.ext`
+Folders are created right where your files already are (there is no separate output folder).
 
-TV episodes are renamed to the Kodi/Plex convention `Show - S01E01 - Title`, and all episodes of a season live together in one `Season XX` folder.
+- **Movies** → `Title (Year)/Title (Year).ext`
+- **TV episodes** → `Show Name/Season 01/Show Name - S01E01.ext`
+
+TV episodes are renamed to the Kodi/Plex convention `Show - S01E01`, and all episodes of a season live together in one `Season XX` folder. If the original filename already contains the episode title, it's kept (`Show - S01E01 - Title`). Otherwise the real title comes from TMDb in Step 3 and is written into each episode's `.nfo`, which is where Kodi, Plex, Jellyfin and CineLibrary read it from. Want the title in the filename too? Turn on **Settings → Add episode titles to file names** (see [Episode titles in file names](#episode-titles-in-file-names)).
 
 ### How each is scraped (Step 3)
 
 - **Movies** → `Title (Year).nfo`, original-resolution poster + fanart, `.actors/` cast photos
 - **TV shows** → `tvshow.nfo` + show poster/fanart/cast at the show root, plus a per-episode `.nfo` and episode thumbnail for every episode inside each season
 
-Flat single-season folders (e.g. `Breaking Bad Season 1 Complete/` with episodes directly inside) are recognized too — the show name is read from the episode filenames, not the folder name.
+Flat single-season folders (e.g. `Breaking Bad Season 1 Complete/` with episodes directly inside) are recognized too - the show name is read from the episode filenames, not the folder name.
 
 ---
 
-## Step 1 — Clean Names
+## Step 1 · Clean Names
 
 ![Step 1 screenshot](https://github.com/user-attachments/assets/e5cdd96c-c8f6-42bc-a279-a48f3c24811d)
 
-This is where messy filenames become clean ones. The app shows you a side-by-side preview of every video file and what it'll be renamed to — you review, edit if needed, then commit.
+This is where messy filenames become clean ones. The app shows you a side-by-side preview of every video file and what it'll be renamed to - you review, edit if needed, then commit.
 
 ### Loading files
 
@@ -109,43 +118,58 @@ Three ways:
 
 If you drop a *file* instead of a folder, the app uses the file's parent folder. Useful when you want to drag a single file from a deep path without navigating to its folder first.
 
+If the folder you load is a season folder (`Season 01`, `Specials`), a message offers **Use show folder**. That loads the show's folder with Subfolders on, so every season is cleaned together and Steps 2 and 3 see the whole show.
+
 ### Understanding each row
 
 | Column | What it shows |
 |---|---|
-| ☑ | Whether this row will be processed when you click Rename Selected. Defaults to checked. |
+| ☑ | Whether this row will be processed when you click Rename Selected. Rows start unchecked: tick the ones you want, or use **Select all** (`Ctrl+A`). |
 | **Original** | The filename on disk now. **Red strikethrough** marks tokens the parser is going to remove (`1080p`, `BluRay`, `x265`, release groups, etc.). Grey tokens are the ones that survive into the cleaned name. |
 | File size | Right under the original, dimmed. Helps you spot tiny "sample" files. |
-| **Cleaned** | The proposed new filename. **Editable** — type into it to override the parser. If an edition is detected (Director's Cut, Extended, IMAX, 4K Remaster, Theatrical, Unrated, Criterion, etc.) a small **chip** appears under the cleaned name. The edition isn't added to the filename itself, but it *is* written to the NFO so Plex / Kodi can group multiple cuts of the same movie. |
-| **Confidence** | A coloured pill — *High* (green) means the parser is sure, *Medium* (amber) means probably right, *Low* (red) means review carefully. |
+| **Cleaned** | The proposed new filename. **Editable** - type into it to override the parser. If an edition is detected (Director's Cut, Extended, IMAX, 4K Remaster, Theatrical, Unrated, Criterion, etc.) a small **chip** appears under the cleaned name. The edition isn't added to the filename itself, but it *is* written to the NFO so Plex / Kodi can group multiple cuts of the same movie. |
+| **Confidence** | A coloured pill - *High* (green) means the parser is sure, *Medium* (amber) means probably right, *Low* (red) means review carefully. |
 | ⚠ | Warning icon. Hover for details: missing year, duplicate name, invalid characters, TV-episode pattern, filename too long, etc. |
-| 🔍 | Inline TMDb search button — click to confirm the title against The Movie Database. |
+| 🔍 | Inline TMDb search button - click to confirm the title against The Movie Database. |
 
 ### Editing & bulk tools
 
 You can fix names three ways:
 
 - **Type directly** into the Cleaned field. Updates apply when you click out of the field.
-- **Bulk Find & Replace** — type something in *Find*, something in *Replace*, click **Replace**. Affects every checked row.
+- **Bulk Find & Replace** - type something in *Find*, something in *Replace*, click **Replace**. Affects every checked row.
+- **Select all** box (left of the toolbar, also `Ctrl+A`) - ticks every row, or clears them all when everything is already ticked. A dash means some rows are ticked.
 - **More menu** (top-right `⋯`):
-  - **Select All** (also Ctrl+A)
-  - **Select None**
-  - **Apply Smart Title Case** — capitalises words properly (small words like "of" / "the" / "a" stay lowercase, except as first/last word).
-  - **Reset Auto-Cleaning** — if you've messed something up, this re-runs the parser on the original filename.
+  - **Apply Smart Title Case** - capitalises words properly (small words like "of" / "the" / "a" stay lowercase, except as first/last word).
+  - **Reset Auto-Cleaning** - if you've messed something up, this re-runs the parser on the original filename.
 
 **Right-click any row** for the same actions targeted at just that one row, plus *Open Containing Folder* and *Remove from List*.
+
+### Keyboard shortcuts
+
+| Key | What it does |
+|---|---|
+| `Ctrl+A` | Select all rows, or clear them all |
+| `F2` | Edit the new name of the focused row (click a row's checkbox or use the arrow keys to move the focus) |
+| `Enter` | Finish editing a name and go back to the row |
+| `Delete` | Remove the focused row from the list. The file itself is not touched |
+
+### Words to always remove
+
+Some tags are never recognized automatically, like a release group's name (`ION10`, `mSD`) or a website watermark. Add them once in **Settings → Words to always remove**, one per line. They're matched as whole words, upper or lower case, and removed from every name the next time files are cleaned (the current list is cleaned again as soon as you close Settings).
 
 ### Filters & search
 
 Top toolbar:
 
-- **🔍 Search box** — live-filters by both original and cleaned name.
-- **Confidence dropdown** — *All*, *High*, *Medium*, *Low*, *Warnings only*, *Needs renaming*.
-- **Modified only toggle** — quick way to hide rows where the cleaned name already matches the original. Useful when you've got a half-cleaned folder and want to focus on what's left.
+- **🔍 Search box** - live-filters by both original and cleaned name.
+- **Confidence dropdown** - *All*, *High*, *Medium*, *Low*, *Warnings*, *Needs renaming*.
+- **Show only warnings** - when any row has a ⚠, this link appears next to the file count at the bottom. One click shows just those rows; **Show all files** brings the rest back.
+- **Modified only toggle** - quick way to hide rows where the cleaned name already matches the original. Useful when you've got a half-cleaned folder and want to focus on what's left.
 
 ### Sorting
 
-Click any of the three column headers — **Original**, **Cleaned**, **Confidence** — to sort by that column. Click again to reverse direction. The little arrow next to the column name shows current state. Your sort choice is **remembered between sessions**.
+Click any of the three column headers - **Original**, **Cleaned**, **Confidence** - to sort by that column. Click again to reverse direction. The little arrow next to the column name shows current state. Your sort choice is **remembered between sessions**.
 
 ### Per-row TMDb search
 
@@ -155,22 +179,22 @@ When the parser isn't sure (or you just want to verify), click the 🔍 button o
 - A list of poster + plot + year for each match
 - Click a result, click **Use Selected**
 
-The cleaned name updates to the canonical TMDb title + year, the row is marked **reviewed**, and confidence jumps to 100%. The original filename on disk hasn't changed yet — that only happens when you hit Rename Selected.
+The cleaned name updates to the canonical TMDb title + year, the row is marked **reviewed**, and confidence jumps to 100%. The original filename on disk hasn't changed yet - that only happens when you hit Rename Selected.
 
 ### Top-row toggles explained
 
 Right of the source picker:
 
-- **Subfolders** — when on, the file scan recurses into every subfolder. Useful for processing an entire downloads tree at once.
-- **Rename folder** — when on, if a movie sits in its **own subfolder** (single-video folder, not the source root), the folder is renamed to match the cleaned filename. Skips the source root, multi-video folders, and name collisions.
-- **Clean metadata** — when on, after the file rename, the app also rewrites the **embedded title tag** inside the video file (and clears Comment / Description / Encoder / Copyright). This is what kills the **website link in VLC's titlebar** that scene releases often have. Powered by [TagLib#](https://github.com/mono/taglib-sharp). No re-encoding — fast and safe.
+- **Subfolders** - when on, the file scan recurses into every subfolder. Useful for processing an entire downloads tree at once.
+- **Rename folder** - when on, if a movie sits in its **own subfolder** (single-video folder, not the source root), the folder is renamed to match the cleaned filename. Skips the source root, multi-video folders, and name collisions.
+- **Clean metadata** - when on, after the file rename, the app also rewrites the **embedded title tag** inside the video file (and clears Comment / Description / Encoder / Copyright). This is what kills the **website link in VLC's titlebar** that scene releases often have. Powered by [TagLib#](https://github.com/mono/taglib-sharp). No re-encoding - fast and safe.
 
 ### Output template dropdown
 
 Choose between two formats for the cleaned filename:
 
-- `{Title} ({Year})` — the Plex / Kodi / Jellyfin / MediaElch standard
-- `{Year} - {Title}` — sortable chronologically
+- `{Title} ({Year})` - the Plex / Kodi / Jellyfin / MediaElch standard
+- `{Year} - {Title}` - sortable chronologically
 
 Switching the template re-applies it to all **non-reviewed** rows. Reviewed rows (yours edits, TMDb confirmations) are left alone so you don't lose your work.
 
@@ -187,7 +211,7 @@ When the rename finishes, you'll see a toast notification at the bottom-right.
 
 ### Undo
 
-The success toast has an **Undo** button. You have **30 seconds** to click it — after that the toast dismisses and the rename is final.
+The success toast has an **Undo** button. You have **30 seconds** to click it - after that the toast dismisses and the rename is final.
 
 Undo reverses every rename in the batch (files first, folders last) so you're back to where you started.
 
@@ -195,43 +219,41 @@ Undo reverses every rename in the batch (files first, folders last) so you're ba
 
 ---
 
-## Step 2 — Organize
+## Step 2 · Organize
 
 ![Step 2 screenshot](https://github.com/user-attachments/assets/7f262903-9bba-4182-8acf-08f6fd257b66)
 
-Step 2 takes the (renamed) files and moves each one into a `Title (Year)/` folder — the layout Plex, Kodi, Jellyfin, and MediaElch all expect.
+Step 2 takes the (renamed) files and moves each one into a `Title (Year)/` folder - the layout Plex, Kodi, Jellyfin, and MediaElch all expect.
 
 ### How files arrive in Step 2
 
 Three ways:
 
-1. **From Step 1** — automatic. Files carry over, all checked, the moment you click into Step 2.
-2. **+ Add Files** — multi-select file picker. Use this when you've already cleaned filenames elsewhere.
-3. **+ Add Folder** — recursively pulls every video out of a folder you pick. Good for processing a whole drive of pre-named files.
-4. **Drag-drop** — drop a folder or files onto the page. Folder = recursive. Files = added directly.
+1. **From Step 1** - automatic. Files carry over, all checked, the moment you click into Step 2.
+2. **+ Add Files** - multi-select file picker. Use this when you've already cleaned filenames elsewhere.
+3. **+ Add Folder** - recursively pulls every video out of a folder you pick. Good for processing a whole drive of pre-named files.
+4. **Drag-drop** - drop a folder or files onto the page. Folder = recursive. Files = added directly.
 
 Each row shows the source file → arrow → destination folder + new filename.
 
-### Output folder
+### Where the folders go
 
-The output folder defaults to the **source folder** so the moves happen "in place" (creating subfolders inside the source). Click the folder button to pick a different output, or use the ▾ for recents.
-
-If you change the output folder, every destination preview updates automatically.
+There is no output folder to pick: each file's new folder is created **right where the file already is**. Only loose files are listed. Files that already sit in their own correctly named folder (or a `Season XX` folder for TV) are skipped automatically, and the status line tells you how many were skipped.
 
 ### Running the move
 
-Tick / untick rows you want to skip, then click **Run File to Folder**. The app:
+Tick / untick rows you want to skip (the **Select all** box toggles every row), then click **Run File to Folder**. The app:
 
-1. Creates a `Title (Year)/` folder (movies) or `Show/Season XX/` folders (TV) under the output.
+1. Creates a `Title (Year)/` folder (movies) or `Show/Season XX/` folders (TV) next to each file.
 2. Moves the video into it.
-3. Moves any matching subtitle files alongside — including language-tagged ones like `Movie.en.forced.srt`.
+3. Moves any matching subtitle files alongside - including language-tagged ones like `Movie.en.forced.srt`.
 4. After success, advances to Step 3 automatically.
 
-**Folder merging:** if a destination folder already exists, files are merged into it instead of erroring. Existing files are never overwritten — and any subtitles from the source still move into the destination. The status line reports e.g. *"3 organized · 2 merged into existing folder(s)"*.
+**Folder merging:** if a destination folder already exists, files are merged into it instead of erroring. Existing files are never overwritten - and any subtitles from the source still move into the destination. The status line reports e.g. *"3 organized · 2 merged into existing folder(s)"*.
 
 ---
 
-## Step 3 — Scrape
+## Step 3 · Scrape
 
 Step 3 downloads metadata, posters, fanart, and actor photos from TMDb and writes them into each movie folder in the **Plex / Kodi NFO standard** layout:
 
@@ -248,16 +270,16 @@ Bawarchi (1972)/
 
 ### Card view
 
-The default view is a **grid of cards** — each card shows the poster (or a placeholder), the title, the folder path, a status pill, and three buttons (Scrape / Open / Remove).
+The default view is a **grid of cards** - each card shows the poster (or a placeholder), the title, the folder path, a status pill, and three buttons (Scrape / Open / Remove).
 
 Status pills are colour-coded:
 
 | Color | Meaning |
 |---|---|
-| Grey | *Ready* — never scraped |
+| Grey | *Ready* - never scraped |
 | Blue | *Scraping…* / *Searching…* / *Downloading…* (in progress) |
 | Green | *Complete* (just scraped) or *Already scraped* (folder already had .nfo + poster when loaded) |
-| Red | *Failed* — hover the warning, the error is in the row |
+| Red | *Failed* - hover the warning, the error is in the row |
 
 If a folder was already scraped (it has both an `.nfo` and a `-poster.jpg`), the app **detects this on load** and pre-unchecks it so a bulk *Scrape Selected* won't redo it.
 
@@ -269,24 +291,83 @@ Click **Scrape** on any card → the same TMDb search dialog as Step 1 opens, pr
 
 Click **Scrape Selected (auto)** at the top → every checked card is processed sequentially using the **first TMDb match** for each one (movie or TV show, depending on the card). Fast for batch processing, less precise than per-card. Use it after you've eyeballed the list and trust the auto-match.
 
+The **Select all** box ticks every card (or clears them all), and a progress bar at the bottom shows *"Scraping 3 of 12: Title"* while a batch runs.
+
 ### Fill gaps only (verify a library)
 
-Click **Fill gaps only** → the app sweeps **every** folder in the list and scrapes only the ones missing something (NFO, poster, fanart, or actor photos). Complete folders are skipped, so it's safe to re-run on an existing library — it just patches the holes. Ignores the row checkboxes. Each card's status shows exactly what's missing, e.g. *"Missing: poster · fanart"* or *"Complete"*.
+Click **Fill gaps only** → the app sweeps **every** folder in the list and scrapes only the ones missing something (NFO, poster, fanart, or actor photos). Complete folders are skipped, so it's safe to re-run on an existing library - it just patches the holes. Ignores the row checkboxes. Each card's status shows exactly what's missing, e.g. *"Missing: poster · fanart"* or *"Complete"*.
 
 ### TV shows in Step 3
 
-TV folders show one card per show with a status like *"TV · 3 seasons · Complete"*. Scraping a TV card writes `tvshow.nfo` + show artwork at the root and a per-episode `.nfo` + thumbnail for every episode. Right-click → **Search TMDb** searches the **TV** database (not movies) for TV cards.
+TV folders show one card per show. Under the title, a line like *"TV · 3 seasons · 24 episodes"* counts what's on disk (double episodes like `S01E01E02` count as two), and after a scrape it adds how many aired episodes are missing, e.g. *"· 2 missing"*. The status pill shows *Complete* or what's missing, the same as for movies.
+
+Scraping a TV card writes `tvshow.nfo` + show artwork at the root and a per-episode `.nfo` + thumbnail for every episode. Right-click → **Search TMDb** searches the **TV** database (not movies) for TV cards. If you add a `Season 01` folder, the card is made for the show folder above it, which is where the show's files belong.
+
+### Episode titles in file names
+
+Off by default. Turn on **Settings → Add episode titles to file names**, and scraping a TV show renames episodes that have no title yet:
+
+```
+Breaking Bad - S01E01.mkv   →   Breaking Bad - S01E01 - Pilot.mkv
+```
+
+Subtitles (`.en.srt` and so on), the episode `.nfo` and the thumbnail are renamed with it. Files that already have a title are left alone, as are double episodes and placeholder titles like *"Episode 5"*. Nothing is ever overwritten. When a scrape renamed anything, a message offers **Undo**, which puts every original name back (one Undo for a whole batch).
+
+### Ratings: IMDb and TMDb
+
+Every NFO gets both ratings, each with its vote count, so Kodi, Jellyfin and CineLibrary can show either one. **Settings → Main rating** picks which one players show first (IMDb by default, when the title has one).
+
+IMDb ratings change over time. **⋯ → Refresh IMDb ratings** updates them for the checked cards (or all cards when none are checked) in one quick request. Only the ratings in the NFO change: nothing is re-scraped and nothing else in the file is touched.
 
 ### Other things you can do
 
-- **+ Add Folder** — add a movie folder that wasn't part of Steps 1 or 2. The app accepts both single movie folders and "parent" folders that contain many movie folders.
-- **Drag-drop** — same as above.
-- **Double-tap a scraped card** — opens the **Movie Details** window (hero fanart, poster, plot, color-coded crew / studio / country / genres / IDs / file info, scrollable cast strip with photos, plus Play / Open Folder / Trailer buttons). ESC closes it. Resizable and maximizable.
-- **Double-tap an unscraped card** — opens the resizable TMDb search dialog so you can pick the right match.
+- **+ Add Folder** - add a movie folder that wasn't part of Steps 1 or 2. The app accepts both single movie folders and "parent" folders that contain many movie folders.
+- **Drag-drop** - same as above.
+- **Double-tap a scraped card** - opens the **Movie Details** window (hero fanart, poster, plot, IMDb and TMDb rating chips, color-coded crew / studio / country / genres / IDs / file info, scrollable cast strip with photos, plus Play / Open Folder / Edit / Trailer buttons). ESC closes it. Resizable and maximizable. For a TV show it also lists the [episodes](#episodes-and-missing-episodes).
+- **Double-tap an unscraped card** - opens the resizable TMDb search dialog so you can pick the right match.
 - **Right-click a card** → View details / Search TMDb / Open Folder / Remove from List.
-- **List view toggle** (icon in toolbar) — for libraries with hundreds of movies, the dense list view is faster. Your preference is remembered.
-- **Each card shows an inline spinner** next to its status pill while it's being scraped — easy to see which one is in flight when you batch-scrape.
-- **Done** button — closes out the workflow with a confirmation message. Files and metadata are already on disk, so this is more of a "finished" indicator than an action.
+- **List view toggle** (icon in toolbar) - for libraries with hundreds of movies, the dense list view is faster. Your preference is remembered.
+- **Each card shows an inline spinner** next to its status pill while it's being scraped - easy to see which one is in flight when you batch-scrape.
+- **Done** button - closes out the workflow with a confirmation message. Files and metadata are already on disk, so this is more of a "finished" indicator than an action.
+
+### Episodes and missing episodes
+
+The details window of a TV show has an **Episodes** section, grouped by season (specials last). Each episode shows its thumbnail, title and air date, read from the files Step 3 wrote. Double-click an episode to play it.
+
+While you look, the app asks TMDb which **aired** episodes aren't in your library and adds them to the list with an orange **Missing** tag. A season you don't have at all shows as one line ("All 10 aired episodes"). Episodes that haven't aired yet and specials are never reported as missing. This needs an internet connection; without one the list simply shows what's on disk.
+
+### Edit NFO
+
+Scraped the right title but want to fix something? Right-click a card → **Edit NFO...**, or click **Edit** in the details window. The editor is its own window: resize it, maximize it, keep it open next to the app. Sections on the left:
+
+| Section | What you can change |
+|---|---|
+| **Details** | Title, original title, sort title, year, premiered date, runtime, age rating, tagline, plot, outline, and for movies the collection and edition |
+| **Genres and tags** | Genres, tags (your own labels like *4K* or *Watched*), studios, countries |
+| **Cast and crew** | Director, writers (creators for TV), and the cast: add, remove, rename, change roles and photos, and drag rows (or use the arrows) to change the billing order |
+| **Ratings and IDs** | See the IMDb and TMDb ratings, refresh the IMDb one, give your own rating (0 to 10 stars), and edit the IMDb id, TMDb id and trailer link (each with an Open button) |
+| **Artwork** | Poster, fanart, clear logo, landscape and banner. Pick **From TMDb** to browse every picture TMDb has for the title (filter by language or *Without text*), or **From file...** |
+| **Episodes** (TV) | Every episode's title, air date, plot and thumbnail |
+| **NFO source** | The file itself, read-only, with **Copy** and **Open folder** |
+
+Some handy details:
+
+- **Chips** for lists: type a genre, studio or name and press `Enter`; click × (or press `Backspace` in the empty box) to remove one. While you type, it suggests values already used in your library, so "Sci-Fi" and "Science Fiction" don't both creep in.
+- **Fetch from TMDb** (the download-arrow button next to title, tagline, plot and outline) fills in just that field from TMDb, in a language you pick. Handy for getting the plot in English when you scrape in another language, or the other way round.
+- **Nothing is written until you Save** (`Ctrl+S`). The header counts your unsaved changes; **Revert** throws them away, and closing the window asks first.
+- **Only what you change is written.** Everything else in the NFO, like file info and tags added by other tools, stays exactly as it was.
+- **Restore previous version** puts back the files exactly as they were before your last save: the NFO and any picture, actor photo or episode file that save replaced. Backups are kept in the app's own folder, not next to your movies.
+- **Protect from re-scrapes** (ticked by default) marks the NFO as locked when you save (`<lockdata>true</lockdata>`, which Jellyfin understands too). After that, **Fill gaps** and **Scrape Selected** keep your edits and your chosen pictures, and only add images that are missing. Picking a match yourself in **Search TMDb...** is an explicit re-scrape and still replaces everything.
+
+### Bulk edit
+
+Tick several cards, then **⋯ → Bulk edit checked items...** to change them all at once:
+
+- Set (or clear) the **collection**, set the **age rating**
+- **Add** or **remove** genres and tags (each title keeps the ones you don't mention)
+- **Protect** or stop protecting them from re-scrapes
+
+Only what you tick or fill in changes. Every changed title keeps a backup, so **Edit NFO → Restore previous version** undoes it for that title.
 
 ---
 
@@ -296,17 +377,20 @@ A **gear icon** lives in the title bar next to the About icon. Clicking it opens
 
 **General**
 
-- **Default output template** — `{Title} ({Year})` or `{Year} - {Title}`.
-- **Recursively scan subfolders by default** — Step 1 starts with the Subfolders toggle on.
-- **Clean embedded MKV metadata by default** — Step 1's "Clean metadata" checkbox starts on.
+- **Default output template** - `{Title} ({Year})` or `{Year} - {Title}`.
+- **Recursively scan subfolders by default** - Step 1 starts with the Subfolders toggle on.
+- **Clean embedded MKV metadata by default** - Step 1's "Clean metadata" checkbox starts on.
+- **Words to always remove** - tags Step 1 should always strip, one per line (see [Words to always remove](#words-to-always-remove)).
 
 **Scraping**
 
-- **TMDb language** — 16 languages including English, Burmese, Hindi, Tamil, Telugu, Thai, Chinese, Japanese, Korean, French, German, Spanish, Italian, Portuguese, Russian, Arabic. TMDb returns titles, plots and posters in the chosen language where available, and falls back to English when it doesn't.
+- **TMDb language** - 16 languages including English, Burmese, Hindi, Tamil, Telugu, Thai, Chinese, Japanese, Korean, French, German, Spanish, Italian, Portuguese, Russian, Arabic. TMDb returns titles, plots and posters in the chosen language where available, and falls back to English when it doesn't.
+- **Main rating** - IMDb (when available) or TMDb: which rating players show first. Both are always saved.
+- **Add episode titles to file names** - off by default (see [Episode titles in file names](#episode-titles-in-file-names)).
 
 **Updates**
 
-- **Check for updates on startup** — silent once-per-24h check against GitHub. When a newer version is published, a toast appears with a **Download** button that fetches the installer directly inside the app (with a live progress percentage) and launches it for you.
+- **Check for updates on startup** - silent once-per-24h check against GitHub. When a newer version is published, a toast appears with a **Download** button that fetches the installer directly inside the app (with a live progress percentage) and launches it for you.
 
 ---
 
@@ -318,7 +402,7 @@ What's remembered between sessions:
 
 - TMDb API key (embedded by default)
 - Everything from the Settings page above
-- Recent source / output folders (last 10 each)
+- Recent source folders (last 10)
 - Window size + position
 - Which warnings you've dismissed
 - Step 3 view preference (Grid / List)
@@ -332,9 +416,9 @@ What's remembered between sessions:
 - **Drag-drop works on every step.** Step 1 = load source. Step 2 = add to organize queue. Step 3 = add to scrape queue.
 - **Right-click is your friend.** Every list / card has a context menu with the most useful actions.
 - **Use "Modified only" + "Low" filter** to focus on the rows that actually need attention in big folders.
-- **The TMDb dialog accepts year in the search box.** Type `Movie 2024` — it parses the year out and uses it as TMDb's release-year filter for tighter matches.
+- **The TMDb dialog accepts year in the search box.** Type `Movie 2024` - it parses the year out and uses it as TMDb's release-year filter for tighter matches.
 - **The 30-second Undo applies to the whole batch.** If you regret part of the rename, undo the whole thing, fix that one row, and re-rename.
-- **Step 3 detects already-scraped folders.** You can re-load the same folder a hundred times — it won't re-scrape what's already done unless you tick the row.
+- **Step 3 detects already-scraped folders.** You can re-load the same folder a hundred times - it won't re-scrape what's already done unless you tick the row.
 - **Clean metadata is a one-shot fix** for the website-in-VLC-titlebar problem. Once it's done for a file, the file is clean forever.
 
 ---
@@ -343,35 +427,39 @@ What's remembered between sessions:
 
 | Problem | Try this |
 |---|---|
-| App doesn't launch | Make sure you're on **Windows 10 build 17763 (1809) or newer**, x64. The installer is self-contained — no other prerequisites. |
-| "Folder no longer exists" toast on a recent | The folder was moved or deleted. Pick a new one — the recent list will refresh. |
+| App doesn't launch | Make sure you're on **Windows 10 build 17763 (1809) or newer**, x64. The installer is self-contained - no other prerequisites. |
+| "Folder no longer exists" toast on a recent | The folder was moved or deleted. Pick a new one - the recent list will refresh. |
 | TMDb search returns nothing | Check spelling, drop the year temporarily, or look the movie up on themoviedb.org first to confirm it exists in their database. |
 | Rename failed: "target already exists" | Two files would have ended up with the same cleaned name. Edit one of them and try again. The duplicate warning would have flagged this before you hit Rename. |
 | Folder rename failed | Likely a file inside the folder is open in another app (e.g. VLC playing it). Close other apps and try again. |
 | Undo did nothing | The undo window is **30 seconds**. After that, the toast dismisses and the operation is final. |
-| Wrong year extracted from filename | Click the 🔍 TMDb button on that row and pick the right match — it'll override both title and year. |
+| Wrong year extracted from filename | Click the 🔍 TMDb button on that row and pick the right match - it'll override both title and year. |
+| A release group's name keeps showing up in cleaned names | Add it to **Settings → Words to always remove**. |
+| No IMDb rating in the details | The title may not have one yet, or the free ratings service was unreachable. Try **⋯ → Refresh IMDb ratings** later. |
+| Fill gaps didn't change a title I edited | That's the lock protecting your edit. To start over from TMDb, use **Search TMDb...** on the card, or untick *Protect from re-scrapes* in **Edit NFO** and save. |
+| Episodes list shows no missing episodes | The check needs an internet connection and a TMDb id in `tvshow.nfo` (scrape the show first). Unaired episodes and specials are never listed. |
 
 ---
 
 ## FAQ
 
 **Q: Will this app re-encode my videos?**
-No. It only renames files (a metadata-level operation) and moves them between folders. Even the "Clean metadata" feature only rewrites tags in the file container — no audio or video data is touched. Operations are near-instant regardless of file size.
+No. It only renames files (a metadata-level operation) and moves them between folders. Even the "Clean metadata" feature only rewrites tags in the file container - no audio or video data is touched. Operations are near-instant regardless of file size.
 
 **Q: Does it work with TV shows?**
-Yes — fully. As of v1.2.0 TV shows are a first-class workflow alongside movies. The app detects episode patterns (`S01E03`, `1x03`, `Season 1 Episode 3`), renames them to the Kodi convention `Show - S01E01 - Title`, organizes them into `Show/Season XX/` folders, and scrapes a `tvshow.nfo` + show poster/fanart/cast plus a per-episode `.nfo` and thumbnail for every episode. A **Mode** selector (Auto / Movies / TV Shows) lets you force or filter the type, and flat "Season Complete" folders are recognized too.
+Yes - fully. As of v1.2.0 TV shows are a first-class workflow alongside movies. The app detects episode patterns (`S01E03`, `1x03`, `Season 1 Episode 3`), renames them to the Kodi convention `Show - S01E01` (keeping the episode title if the filename has one), organizes them into `Show/Season XX/` folders, and scrapes a `tvshow.nfo` + show poster/fanart/cast plus a per-episode `.nfo` (with the real episode title) and thumbnail for every episode. A **Mode** selector (Auto / Movies / TV Shows) lets you force or filter the type, and flat "Season Complete" folders are recognized too.
 
 **Q: What about my movie's existing subtitles?**
 Companion files with the same base name (`.srt`, `.sub`, `.ass`, `.ssa`, `.vtt`, `.idx`) are renamed alongside the video automatically. They get moved into the `Title (Year)/` folder along with the video in Step 2.
 
-**Q: My TMDb API key — is it the app's or mine?**
+**Q: My TMDb API key - is it the app's or mine?**
 The app ships with an embedded API key, so it works out of the box. If you want to use your own (e.g. for higher rate limits), edit the `TmdbApiKey` field in `appsettings.json`.
 
 **Q: Can I trust this with my library?**
-Step 1's renames are reversible via the 30-second Undo toast. Steps 2 and 3 are more conservative — they create new folders and move files but don't delete anything. As always, **try it on a small folder first** before unleashing it on your whole collection.
+Step 1's renames are reversible via the 30-second Undo toast. Steps 2 and 3 are more conservative - they create new folders and move files but don't delete anything. As always, **try it on a small folder first** before unleashing it on your whole collection.
 
 **Q: Where do I report bugs / request features?**
-Open an issue at https://github.com/aungkokomm/CineLibraryEssentials/issues.
+Open an issue at https://github.com/aungkokomm/CineLibraryEssentials/issues. For a bug, open **ⓘ About → Copy diagnostics** first and paste the result into the issue. It holds the app version, your settings (never your API key) and the warnings you saw this session. Have a look before posting: those warnings can include file or folder names.
 
 **Q: Why use this over MediaElch directly?**
 MediaElch is *fantastic* for full-fledged scraping but it stumbles on messy filenames and unstructured folders. CineLibrary Essentials does the cleanup work first so MediaElch (or our built-in scraper) starts from a clean slate. Use them together.
@@ -382,7 +470,7 @@ MediaElch is *fantastic* for full-fledged scraping but it stumbles on messy file
 
 When your library is clean and scraped:
 
-1. **For deeper scraping** → open MediaElch and point it at your output folder.
+1. **For deeper scraping** → open MediaElch and point it at your library folder.
 2. **For browsing + management** → grab [CineLibrary](https://github.com/aungkokomm/CineLibraryCS), the companion app that catalogs your prepared library across multiple drives.
 
 Enjoy your tidy movie collection! 🎬

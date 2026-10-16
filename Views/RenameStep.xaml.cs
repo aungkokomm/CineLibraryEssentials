@@ -24,6 +24,10 @@ public sealed partial class RenameStep : UserControl
     {
         InitializeComponent();
 
+        // handledEventsToo: the list and the name boxes mark some keys handled
+        // before they bubble up, and F2 / Delete / Enter must still reach us.
+        FilePreviewList.AddHandler(KeyDownEvent, new KeyEventHandler(OnListKeyDown), true);
+
         Loaded += (_, _) =>
         {
             RebuildRecentFoldersFlyout();
@@ -43,7 +47,7 @@ public sealed partial class RenameStep : UserControl
         if (_configService.IsWarningDismissed(WarningId)) return;
 
         var bar = ToastService.ShowAction(
-            message: "Already-clean files are hidden — turn off \"Modified only\" to see them. " +
+            message: "Already-clean files are hidden - turn off \"Modified only\" to see them. " +
                      "Review Low / Medium rows carefully; you get a 30-second Undo after each rename.",
             title: "Tip",
             actionText: "Don't show again",
@@ -90,6 +94,73 @@ public sealed partial class RenameStep : UserControl
     }
 
     private void OnBackClick(object sender, RoutedEventArgs e) => BackRequested?.Invoke(this, EventArgs.Empty);
+
+    private void OnWarningsLinkClick(object sender, RoutedEventArgs e) => _viewModel?.ToggleWarningsOnly();
+
+    // -----------------------------------------------------------------
+    //  Keyboard editing in the file list
+    // -----------------------------------------------------------------
+
+    /// <summary>
+    /// F2 edits the focused row's cleaned name, Delete removes the row from the
+    /// list (the file itself is untouched), Enter in a name box finishes editing.
+    /// </summary>
+    private void OnListKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (_viewModel == null) return;
+
+        if (e.OriginalSource is TextBox box)
+        {
+            // Typing keys belong to the name box; Enter hands focus back to the
+            // row, which commits the edit and keeps arrow-key navigation going.
+            if (e.Key == Windows.System.VirtualKey.Enter && box.DataContext is FilePreview edited)
+            {
+                FocusRow(edited);
+                e.Handled = true;
+            }
+            return;
+        }
+
+        if ((e.OriginalSource as FrameworkElement)?.DataContext is not FilePreview row) return;
+
+        if (e.Key == Windows.System.VirtualKey.F2)
+        {
+            if (FilePreviewList.ContainerFromItem(row) is DependencyObject container
+                && FindChild<TextBox>(container) is { } nameBox)
+            {
+                nameBox.Focus(FocusState.Keyboard);
+                nameBox.SelectAll();
+            }
+            e.Handled = true;
+        }
+        else if (e.Key == Windows.System.VirtualKey.Delete)
+        {
+            var index = _viewModel.FilePreviews.IndexOf(row);
+            _viewModel.RemovePreview(row);
+            // Keep the keyboard in the list on the row that took its place
+            if (_viewModel.FilePreviews.Count > 0)
+                FocusRow(_viewModel.FilePreviews[Math.Min(index, _viewModel.FilePreviews.Count - 1)]);
+            e.Handled = true;
+        }
+    }
+
+    private void FocusRow(FilePreview row)
+    {
+        FilePreviewList.ScrollIntoView(row);
+        FilePreviewList.UpdateLayout();
+        (FilePreviewList.ContainerFromItem(row) as Control)?.Focus(FocusState.Keyboard);
+    }
+
+    private static T? FindChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (int i = 0; i < Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
+            if (child is T match) return match;
+            if (FindChild<T>(child) is { } deeper) return deeper;
+        }
+        return null;
+    }
 
     // -----------------------------------------------------------------
     //  Draggable column divider (Original ↔ Cleaned)
@@ -148,17 +219,54 @@ public sealed partial class RenameStep : UserControl
             picker.FileTypeFilter.Add("*");
 
             var folder = await picker.PickSingleFolderAsync();
-            if (folder != null && _viewModel != null)
-            {
-                SourceFolderText.Text = folder.Path;
-                await _viewModel.LoadFilesAsync(folder.Path);
-                RebuildRecentFoldersFlyout();
-            }
+            if (folder != null)
+                await LoadFolderAsync(folder.Path);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Error: {ex.Message}");
         }
+    }
+
+    /// <summary>Loads a folder the user picked, dropped or chose from Recent.</summary>
+    private async Task LoadFolderAsync(string path)
+    {
+        if (_viewModel == null) return;
+        SourceFolderText.Text = path;
+        await _viewModel.LoadFilesAsync(path);
+        RebuildRecentFoldersFlyout();
+        OfferShowFolderIfSeason(path);
+    }
+
+    /// <summary>
+    /// A "Season 01" folder is better loaded from its show folder (with
+    /// Subfolders on), so Steps 2 and 3 see the whole show. Offers the switch.
+    /// </summary>
+    private void OfferShowFolderIfSeason(string path)
+    {
+        var trimmed = path.TrimEnd('\\', '/');
+        var name = Path.GetFileName(trimmed);
+        if (!ScrapingViewModel.LooksLikeSeasonFolder(name)) return;
+
+        var parent = Path.GetDirectoryName(trimmed);
+        if (string.IsNullOrEmpty(parent)
+            || string.Equals(Path.GetPathRoot(parent), parent, StringComparison.OrdinalIgnoreCase))
+            return;   // D:\Season 01 has no show folder above it
+
+        ToastService.ShowAction(
+            message: $"\"{name}\" looks like a season folder. Load the show folder \"{Path.GetFileName(parent)}\" with its subfolders instead?",
+            title: "Season folder",
+            actionText: "Use show folder",
+            onAction: () => _ = UseShowFolderAsync(parent),
+            autoDismissMs: 15000);
+    }
+
+    private async Task UseShowFolderAsync(string showFolder)
+    {
+        if (_viewModel == null) return;
+        await LoadFolderAsync(showFolder);
+        if (!_viewModel.IsRecursive)
+            _viewModel.IsRecursive = true;   // reloads with the Season folders included
     }
 
     private void RebuildRecentFoldersFlyout()
@@ -182,9 +290,7 @@ public sealed partial class RenameStep : UserControl
             {
                 if (_viewModel != null && Directory.Exists(path))
                 {
-                    SourceFolderText.Text = path;
-                    await _viewModel.LoadFilesAsync(path);
-                    RebuildRecentFoldersFlyout();
+                    await LoadFolderAsync(path);
                 }
                 else if (!Directory.Exists(path))
                 {
@@ -235,22 +341,13 @@ public sealed partial class RenameStep : UserControl
                 if (file != null)
                 {
                     var parentPath = System.IO.Path.GetDirectoryName(file.Path);
-                    if (!string.IsNullOrEmpty(parentPath) && _viewModel != null)
-                    {
-                        SourceFolderText.Text = parentPath;
-                        await _viewModel.LoadFilesAsync(parentPath);
-                        RebuildRecentFoldersFlyout();
-                    }
+                    if (!string.IsNullOrEmpty(parentPath))
+                        await LoadFolderAsync(parentPath);
                 }
                 return;
             }
 
-            if (_viewModel != null)
-            {
-                SourceFolderText.Text = folder.Path;
-                await _viewModel.LoadFilesAsync(folder.Path);
-                RebuildRecentFoldersFlyout();
-            }
+            await LoadFolderAsync(folder.Path);
         }
         catch (Exception ex)
         {
@@ -440,7 +537,7 @@ public sealed partial class RenameStep : UserControl
         // Nothing to do AT ALL: no renames pending and Clean Metadata isn't ticked.
         if (pending == 0 && !_viewModel.CleanEmbeddedMetadata)
         {
-            ToastService.Info("No files need renaming — every selected row's cleaned name already matches. Tick 'Clean metadata' if you only want to scrub embedded tags.");
+            ToastService.Info("No files need renaming - every selected row's cleaned name already matches. Tick 'Clean metadata' if you only want to scrub embedded tags.");
             return;
         }
 
@@ -449,7 +546,7 @@ public sealed partial class RenameStep : UserControl
         var cleaningMetadata = _viewModel.CleanEmbeddedMetadata;
         const string patienceNote =
             "\n\n⏳ Cleaning embedded metadata rewrites each file and can take a while " +
-            "for large videos — please be patient and don't close the app until it finishes.";
+            "for large videos - please be patient and don't close the app until it finishes.";
 
         // Build a dialog message that reflects what's actually about to happen.
         string title, content, primary;
@@ -509,7 +606,8 @@ public sealed partial class RenameStep : UserControl
                         var (ok, bad) = _viewModel.UndoLastRename();
                         if (bad == 0) ToastService.Success($"Reverted {ok} rename(s).");
                         else ToastService.Warning($"Reverted {ok}, {bad} failed.");
-                    });
+                    },
+                    severity: Microsoft.UI.Xaml.Controls.InfoBarSeverity.Success);
             }
         }
         else

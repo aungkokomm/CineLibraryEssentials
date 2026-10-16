@@ -295,8 +295,8 @@ public partial class FileToFolderViewModel : ObservableObject
         if (OperationsPreview.Count == 0)
         {
             StatusMessage = _alreadyOrganizedCount > 0
-                ? $"All {_alreadyOrganizedCount} file(s) are already in their own folders — nothing to organize here."
-                : "No loose files — drop a folder, click + Add Files / + Add Folder, or come back from Step 1.";
+                ? $"All {_alreadyOrganizedCount} file(s) are already in their own folders - nothing to organize here."
+                : "No loose files - drop a folder, click + Add Files / + Add Folder, or come back from Step 1.";
         }
         else
         {

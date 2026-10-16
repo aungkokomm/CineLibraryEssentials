@@ -5,7 +5,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Settings"
     CloseButtonText="Close"
-    DefaultButton="Close">
+    DefaultButton="Close"
+    Closing="OnDialogClosing">
     <ScrollViewer MaxHeight="520">
         <StackPanel Spacing="20" Width="460">
 
@@ -39,6 +40,21 @@
                 <ToggleSwitch x:Name="CleanMetaToggle"
                               Header="Clean embedded MKV metadata by default"
                               Toggled="OnCleanMetaToggled" />
+
+                <!-- Words to always remove -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Words to always remove" FontSize="13" />
+                    <TextBox x:Name="RemoveWordsBox"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             Height="96"
+                             PlaceholderText="One per line, e.g.&#x0a;ION10&#x0a;mSD"
+                             AutomationProperties.Name="Words to always remove" />
+                    <TextBlock Text="Tags Step 1 doesn't recognize, like a release group's name. Matched as whole words, upper or lower case. Applied the next time files are cleaned."
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                </StackPanel>
             </StackPanel>
 
             <!-- ============ Scraping ============ -->
@@ -55,23 +71,50 @@
                               MinWidth="260"
                               SelectionChanged="OnLanguageChanged">
                         <ComboBoxItem Content="English" Tag="en" />
-                        <ComboBoxItem Content="မြန်မာ — Burmese" Tag="my" />
-                        <ComboBoxItem Content="हिन्दी — Hindi" Tag="hi" />
-                        <ComboBoxItem Content="தமிழ் — Tamil" Tag="ta" />
-                        <ComboBoxItem Content="తెలుగు — Telugu" Tag="te" />
-                        <ComboBoxItem Content="ไทย — Thai" Tag="th" />
-                        <ComboBoxItem Content="中文 — Chinese (Simplified)" Tag="zh" />
-                        <ComboBoxItem Content="日本語 — Japanese" Tag="ja" />
-                        <ComboBoxItem Content="한국어 — Korean" Tag="ko" />
-                        <ComboBoxItem Content="Français — French" Tag="fr" />
-                        <ComboBoxItem Content="Deutsch — German" Tag="de" />
-                        <ComboBoxItem Content="Español — Spanish" Tag="es" />
-                        <ComboBoxItem Content="Italiano — Italian" Tag="it" />
-                        <ComboBoxItem Content="Português — Portuguese" Tag="pt" />
-                        <ComboBoxItem Content="Русский — Russian" Tag="ru" />
-                        <ComboBoxItem Content="العربية — Arabic" Tag="ar" />
+                        <ComboBoxItem Content="မြန်မာ - Burmese" Tag="my" />
+                        <ComboBoxItem Content="हिन्दी - Hindi" Tag="hi" />
+                        <ComboBoxItem Content="தமிழ் - Tamil" Tag="ta" />
+                        <ComboBoxItem Content="తెలుగు - Telugu" Tag="te" />
+                        <ComboBoxItem Content="ไทย - Thai" Tag="th" />
+                        <ComboBoxItem Content="中文 - Chinese (Simplified)" Tag="zh" />
+                        <ComboBoxItem Content="日本語 - Japanese" Tag="ja" />
+                        <ComboBoxItem Content="한국어 - Korean" Tag="ko" />
+                        <ComboBoxItem Content="Français - French" Tag="fr" />
+                        <ComboBoxItem Content="Deutsch - German" Tag="de" />
+                        <ComboBoxItem Content="Español - Spanish" Tag="es" />
+                        <ComboBoxItem Content="Italiano - Italian" Tag="it" />
+                        <ComboBoxItem Content="Português - Portuguese" Tag="pt" />
+                        <ComboBoxItem Content="Русский - Russian" Tag="ru" />
+                        <ComboBoxItem Content="العربية - Arabic" Tag="ar" />
                     </ComboBox>
                     <TextBlock Text="TMDb will return titles, plots and posters in this language where available. Falls back to English when missing."
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                </StackPanel>
+
+                <!-- Main rating -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Main rating" FontSize="13" />
+                    <ComboBox x:Name="RatingCombo"
+                              MinWidth="220"
+                              SelectionChanged="OnRatingChanged"
+                              AutomationProperties.Name="Main rating">
+                        <ComboBoxItem Content="IMDb (when available)" Tag="imdb" />
+                        <ComboBoxItem Content="TMDb" Tag="tmdb" />
+                    </ComboBox>
+                    <TextBlock Text="Scraped NFOs include both the IMDb and TMDb rating with vote counts. This picks the one players show first."
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                </StackPanel>
+
+                <!-- Episode titles in file names (opt-in) -->
+                <StackPanel Spacing="4">
+                    <ToggleSwitch x:Name="EpisodeTitlesToggle"
+                                  Header="Add episode titles to file names"
+                                  Toggled="OnEpisodeTitlesToggled" />
+                    <TextBlock Text="When a TV show is scraped, &quot;Show - S01E01.mkv&quot; becomes &quot;Show - S01E01 - Pilot.mkv&quot;. Subtitles, the .nfo and the thumbnail are renamed with it. Files that already have a title are left alone, and you get an Undo after each scrape."
                                FontSize="11"
                                TextWrapping="Wrap"
                                Foreground="{ThemeResource TextFillColorTertiaryBrush}" />

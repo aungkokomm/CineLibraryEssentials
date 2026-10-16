@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="CineLibraryEssentials.Views.BulkEditDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CineLibraryEssentials.Controls"
+    Title="Bulk edit"
+    PrimaryButtonText="Apply"
+    CloseButtonText="Cancel"
+    DefaultButton="Primary"
+    PrimaryButtonClick="OnApplyClick">
+
+    <ContentDialog.Resources>
+        <x:Double x:Key="ContentDialogMaxWidth">760</x:Double>
+    </ContentDialog.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="600" Padding="0,0,14,0">
+        <StackPanel Spacing="14" Width="600">
+            <TextBlock x:Name="IntroText" TextWrapping="Wrap" />
+
+            <StackPanel Spacing="6">
+                <CheckBox x:Name="CollectionCheck" Content="Set the collection" />
+                <AutoSuggestBox x:Name="CollectionBox" PlaceholderText="Leave empty to take them out of their collection"
+                                TextChanged="OnCollectionTextChanged" IsEnabled="{Binding IsChecked, ElementName=CollectionCheck}" />
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+                <CheckBox x:Name="AgeRatingCheck" Content="Set the age rating" />
+                <ComboBox x:Name="AgeRatingBox" IsEditable="True" MinWidth="200"
+                          IsEnabled="{Binding IsChecked, ElementName=AgeRatingCheck}" />
+            </StackPanel>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="14">
+                <controls:TokenBox x:Name="AddGenresBox" Header="Add genres" />
+                <controls:TokenBox Grid.Column="1" x:Name="RemoveGenresBox" Header="Remove genres" />
+            </Grid>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="14">
+                <controls:TokenBox x:Name="AddTagsBox" Header="Add tags" />
+                <controls:TokenBox Grid.Column="1" x:Name="RemoveTagsBox" Header="Remove tags" />
+            </Grid>
+
+            <StackPanel Spacing="6">
+                <TextBlock Text="Protect from re-scrapes" />
+                <ComboBox x:Name="LockBox" MinWidth="200" SelectedIndex="0">
+                    <ComboBoxItem Content="Leave as it is" />
+                    <ComboBoxItem Content="Protect" />
+                    <ComboBoxItem Content="Don't protect" />
+                </ComboBox>
+            </StackPanel>
+
+            <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                       Text="Each changed title keeps a backup: open it with Edit NFO and click Restore previous version to undo." />
+            <TextBlock x:Name="ErrorText" Visibility="Collapsed" TextWrapping="Wrap"
+                       Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+        </StackPanel>
+    </ScrollViewer>
+</ContentDialog>

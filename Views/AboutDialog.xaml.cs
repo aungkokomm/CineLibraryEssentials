@@ -63,6 +63,18 @@ public sealed partial class AboutDialog : ContentDialog
         }
     }
 
+    private void OnCopyDiagnosticsClick(object sender, RoutedEventArgs e)
+    {
+        var version = typeof(AboutDialog).Assembly.GetName().Version;
+        var text = DiagnosticsService.Build(new ConfigService(),
+            version == null ? "?" : $"{version.Major}.{version.Minor}.{version.Build}");
+
+        var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+        package.SetText(text);
+        Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+        CopiedText.Visibility = Visibility.Visible;
+    }
+
     private void OnReleaseLinkTapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
     {
         if (sender is TextBlock tb && tb.Tag is string url && !string.IsNullOrEmpty(url))

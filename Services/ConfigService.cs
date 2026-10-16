@@ -10,12 +10,23 @@ public class ConfigService
     private const int RecentFoldersMax = 10;
 
     private readonly string _configPath;
-    private AppConfig _config;
+
+    // One settings object shared by every ConfigService in the app. Each screen
+    // creates its own ConfigService; when each held a private copy, a change made
+    // in Settings was invisible elsewhere until restart, and was overwritten the
+    // next time another screen saved its stale copy.
+    private static AppConfig? _shared;
+    private static readonly object _lock = new();
+    private AppConfig _config => _shared!;
 
     public ConfigService()
     {
         _configPath = Path.Combine(AppContext.BaseDirectory, ConfigFileName);
-        _config = LoadConfig();
+        lock (_lock)
+        {
+            if (_shared != null) return;
+            _shared = LoadConfig();
+        }
 
         // Ensure API key is always set
         if (string.IsNullOrEmpty(_config.TmdbApiKey))
@@ -27,6 +38,8 @@ public class ConfigService
 
     // ----- API key -----
     public string? GetApiKey() => _config.TmdbApiKey ?? DefaultTmdbApiKey;
+    /// <summary>True when the user entered their own TMDb key (for diagnostics; never the key itself).</summary>
+    public bool HasOwnApiKey() => !string.IsNullOrEmpty(_config.TmdbApiKey);
     public void SetApiKey(string apiKey) { _config.TmdbApiKey = apiKey; SaveConfig(); }
 
     // ----- Output path (legacy) -----
@@ -156,6 +169,28 @@ public class ConfigService
         SaveConfig();
     }
 
+    // ----- Words to always remove (v1.3) -----
+    public IReadOnlyList<string> GetCustomRemoveWords() => _config.CustomRemoveWords;
+
+    /// <summary>Saves the list trimmed, without blanks or case-insensitive duplicates.</summary>
+    public void SetCustomRemoveWords(IEnumerable<string> words)
+    {
+        _config.CustomRemoveWords = words
+            .Select(w => w.Trim())
+            .Where(w => w.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        SaveConfig();
+    }
+
+    // ----- Main rating source (v1.3) -----
+    public bool GetPreferImdbRating() => _config.PreferImdbRating;
+    public void SetPreferImdbRating(bool v) { _config.PreferImdbRating = v; SaveConfig(); }
+
+    // ----- Episode titles in file names (v1.3, opt-in) -----
+    public bool GetAddEpisodeTitles() => _config.AddEpisodeTitlesToFilenames;
+    public void SetAddEpisodeTitles(bool v) { _config.AddEpisodeTitlesToFilenames = v; SaveConfig(); }
+
     // ----- Persistence -----
     private AppConfig LoadConfig()
     {
@@ -179,7 +214,8 @@ public class ConfigService
         try
         {
             var options = new JsonSerializerOptions { WriteIndented = true };
-            File.WriteAllText(_configPath, JsonSerializer.Serialize(_config, options));
+            lock (_lock)   // steps can save from background work at the same time
+                File.WriteAllText(_configPath, JsonSerializer.Serialize(_config, options));
         }
         catch (Exception ex)
         {

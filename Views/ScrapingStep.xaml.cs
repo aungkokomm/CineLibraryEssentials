@@ -40,6 +40,8 @@ public sealed partial class ScrapingStep : UserControl
         _viewModel = viewModel;
         DataContext = viewModel;
         viewModel.MovieFolders.CollectionChanged += (_, _) => UpdateEmptyState();
+        viewModel.EpisodeTitlesAdded += OfferEpisodeRenameUndo;
+        NfoEditorWindow.FolderSaved += OnNfoSaved;
         viewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(ScrapingViewModel.IsAllSelected)
@@ -52,11 +54,30 @@ public sealed partial class ScrapingStep : UserControl
         SyncMasterCheckBoxes();
     }
 
+    /// <summary>"Add episode titles to file names" renamed files: offer to put the old names back.</summary>
+    private void OfferEpisodeRenameUndo(List<EpisodeFileRenamer.Rename> renames)
+    {
+        ToastService.ShowAction(
+            message: $"Added episode titles to {renames.Count} file name{(renames.Count == 1 ? "" : "s")}.",
+            title: "Episode titles",
+            actionText: "Undo",
+            onAction: () =>
+            {
+                var restored = EpisodeFileRenamer.Undo(renames);
+                ToastService.Info($"Put back {restored} original file name{(restored == 1 ? "" : "s")}.");
+            },
+            severity: InfoBarSeverity.Success);
+    }
+
     private void SyncMasterCheckBoxes()
     {
         if (_viewModel == null) return;
-        AllCheckBox.IsChecked = _viewModel.IsAllSelected;
-        NoneCheckBox.IsChecked = _viewModel.IsNoneSelected;
+        // Tri-state: all → checked, none → unchecked, partial → indeterminate (dash).
+        SelectAllCheckBox.IsChecked = _viewModel.IsAllSelected
+            ? true
+            : _viewModel.IsNoneSelected
+                ? false
+                : (bool?)null;
     }
 
     public void RefreshFromOrganized()
@@ -122,16 +143,34 @@ public sealed partial class ScrapingStep : UserControl
             await _viewModel.ScrapeGapsOnlyCommand.ExecuteAsync(null);
     }
 
-    private void OnSelectAllClick(object sender, RoutedEventArgs e)
+    private void OnSelectAllToggle(object sender, RoutedEventArgs e)
     {
-        _viewModel?.SelectAllCommand.Execute(null);
+        if (_viewModel == null) return;
+        if (_viewModel.IsAllSelected)
+            _viewModel.SelectNoneCommand.Execute(null);
+        else
+            _viewModel.SelectAllCommand.Execute(null);
         SyncMasterCheckBoxes();
     }
 
-    private void OnSelectNoneClick(object sender, RoutedEventArgs e)
+    private async void OnRefreshImdbClick(object sender, RoutedEventArgs e)
     {
-        _viewModel?.SelectNoneCommand.Execute(null);
-        SyncMasterCheckBoxes();
+        if (_viewModel == null) return;
+        if (_viewModel.MovieFolders.Count == 0)
+        {
+            ToastService.Info("Add some scraped folders first.");
+            return;
+        }
+
+        var r = await _viewModel.RefreshImdbRatingsAsync();
+        if (r == null) return;   // another batch is still running
+
+        if (r.Updated > 0)
+            ToastService.Success(_viewModel.StatusMessage);
+        else if (r.NoRating > 0 && r.AlreadyCurrent == 0)
+            ToastService.Warning("Couldn't get IMDb ratings right now. Check your internet connection and try again later.");
+        else
+            ToastService.Info(_viewModel.StatusMessage);
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
@@ -185,13 +224,56 @@ public sealed partial class ScrapingStep : UserControl
 
     private async Task ShowMovieDetailsAsync(MovieFolderItem item)
     {
-        var dialog = new MovieDetailsDialog();
+        var dialog = new MovieDetailsDialog { LibraryFolders = LibraryFolders() };
         if (!dialog.LoadFromFolder(item.FolderPath))
         {
-            ToastService.Info("No metadata found for this folder yet — run Scrape first.");
+            ToastService.Info("No metadata found for this folder yet - run Scrape first.");
             return;
         }
         await dialog.ShowDialogAsync(App.MainWindow);
+    }
+
+    /// <summary>Every folder in the list, for the editor's suggestions while typing.</summary>
+    private List<string> LibraryFolders()
+        => _viewModel?.MovieFolders.Select(m => m.FolderPath).ToList() ?? new List<string>();
+
+    private void OpenNfoEditor(string folder)
+    {
+        var (_, error) = NfoEditorWindow.Show(folder, LibraryFolders());
+        if (error != null) ToastService.Info(error);
+    }
+
+    /// <summary>An NFO was saved or restored in the editor: show the new poster and status.</summary>
+    private void OnNfoSaved(string folder)
+    {
+        var item = _viewModel?.MovieFolders.FirstOrDefault(m =>
+            string.Equals(m.FolderPath, folder, StringComparison.OrdinalIgnoreCase));
+        if (item == null) return;
+        item.PosterPath = null;   // forces the card to load the (maybe replaced) poster again
+        _viewModel!.RefreshAssetFlags(item);
+    }
+
+    private async void OnBulkEditClick(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel == null) return;
+        var folders = _viewModel.MovieFolders.Where(m => m.IsSelected).Select(m => m.FolderPath).ToList();
+        if (folders.Count == 0)
+        {
+            ToastService.Info("Tick the cards you want to edit first.");
+            return;
+        }
+
+        var dialog = new BulkEditDialog(folders, LibraryFolders()) { XamlRoot = XamlRoot };
+        await dialog.ShowAsync();
+        if (dialog.Result is not { } r) return;
+
+        foreach (var folder in folders) OnNfoSaved(folder);
+        var message = $"Updated {r.Updated} NFO{(r.Updated == 1 ? "" : "s")}"
+            + (r.Unchanged > 0 ? $", {r.Unchanged} already matched" : "")
+            + (r.NoNfo > 0 ? $", {r.NoNfo} not scraped yet" : "")
+            + (r.Failed > 0 ? $", {r.Failed} failed" : "") + ".";
+        if (r.Failed > 0) ToastService.Warning(message);
+        else ToastService.Success(message);
     }
 
     // -----------------------------------------------------------------
@@ -214,6 +296,12 @@ public sealed partial class ScrapingStep : UserControl
     {
         var item = GetContextRow(sender);
         if (item != null) await ShowMovieDetailsAsync(item);
+    }
+
+    private void OnContextEditNfoClick(object sender, RoutedEventArgs e)
+    {
+        var item = GetContextRow(sender);
+        if (item != null) OpenNfoEditor(item.FolderPath);
     }
 
     private void OnContextOpenClick(object sender, RoutedEventArgs e)

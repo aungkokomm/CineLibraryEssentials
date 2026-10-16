@@ -8,13 +8,26 @@ public class ScraperService
     private readonly ImageDownloadService _imageService;
     private readonly NfoGeneratorService _nfoService;
     private readonly MediaProbeService _mediaProbe;
+    private readonly ImdbRatingService _imdb = new();
+    private readonly bool _addEpisodeTitles;
 
-    public ScraperService(string tmdbApiKey, string language = "en")
+    public ScraperService(string tmdbApiKey, string language = "en", bool preferImdbRating = true,
+        bool addEpisodeTitles = false)
     {
         _tmdbClient = new TmdbApiClient(tmdbApiKey, language);
         _imageService = new ImageDownloadService();
-        _nfoService = new NfoGeneratorService();
+        _nfoService = new NfoGeneratorService { PreferImdbRating = preferImdbRating };
         _mediaProbe = new MediaProbeService();
+        _addEpisodeTitles = addEpisodeTitles;
+    }
+
+    /// <summary>
+    /// Outcome of a TV scrape. Missing = aired episodes not on disk; Renamed =
+    /// episode files that got their title added to the name (for Undo).
+    /// </summary>
+    public record TvScrapeResult(bool Success, string Message, int Missing, List<EpisodeFileRenamer.Rename> Renamed)
+    {
+        public static TvScrapeResult Fail(string message) => new(false, message, 0, new());
     }
 
     /// <summary>
@@ -29,6 +42,12 @@ public class ScraperService
     {
         try
         {
+            // Details the user edited and locked: stay on their TMDb id instead of
+            // searching, and only fill in missing images (see keepEdits).
+            var lockInfo = NfoEditor.LockInfo(movieFolderPath);
+            if (lockInfo.TmdbId is int lockedId)
+                return await DownloadAllAssetsAsync(movieFolderPath, lockedId, progress, keepEdits: true);
+
             progress?.Report($"Searching for '{movieTitle}'...");
             var searchResults = await _tmdbClient.SearchMovieAsync(movieTitle, movieYear);
 
@@ -39,7 +58,7 @@ public class ScraperService
             if (movie == null)
                 return (false, "No matching movie found");
 
-            return await DownloadAllAssetsAsync(movieFolderPath, movie.TmdbId, progress);
+            return await DownloadAllAssetsAsync(movieFolderPath, movie.TmdbId, progress, keepEdits: lockInfo.Locked);
         }
         catch (Exception ex)
         {
@@ -68,17 +87,24 @@ public class ScraperService
 
     /// <summary>
     /// Shared pipeline: details → cast → poster → fanart → actor photos → NFO file.
+    /// keepEdits (a locked NFO, automatic scrape): the NFO and any existing poster
+    /// or fanart are left as the user made them; only missing images are added.
     /// </summary>
     private async Task<(bool success, string message)> DownloadAllAssetsAsync(
         string movieFolderPath,
         int tmdbId,
-        IProgress<string>? progress)
+        IProgress<string>? progress,
+        bool keepEdits = false)
     {
         // Details — single batched call now returns cast + crew + certification + trailer.
         progress?.Report("Downloading metadata...");
         var details = await _tmdbClient.GetMovieDetailsAsync(tmdbId);
         if (details == null)
             return (false, "Failed to get movie details");
+
+        // IMDb rating + votes (best effort: skipped quietly if unavailable)
+        if (await _imdb.GetRatingAsync(details.ImdbId) is { } imdbRating)
+            (details.ImdbRating, details.ImdbVotes) = (imdbRating.Rating, imdbRating.Votes);
 
         // Find a video file in the folder to base poster/fanart filenames on
         var videoFile = Directory.GetFiles(movieFolderPath, "*.*")
@@ -96,7 +122,8 @@ public class ScraperService
 
         // Poster — pull TMDb's "original" upload (typically 1500–2000px tall).
         // The previous w500 default produced blurry results on any modern display.
-        if (!string.IsNullOrEmpty(details.PosterPath) && !string.IsNullOrEmpty(videoFile))
+        if (!string.IsNullOrEmpty(details.PosterPath) && !string.IsNullOrEmpty(videoFile)
+            && !(keepEdits && HasImage(movieFolderPath, "-poster.jpg")))
         {
             progress?.Report("Downloading poster...");
             var posterUrl = _tmdbClient.GetImageUrl(details.PosterPath, "original");
@@ -104,7 +131,8 @@ public class ScraperService
         }
 
         // Fanart — also "original" (typically 1920×1080+) for sharp 1080p/4K TVs.
-        if (!string.IsNullOrEmpty(details.BackdropPath) && !string.IsNullOrEmpty(videoFile))
+        if (!string.IsNullOrEmpty(details.BackdropPath) && !string.IsNullOrEmpty(videoFile)
+            && !(keepEdits && HasImage(movieFolderPath, "-fanart.jpg")))
         {
             progress?.Report("Downloading fanart...");
             var fanartUrl = _tmdbClient.GetImageUrl(details.BackdropPath, "original");
@@ -126,13 +154,21 @@ public class ScraperService
             streamDetails = _mediaProbe.Probe(videoFile);
         }
 
-        // NFO
+        // NFO (never over a locked one: those are the user's edits)
+        if (keepEdits)
+        {
+            progress?.Report("Complete");
+            return (true, $"Kept your edited details for '{details.Title}' and added any missing images");
+        }
         progress?.Report("Generating metadata file...");
         _nfoService.SaveNfoFile(details, movieFolderPath, streamDetails);
 
         progress?.Report("Complete");
         return (true, $"Metadata scraped for '{details.Title}'");
     }
+
+    private static bool HasImage(string folder, string suffix)
+        => Directory.EnumerateFiles(folder, "*" + suffix).Any();
 
     // ═════════════════════════════════════════════════════════════════════
     //  TV SHOW SCRAPING
@@ -149,20 +185,25 @@ public class ScraperService
     ///           Show - S01E01 - Title.nfo        (written here)
     ///           Show - S01E01 - Title-thumb.jpg  (episode thumbnail)
     /// </summary>
-    public async Task<(bool success, string message)> ScrapeTvShowAsync(
+    public async Task<TvScrapeResult> ScrapeTvShowAsync(
         string showFolderPath,
         IProgress<string>? progress = null)
     {
         if (!Directory.Exists(showFolderPath))
-            return (false, $"Folder not found: {showFolderPath}");
+            return TvScrapeResult.Fail($"Folder not found: {showFolderPath}");
 
         // 1) Find every episode file under the folder (handles BOTH layouts):
         //      a) Show/Season 01/Ep.mp4   — classic Kodi multi-season root
         //      b) Show Season 1 Complete/Ep.mp4   — flat single-season folder
         progress?.Report("Scanning for episodes...");
-        var episodes = FindEpisodeFiles(showFolderPath);
+        var episodes = TvEpisodeScanner.Scan(showFolderPath);
         if (episodes.Count == 0)
-            return (false, "No TV episode files found in this folder.");
+            return TvScrapeResult.Fail("No TV episode files found in this folder.");
+
+        // A show the user edited and locked keeps its TMDb id and its tvshow.nfo.
+        var lockInfo = NfoEditor.LockInfo(showFolderPath);
+        if (lockInfo.TmdbId is int lockedId)
+            return await ScrapeTvShowWithDetailsAsync(showFolderPath, episodes, lockedId, progress, keepEdits: true);
 
         // 2) Show name from filenames — far more reliable than the folder name
         //    (which is often "Show Name Season 1 Complete" or worse).
@@ -172,28 +213,28 @@ public class ScraperService
         progress?.Report($"Searching TMDb for '{showName}'...");
         var matches = await _tmdbClient.SearchTvAsync(showName);
         if (matches.Count == 0)
-            return (false, $"No TMDb match for '{showName}'");
+            return TvScrapeResult.Fail($"No TMDb match for '{showName}'");
 
         var top = matches.First();
-        return await ScrapeTvShowWithDetailsAsync(showFolderPath, episodes, top.TmdbId, progress);
+        return await ScrapeTvShowWithDetailsAsync(showFolderPath, episodes, top.TmdbId, progress, keepEdits: lockInfo.Locked);
     }
 
     /// <summary>
     /// TV scrape variant that skips the auto-search — used after the user picks
     /// a specific show in the TMDb search dialog.
     /// </summary>
-    public async Task<(bool success, string message)> ScrapeTvShowByIdAsync(
+    public async Task<TvScrapeResult> ScrapeTvShowByIdAsync(
         string showFolderPath,
         int tmdbId,
         IProgress<string>? progress = null)
     {
         if (!Directory.Exists(showFolderPath))
-            return (false, $"Folder not found: {showFolderPath}");
+            return TvScrapeResult.Fail($"Folder not found: {showFolderPath}");
 
         progress?.Report("Scanning for episodes...");
-        var episodes = FindEpisodeFiles(showFolderPath);
+        var episodes = TvEpisodeScanner.Scan(showFolderPath);
         if (episodes.Count == 0)
-            return (false, "No TV episode files found in this folder.");
+            return TvScrapeResult.Fail("No TV episode files found in this folder.");
 
         return await ScrapeTvShowWithDetailsAsync(showFolderPath, episodes, tmdbId, progress);
     }
@@ -202,17 +243,24 @@ public class ScraperService
     /// Shared finisher used by both ScrapeTvShowAsync (auto-search) and
     /// ScrapeTvShowByIdAsync (user-picked id). Given the TMDb show id and the
     /// already-found list of local episode files, downloads metadata + assets
-    /// and writes the NFOs.
+    /// and writes the NFOs. Also counts aired episodes that aren't on disk.
+    /// keepEdits (a locked tvshow.nfo, automatic scrape): tvshow.nfo is left as
+    /// the user edited it. Show images are never replaced anyway.
     /// </summary>
-    private async Task<(bool success, string message)> ScrapeTvShowWithDetailsAsync(
+    private async Task<TvScrapeResult> ScrapeTvShowWithDetailsAsync(
         string showFolderPath,
-        List<EpisodeFile> episodes,
+        List<TvEpisodeScanner.EpisodeFile> episodes,
         int tmdbId,
-        IProgress<string>? progress)
+        IProgress<string>? progress,
+        bool keepEdits = false)
     {
         var details = await _tmdbClient.GetTvDetailsAsync(tmdbId);
         if (details == null)
-            return (false, $"Failed to fetch show details (tmdb id {tmdbId})");
+            return TvScrapeResult.Fail($"Failed to fetch show details (tmdb id {tmdbId})");
+
+        // IMDb rating + votes for the show (best effort: skipped quietly if unavailable)
+        if (await _imdb.GetRatingAsync(details.ImdbId) is { } imdbRating)
+            (details.ImdbRating, details.ImdbVotes) = (imdbRating.Rating, imdbRating.Votes);
 
         // 3) Show-level images at the FOLDER root (works for either layout —
         //    flat single-season folders get poster/fanart there too).
@@ -226,10 +274,13 @@ public class ScraperService
         // 4) Group episodes by season number, fetch each season's metadata
         //    from TMDb in one call, then scrape every episode in that season.
         int episodesScraped = 0, episodesFailed = 0;
+        var seasonEpisodes = new Dictionary<int, List<TvEpisodeMetadata>>();   // for the missing check
+        var renamed = new List<EpisodeFileRenamer.Rename>();
         foreach (var seasonGroup in episodes.GroupBy(e => e.Season).OrderBy(g => g.Key))
         {
             progress?.Report($"Loading season {seasonGroup.Key} from TMDb...");
             var tmdbEpisodes = await _tmdbClient.GetTvSeasonAsync(details.TmdbId, seasonGroup.Key);
+            seasonEpisodes[seasonGroup.Key] = tmdbEpisodes;
             var byNumber = tmdbEpisodes.ToDictionary(e => e.EpisodeNumber);
 
             foreach (var ep in seasonGroup)
@@ -244,15 +295,32 @@ public class ScraperService
 
                 progress?.Report($"Scraping S{ep.Season:D2}E{ep.Episode:D2}...");
 
-                var streams = _mediaProbe.Probe(ep.VideoFile);
-                _nfoService.SaveEpisodeNfo(tmdbEp, details, ep.VideoFile, streams);
+                // Opt-in: "Show - S01E01.mkv" -> "Show - S01E01 - Pilot.mkv" before the
+                // NFO and thumbnail are written, so they get the new name too.
+                // Double episodes keep their name (the title format has one number).
+                var videoFile = ep.VideoFile;
+                if (_addEpisodeTitles && ep.LastEpisode == ep.Episode && string.IsNullOrWhiteSpace(ep.EpisodeTitle))
+                {
+                    var title = EpisodeFileRenamer.CleanTitle(tmdbEp.Name);
+                    var show = string.IsNullOrWhiteSpace(ep.ShowName) ? details.Name : ep.ShowName;
+                    if (title.Length > 0
+                        && EpisodeFileRenamer.RenameWithSidecars(videoFile,
+                               RenameService.BuildTvFileName(show, ep.Season, ep.Episode, title)) is { } newPath)
+                    {
+                        renamed.Add(new EpisodeFileRenamer.Rename(videoFile, newPath));
+                        videoFile = newPath;
+                    }
+                }
+
+                var streams = _mediaProbe.Probe(videoFile);
+                _nfoService.SaveEpisodeNfo(tmdbEp, details, videoFile, streams);
 
                 if (!string.IsNullOrEmpty(tmdbEp.StillPath))
                 {
                     var thumbUrl = _tmdbClient.GetImageUrl(tmdbEp.StillPath, "original");
                     var thumbPath = Path.Combine(
-                        Path.GetDirectoryName(ep.VideoFile)!,
-                        Path.GetFileNameWithoutExtension(ep.VideoFile) + "-thumb.jpg");
+                        Path.GetDirectoryName(videoFile)!,
+                        Path.GetFileNameWithoutExtension(videoFile) + "-thumb.jpg");
                     if (!File.Exists(thumbPath))
                         await _imageService.DownloadAnyImageAsync(thumbUrl, thumbPath);
                 }
@@ -263,59 +331,27 @@ public class ScraperService
 
         // 5) tvshow.nfo last so a mid-flight failure doesn't leave it pointing
         //    at a half-scraped show.
-        progress?.Report("Writing tvshow.nfo...");
-        _nfoService.SaveTvShowNfo(details, showFolderPath);
+        if (!keepEdits)
+        {
+            progress?.Report("Writing tvshow.nfo...");
+            _nfoService.SaveTvShowNfo(details, showFolderPath);
+        }
+
+        var missing = MissingEpisodes.Total(
+            MissingEpisodes.Find(TvEpisodeScanner.Covered(episodes), details, seasonEpisodes));
 
         progress?.Report("Complete");
-        return (true,
-            $"Scraped '{details.Name}' — {episodesScraped} episode(s)"
-            + (episodesFailed > 0 ? $", {episodesFailed} failed" : ""));
-    }
-
-    private record EpisodeFile(string VideoFile, int Season, int Episode, string ShowName);
-
-    /// <summary>
-    /// Finds every video file under the folder (direct or in any subfolder one
-    /// level deep — i.e. either flat layout OR Season XX/ subdirs) and parses
-    /// the SxxExx out of each filename. Skips files without a TV pattern.
-    /// </summary>
-    private static List<EpisodeFile> FindEpisodeFiles(string rootFolder)
-    {
-        var list = new List<EpisodeFile>();
-        try
-        {
-            // Direct files
-            foreach (var f in Directory.EnumerateFiles(rootFolder))
-                TryAddEpisode(f, list);
-
-            // Files one level deep (Season XX/, or any subfolder)
-            foreach (var sub in Directory.EnumerateDirectories(rootFolder))
-            {
-                try
-                {
-                    foreach (var f in Directory.EnumerateFiles(sub))
-                        TryAddEpisode(f, list);
-                }
-                catch { /* permissions */ }
-            }
-        }
-        catch { /* permissions */ }
-        return list;
-    }
-
-    private static void TryAddEpisode(string filePath, List<EpisodeFile> list)
-    {
-        if (!Utilities.FileFormatValidator.IsVideoFile(filePath)) return;
-        var parse = Utilities.RegexPatterns.ParseTvEpisode(Path.GetFileName(filePath));
-        if (parse == null) return;
-        list.Add(new EpisodeFile(filePath, parse.Season, parse.Episode, parse.ShowName));
+        return new TvScrapeResult(true,
+            $"Scraped '{details.Name}' - {episodesScraped} episode(s)"
+            + (episodesFailed > 0 ? $", {episodesFailed} failed" : ""),
+            missing, renamed);
     }
 
     /// <summary>
     /// Picks the show name that appears most often across the parsed episodes.
     /// Avoids a single oddly-named file skewing the TMDb search.
     /// </summary>
-    private static string? PickConsensusShowName(List<EpisodeFile> episodes)
+    private static string? PickConsensusShowName(List<TvEpisodeScanner.EpisodeFile> episodes)
     {
         var grouped = episodes
             .Where(e => !string.IsNullOrWhiteSpace(e.ShowName))

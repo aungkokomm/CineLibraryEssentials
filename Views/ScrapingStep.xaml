@@ -27,22 +27,20 @@
                         <TextBlock Text="Clear" FontSize="12" />
                     </StackPanel>
                 </Button>
+                <!-- Tri-state master select: checked = all, unchecked = none, dash = some -->
                 <CheckBox Grid.Column="2"
-                          x:Name="AllCheckBox"
-                          Content="All"
-                          Click="OnSelectAllClick"
+                          x:Name="SelectAllCheckBox"
+                          Content="Select all"
+                          IsThreeState="True"
+                          Click="OnSelectAllToggle"
                           VerticalAlignment="Center"
-                          ToolTipService.ToolTip="Select all movies" />
-                <CheckBox Grid.Column="3"
-                          x:Name="NoneCheckBox"
-                          Content="None"
-                          Click="OnSelectNoneClick"
-                          VerticalAlignment="Center"
-                          ToolTipService.ToolTip="Deselect all movies" />
-                <ToggleButton Grid.Column="4"
+                          Margin="4,0,0,0"
+                          ToolTipService.ToolTip="Select / deselect all cards" />
+                <ToggleButton Grid.Column="3"
                               x:Name="ListViewToggle"
                               IsChecked="False"
                               Click="OnViewToggleClick"
+                              AutomationProperties.Name="List view"
                               ToolTipService.ToolTip="Switch to list view">
                     <FontIcon Glyph="&#xE8FD;" FontSize="13" />
                 </ToggleButton>
@@ -50,7 +48,7 @@
                           SelectedItem="{Binding WizardMode, Mode=TwoWay}"
                           VerticalAlignment="Center"
                           MinWidth="110"
-                          Margin="40,0,0,0"
+                          AutomationProperties.Name="Mode"
                           ToolTipService.ToolTip="Filter cards: Auto shows everything, Movies hides TV shows, TvShows hides movies. Synced with Step 1's mode.">
                     <x:String>Auto</x:String>
                     <x:String>Movies</x:String>
@@ -67,10 +65,29 @@
                 <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="6">
                     <Button Content="Fill gaps only"
                             Click="OnScrapeGapsClick"
-                            ToolTipService.ToolTip="Verify library — auto-scrape every folder that's missing the NFO, poster, fanart, or actor photos. Skips folders that are already complete." />
+                            ToolTipService.ToolTip="Verify library - auto-scrape every folder that's missing the NFO, poster, fanart, or actor photos. Skips folders that are already complete." />
                     <Button Content="Scrape Selected (auto)"
                             Click="OnScrapeSelectedClick"
                             ToolTipService.ToolTip="Auto-scrape every checked movie using the first TMDb match" />
+                    <Button Padding="8,5" MinWidth="0"
+                            AutomationProperties.Name="More actions"
+                            ToolTipService.ToolTip="More actions">
+                        <FontIcon Glyph="&#xE712;" FontSize="14" />
+                        <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                <MenuFlyoutItem Text="Refresh IMDb ratings"
+                                                Click="OnRefreshImdbClick"
+                                                ToolTipService.ToolTip="Update the IMDb rating and vote count in the checked items' NFO files (all items when none are checked). Nothing else is re-scraped.">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE734;" /></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem Text="Bulk edit checked items..."
+                                                Click="OnBulkEditClick"
+                                                ToolTipService.ToolTip="Set a collection, age rating, genres, tags or protection for every checked card at once.">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE70F;" /></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
                 </StackPanel>
             </Grid>
 
@@ -108,6 +125,10 @@
                                         <MenuFlyoutItem Text="View details..."
                                                         Click="OnContextViewDetailsClick">
                                             <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE946;" /></MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutItem Text="Edit NFO..."
+                                                        Click="OnContextEditNfoClick">
+                                            <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE70F;" /></MenuFlyoutItem.Icon>
                                         </MenuFlyoutItem>
                                         <MenuFlyoutItem Text="Search TMDb..."
                                                         Click="OnContextScrapeClick">
@@ -152,6 +173,7 @@
                                                 Padding="2"
                                                 Margin="4">
                                             <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                      AutomationProperties.Name="{Binding DisplayName}"
                                                       MinWidth="0"
                                                       Padding="0" />
                                         </Border>
@@ -177,16 +199,22 @@
                                         </StackPanel>
                                     </Grid>
 
-                                    <!-- Title + year -->
-                                    <TextBlock Grid.Row="1"
-                                               Text="{Binding DisplayName}"
-                                               Padding="6,4,6,2"
-                                               FontWeight="SemiBold"
-                                               FontSize="11"
-                                               MaxLines="2"
-                                               TextWrapping="Wrap"
-                                               TextTrimming="CharacterEllipsis"
-                                               ToolTipService.ToolTip="{Binding FolderPath}" />
+                                    <!-- Title + year, then the TV line ("TV · 3 seasons · 24 episodes") -->
+                                    <StackPanel Grid.Row="1" Padding="6,4,6,2" Spacing="1">
+                                        <TextBlock Text="{Binding DisplayName}"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="11"
+                                                   MaxLines="2"
+                                                   TextWrapping="Wrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTipService.ToolTip="{Binding FolderPath}" />
+                                        <TextBlock Text="{Binding TvSummary}"
+                                                   FontSize="10"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTipService.ToolTip="{Binding TvSummary}"
+                                                   Visibility="{Binding TvSummary, Converter={StaticResource StringNonEmptyToVisibilityConverter}}" />
+                                    </StackPanel>
 
                                     <!-- Action buttons (always visible, no hover overlay) -->
                                     <StackPanel Grid.Row="2"
@@ -196,16 +224,19 @@
                                                 Padding="2,2,2,4">
                                         <Button Tag="{Binding}" Click="OnScrapeRowClick"
                                                 Padding="8,3" MinWidth="0"
+                                                AutomationProperties.Name="Search TMDb"
                                                 ToolTipService.ToolTip="Scrape (or double-click the card)">
                                             <FontIcon Glyph="&#xE721;" FontSize="11" />
                                         </Button>
                                         <Button Tag="{Binding}" Click="OnOpenRowClick"
                                                 Padding="8,3" MinWidth="0"
+                                                AutomationProperties.Name="Open folder"
                                                 ToolTipService.ToolTip="Open folder">
                                             <FontIcon Glyph="&#xE838;" FontSize="11" />
                                         </Button>
                                         <Button Tag="{Binding}" Click="OnRemoveRowClick"
                                                 Padding="8,3" MinWidth="0"
+                                                AutomationProperties.Name="Remove from list"
                                                 ToolTipService.ToolTip="Remove">
                                             <FontIcon Glyph="&#xE74D;" FontSize="11" />
                                         </Button>
@@ -236,6 +267,9 @@
                                         <MenuFlyoutItem Text="View details..." Click="OnContextViewDetailsClick">
                                             <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE946;" /></MenuFlyoutItem.Icon>
                                         </MenuFlyoutItem>
+                                        <MenuFlyoutItem Text="Edit NFO..." Click="OnContextEditNfoClick">
+                                            <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE70F;" /></MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
                                         <MenuFlyoutItem Text="Search TMDb..." Click="OnContextScrapeClick">
                                             <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE721;" /></MenuFlyoutItem.Icon>
                                         </MenuFlyoutItem>
@@ -249,11 +283,17 @@
                                     </MenuFlyout>
                                 </Grid.ContextFlyout>
                                 <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          AutomationProperties.Name="{Binding DisplayName}"
                                           VerticalAlignment="Center" />
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
                                     <TextBlock Text="{Binding DisplayName}"
                                                FontWeight="SemiBold" FontSize="13"
                                                TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding TvSummary}"
+                                               FontSize="11"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               Visibility="{Binding TvSummary, Converter={StaticResource StringNonEmptyToVisibilityConverter}}" />
                                     <TextBlock Text="{Binding FolderPath}"
                                                FontSize="10"
                                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
@@ -288,10 +328,12 @@
                                         </StackPanel>
                                     </Button>
                                     <Button Tag="{Binding}" Click="OnOpenRowClick" Padding="8,2"
+                                            AutomationProperties.Name="Open folder"
                                             ToolTipService.ToolTip="Open folder">
                                         <FontIcon Glyph="&#xE838;" FontSize="13" />
                                     </Button>
                                     <Button Tag="{Binding}" Click="OnRemoveRowClick" Padding="8,2"
+                                            AutomationProperties.Name="Remove from list"
                                             ToolTipService.ToolTip="Remove from list">
                                         <FontIcon Glyph="&#xE74D;" FontSize="13" />
                                     </Button>
@@ -323,12 +365,26 @@
                 </StackPanel>
             </Grid>
 
-            <!-- Footer: Back on the left · Done on the right (single compact row) -->
+            <!-- Footer: Back on the left · batch progress in the middle · Done on the right -->
             <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" Margin="0,2,0,0">
                 <Button Grid.Column="0"
                         Content="← Back"
                         Click="OnBackClick"
                         VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Margin="16,0"
+                            Spacing="2"
+                            Visibility="{Binding IsWorking, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <ProgressBar Maximum="{Binding ProgressMax}"
+                                 Value="{Binding ProgressValue}"
+                                 IsIndeterminate="{Binding IsProgressIndeterminate}"
+                                 AutomationProperties.Name="Batch progress" />
+                    <TextBlock Text="{Binding ProgressText}"
+                               FontSize="11"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
                 <Button Grid.Column="2"
                         x:Name="SaveButton"
                         Content="Done"

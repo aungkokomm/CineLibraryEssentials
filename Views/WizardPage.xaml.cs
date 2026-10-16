@@ -17,6 +17,9 @@ public sealed partial class WizardPage : Page
     {
         InitializeComponent();
 
+        // Load the Settings "Words to always remove" list before any file is parsed.
+        Utilities.RegexPatterns.SetCustomRemoveWords(new Services.ConfigService().GetCustomRemoveWords());
+
         _viewModel = new WizardViewModel();
         DataContext = _viewModel;
 
@@ -91,6 +94,11 @@ public sealed partial class WizardPage : Page
     {
         var dialog = new SettingsDialog { XamlRoot = this.XamlRoot };
         await dialog.ShowAsync();
+
+        // New words to remove: re-clean the folder Step 1 is showing so the change
+        // is visible right away.
+        if (dialog.RemoveWordsChanged && !string.IsNullOrEmpty(_renameViewModel.SourceFolderPath))
+            await _renameViewModel.LoadFilesAsync(_renameViewModel.SourceFolderPath);
     }
 
     // -----------------------------------------------------------------

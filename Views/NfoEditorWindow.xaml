@@ -1,0 +1,421 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="CineLibraryEssentials.Views.NfoEditorWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CineLibraryEssentials.Controls">
+
+    <Grid x:Name="RootGrid"
+          Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+          RowDefinitions="Auto,Auto,*"
+          KeyboardAcceleratorPlacementMode="Hidden">
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Modifiers="Control" Key="S" Invoked="OnSaveAccelerator" />
+            <KeyboardAccelerator Key="Escape" Invoked="OnEscapeAccelerator" />
+        </Grid.KeyboardAccelerators>
+        <Grid.Resources>
+            <Style x:Key="SectionHeader" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Setter Property="Margin" Value="0,18,0,2" />
+            </Style>
+            <Style x:Key="Hint" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorTertiaryBrush}" />
+            </Style>
+            <Style x:Key="FetchButton" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                <Setter Property="VerticalAlignment" Value="Bottom" />
+                <Setter Property="Padding" Value="10,6" />
+            </Style>
+        </Grid.Resources>
+
+        <!-- ============ Header: poster, title, state, actions ============ -->
+        <Grid Padding="20,14" ColumnSpacing="14" ColumnDefinitions="Auto,*,Auto"
+              BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+            <Border Width="48" Height="72" CornerRadius="4"
+                    Background="{ThemeResource ControlFillColorTertiaryBrush}">
+                <Image x:Name="HeaderPoster" Stretch="UniformToFill" />
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+                <TextBlock x:Name="HeaderTitle" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Border CornerRadius="4" Padding="8,2" Background="{ThemeResource ControlFillColorTertiaryBrush}">
+                        <TextBlock x:Name="KindText" FontSize="12" />
+                    </Border>
+                    <Border x:Name="ProtectedBadge" CornerRadius="4" Padding="8,2"
+                            Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <FontIcon Glyph="&#xE72E;" FontSize="11" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                            <TextBlock Text="Protected" FontSize="12" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="UnsavedBadge" CornerRadius="4" Padding="8,2" Visibility="Collapsed"
+                            Background="{ThemeResource SystemFillColorCautionBackgroundBrush}">
+                        <TextBlock x:Name="UnsavedText" FontSize="12" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <CheckBox x:Name="LockCheckBox"
+                          Content="Protect from re-scrapes"
+                          Click="OnLockClick"
+                          ToolTipService.ToolTip="When you save, Fill gaps and Scrape Selected will keep your changes and only add missing images. Picking a match in Search TMDb still replaces everything." />
+                <Button x:Name="RestoreButton" Click="OnRestoreClick">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE7A7;" FontSize="13" />
+                        <TextBlock Text="Restore previous version" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="RevertButton" Click="OnRevertClick"
+                        ToolTipService.ToolTip="Throw away the changes you haven't saved">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE72C;" FontSize="13" />
+                        <TextBlock Text="Revert" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="SaveButton" Style="{ThemeResource AccentButtonStyle}" Click="OnSaveClick"
+                        ToolTipService.ToolTip="Save (Ctrl+S)">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE74E;" FontSize="13" />
+                        <TextBlock Text="Save" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <InfoBar x:Name="StatusBar" Grid.Row="1" IsOpen="False" Margin="20,10,20,0" />
+
+        <!-- ============ Sections ============ -->
+        <NavigationView x:Name="Nav"
+                        Grid.Row="2"
+                        PaneDisplayMode="Left"
+                        IsBackButtonVisible="Collapsed"
+                        IsSettingsVisible="False"
+                        IsPaneToggleButtonVisible="False"
+                        OpenPaneLength="210"
+                        SelectionChanged="OnNavSelectionChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="Details" Tag="details" IsSelected="True">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8A5;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Genres and tags" Tag="genres">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8EC;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Cast and crew" Tag="cast">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE716;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Ratings and IDs" Tag="ratings">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE734;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Artwork" Tag="artwork">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xEB9F;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="EpisodesNavItem" Content="Episodes" Tag="episodes">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8FD;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="NFO source" Tag="source">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE943;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <Grid>
+                <!-- ======== Details ======== -->
+                <ScrollViewer x:Name="DetailsPanel" Padding="28,0,28,28">
+                    <StackPanel Spacing="12" MaxWidth="1000" HorizontalAlignment="Stretch">
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="Titles" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBox x:Name="TitleBox" Header="Title" TextChanged="OnAnyChange" />
+                            <Button Grid.Column="1" x:Name="FetchTitleButton" Tag="title" Style="{StaticResource FetchButton}"
+                                    AutomationProperties.Name="Fetch the title from TMDb"
+                                    ToolTipService.ToolTip="Fetch from TMDb, in a language you pick">
+                                <FontIcon Glyph="&#xE896;" FontSize="13" />
+                            </Button>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                            <TextBox x:Name="OriginalTitleBox" Header="Original title" TextChanged="OnAnyChange" />
+                            <TextBox Grid.Column="1" x:Name="SortTitleBox" Header="Sort title"
+                                     PlaceholderText="Same as the title" TextChanged="OnAnyChange" />
+                        </Grid>
+
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="Release" />
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="16">
+                            <NumberBox x:Name="YearBox" Header="Year" Minimum="0" Maximum="2100"
+                                       SpinButtonPlacementMode="Hidden" ValueChanged="OnNumberChanged" />
+                            <TextBox Grid.Column="1" x:Name="PremieredBox" Header="Premiered"
+                                     PlaceholderText="2010-07-15" TextChanged="OnAnyChange" />
+                            <NumberBox Grid.Column="2" x:Name="RuntimeBox" Header="Runtime (minutes)"
+                                       Minimum="0" Maximum="2000" SpinButtonPlacementMode="Hidden" ValueChanged="OnNumberChanged" />
+                            <ComboBox Grid.Column="3" x:Name="AgeRatingBox" Header="Age rating" IsEditable="True"
+                                      HorizontalAlignment="Stretch" SelectionChanged="OnAgeRatingSelectionChanged" TextSubmitted="OnAgeRatingSubmitted" />
+                        </Grid>
+
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="Story" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBox x:Name="TaglineBox" Header="Tagline" TextChanged="OnAnyChange" />
+                            <Button Grid.Column="1" x:Name="FetchTaglineButton" Tag="tagline" Style="{StaticResource FetchButton}"
+                                    AutomationProperties.Name="Fetch the tagline from TMDb"
+                                    ToolTipService.ToolTip="Fetch from TMDb, in a language you pick">
+                                <FontIcon Glyph="&#xE896;" FontSize="13" />
+                            </Button>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBox x:Name="PlotBox" Header="Plot" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Height="170" TextChanged="OnAnyChange" />
+                            <Button Grid.Column="1" x:Name="FetchPlotButton" Tag="plot" Style="{StaticResource FetchButton}"
+                                    AutomationProperties.Name="Fetch the plot from TMDb"
+                                    ToolTipService.ToolTip="Fetch from TMDb, in a language you pick">
+                                <FontIcon Glyph="&#xE896;" FontSize="13" />
+                            </Button>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBox x:Name="OutlineBox" Header="Outline (short summary)" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Height="80" TextChanged="OnAnyChange" />
+                            <Button Grid.Column="1" x:Name="FetchOutlineButton" Tag="outline" Style="{StaticResource FetchButton}"
+                                    AutomationProperties.Name="Fetch the outline from TMDb"
+                                    ToolTipService.ToolTip="Fetch from TMDb, in a language you pick">
+                                <FontIcon Glyph="&#xE896;" FontSize="13" />
+                            </Button>
+                        </Grid>
+
+                        <StackPanel x:Name="MovieOnlyDetails" Spacing="12">
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="Collection and edition" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                                <AutoSuggestBox x:Name="CollectionBox" Header="Collection"
+                                                PlaceholderText="The Dark Knight Collection"
+                                                TextChanged="OnSuggestTextChanged" />
+                                <AutoSuggestBox Grid.Column="1" x:Name="EditionBox" Header="Edition"
+                                                PlaceholderText="Director's Cut"
+                                                TextChanged="OnSuggestTextChanged" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ======== Genres and tags ======== -->
+                <ScrollViewer x:Name="GenresPanel" Padding="28,0,28,28" Visibility="Collapsed">
+                    <StackPanel Spacing="14" MaxWidth="1000">
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="Classification" />
+                        <controls:TokenBox x:Name="GenresBox" Header="Genres" />
+                        <controls:TokenBox x:Name="TagsBox" Header="Tags" />
+                        <TextBlock Style="{StaticResource Hint}" Text="Tags are your own labels, like 4K, Watched or Kids. Kodi, Jellyfin and CineLibrary can filter by them." />
+                        <controls:TokenBox x:Name="StudiosBox" Header="Studios" />
+                        <controls:TokenBox x:Name="CountriesBox" Header="Countries" />
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ======== Cast and crew ======== -->
+                <ScrollViewer x:Name="CastPanel" Padding="28,0,28,28" Visibility="Collapsed">
+                    <StackPanel Spacing="14" MaxWidth="1000">
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="Crew" />
+                        <controls:TokenBox x:Name="DirectorsBox" Header="Director" />
+                        <controls:TokenBox x:Name="WritersBox" Header="Writers" />
+
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="Cast" />
+                            <Button Grid.Column="1" Click="OnAddActorClick" VerticalAlignment="Bottom">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE710;" FontSize="12" />
+                                    <TextBlock Text="Add actor" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                        <TextBlock Style="{StaticResource Hint}" Text="Drag rows to change the billing order, or use the arrows." />
+                        <ListView x:Name="CastList"
+                                  SelectionMode="Single"
+                                  CanReorderItems="True"
+                                  CanDragItems="True"
+                                  AllowDrop="True"
+                                  AutomationProperties.Name="Cast">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Padding" Value="4,4" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="10" ColumnDefinitions="Auto,Auto,*,*,Auto">
+                                        <FontIcon Glyph="&#xE76F;" FontSize="14" VerticalAlignment="Center"
+                                                  Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                        <Border Grid.Column="1" Width="40" Height="40" CornerRadius="20"
+                                                Background="{ThemeResource ControlFillColorTertiaryBrush}">
+                                            <Image Source="{Binding Photo}" Stretch="UniformToFill" />
+                                        </Border>
+                                        <TextBox Grid.Column="2" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 PlaceholderText="Name" VerticalAlignment="Center"
+                                                 AutomationProperties.Name="Actor name" />
+                                        <TextBox Grid.Column="3" Text="{Binding Role, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 PlaceholderText="Role" VerticalAlignment="Center"
+                                                 AutomationProperties.Name="Role" />
+                                        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="2">
+                                            <Button Tag="{Binding}" Click="OnActorPhotoClick" Padding="8,6"
+                                                    AutomationProperties.Name="Change photo" ToolTipService.ToolTip="Change photo">
+                                                <FontIcon Glyph="&#xE722;" FontSize="13" />
+                                            </Button>
+                                            <Button Tag="{Binding}" Click="OnActorUpClick" Padding="8,6"
+                                                    AutomationProperties.Name="Move up" ToolTipService.ToolTip="Move up">
+                                                <FontIcon Glyph="&#xE70E;" FontSize="12" />
+                                            </Button>
+                                            <Button Tag="{Binding}" Click="OnActorDownClick" Padding="8,6"
+                                                    AutomationProperties.Name="Move down" ToolTipService.ToolTip="Move down">
+                                                <FontIcon Glyph="&#xE70D;" FontSize="12" />
+                                            </Button>
+                                            <Button Tag="{Binding}" Click="OnActorRemoveClick" Padding="8,6"
+                                                    AutomationProperties.Name="Remove actor" ToolTipService.ToolTip="Remove">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="13" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ======== Ratings and IDs ======== -->
+                <ScrollViewer x:Name="RatingsPanel" Padding="28,0,28,28" Visibility="Collapsed">
+                    <StackPanel Spacing="12" MaxWidth="1000">
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="Ratings" />
+                        <controls:WrapPanel x:Name="RatingsChips" />
+                        <Button x:Name="RefreshImdbButton" Click="OnRefreshImdbClick" HorizontalAlignment="Left">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE72C;" FontSize="13" />
+                                <TextBlock Text="Refresh IMDb rating" />
+                            </StackPanel>
+                        </Button>
+
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="My rating" />
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <RatingControl x:Name="UserRatingControl" MaxRating="10" IsClearEnabled="True"
+                                           ValueChanged="OnUserRatingChanged" AutomationProperties.Name="My rating" />
+                            <TextBlock x:Name="UserRatingText" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="IDs and links" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBox x:Name="ImdbIdBox" Header="IMDb id" PlaceholderText="tt1375666" TextChanged="OnAnyChange" />
+                            <HyperlinkButton Grid.Column="1" Content="Open on IMDb" Click="OnOpenImdbClick" VerticalAlignment="Bottom" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBox x:Name="TmdbIdBox" Header="TMDb id" PlaceholderText="27205" TextChanged="OnAnyChange" />
+                            <HyperlinkButton Grid.Column="1" Content="Open on TMDb" Click="OnOpenTmdbClick" VerticalAlignment="Bottom" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBox x:Name="TrailerBox" Header="Trailer link" TextChanged="OnAnyChange" />
+                            <HyperlinkButton Grid.Column="1" Content="Open trailer" Click="OnOpenTrailerClick" VerticalAlignment="Bottom" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource Hint}" Text="Changing the TMDb id points artwork, Fetch from TMDb and future Fill gaps at that title." />
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ======== Artwork ======== -->
+                <ScrollViewer x:Name="ArtworkPanel" Padding="28,0,28,28" Visibility="Collapsed">
+                    <StackPanel Spacing="12" MaxWidth="1200">
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="Artwork" />
+                        <TextBlock Style="{StaticResource Hint}" Text="Pick from TMDb or from a file. Nothing is written until you click Save." />
+                        <controls:WrapPanel x:Name="ArtSlotsPanel" Spacing="14" />
+
+                        <StackPanel x:Name="GalleryPanel" Spacing="10" Visibility="Collapsed" Margin="0,12,0,0">
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                                <TextBlock x:Name="GalleryTitle" Style="{StaticResource SectionHeader}" Margin="0" VerticalAlignment="Center" />
+                                <ComboBox Grid.Column="1" x:Name="GalleryLanguageBox" MinWidth="170"
+                                          SelectionChanged="OnGalleryLanguageChanged" AutomationProperties.Name="Language" />
+                                <Button Grid.Column="2" Click="OnGalleryCloseClick" AutomationProperties.Name="Close the TMDb pictures">
+                                    <FontIcon Glyph="&#xE711;" FontSize="12" />
+                                </Button>
+                            </Grid>
+                            <TextBlock x:Name="GalleryEmptyText" Style="{StaticResource Hint}" Visibility="Collapsed" />
+                            <GridView x:Name="GalleryGrid"
+                                      IsItemClickEnabled="True"
+                                      SelectionMode="None"
+                                      ItemClick="OnGalleryItemClick"
+                                      AutomationProperties.Name="Pictures on TMDb">
+                                <GridView.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Width="{Binding ItemWidth}" Spacing="4" Padding="4">
+                                            <Border Height="{Binding ImageHeight}" CornerRadius="4"
+                                                    Background="{ThemeResource ControlFillColorTertiaryBrush}">
+                                                <Image Source="{Binding PreviewUrl}" Stretch="Uniform" />
+                                            </Border>
+                                            <TextBlock Text="{Binding Caption}" FontSize="11"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </GridView.ItemTemplate>
+                            </GridView>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ======== Episodes (TV) ======== -->
+                <Grid x:Name="EpisodesPanel" Padding="28,12,28,28" ColumnDefinitions="320,*" ColumnSpacing="20" Visibility="Collapsed">
+                    <ListView x:Name="EpisodeList" SelectionMode="Single" SelectionChanged="OnEpisodeSelected"
+                              BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4"
+                              AutomationProperties.Name="Episodes">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Padding="0,4">
+                                    <TextBlock Text="{Binding Code}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <ScrollViewer Grid.Column="1">
+                        <StackPanel x:Name="EpisodeEditor" Spacing="12" MaxWidth="900">
+                            <TextBlock x:Name="EpisodeHeading" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock x:Name="EpisodeNoNfoText" Style="{StaticResource Hint}" Visibility="Collapsed"
+                                       Text="This episode has no NFO yet. Scrape the show in Step 3 first." />
+                            <StackPanel x:Name="EpisodeFieldsPanel" Spacing="12">
+                                <TextBox Header="Title" Text="{Binding Title, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBox Header="Aired" PlaceholderText="2017-12-01"
+                                         Text="{Binding Aired, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBox Header="Plot" AcceptsReturn="True" TextWrapping="Wrap" Height="150"
+                                         Text="{Binding Plot, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Thumbnail" />
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Border Width="240" Height="135" CornerRadius="4"
+                                            Background="{ThemeResource ControlFillColorTertiaryBrush}">
+                                        <Image Source="{Binding Thumb}" Stretch="UniformToFill" />
+                                    </Border>
+                                    <Button Content="Change thumbnail..." Click="OnEpisodeThumbClick" VerticalAlignment="Bottom" />
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+
+                <!-- ======== NFO source ======== -->
+                <Grid x:Name="SourcePanel" Padding="28,12,28,28" RowDefinitions="Auto,*" RowSpacing="10" Visibility="Collapsed">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <TextBlock x:Name="SourcePathText" Style="{StaticResource Hint}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <Button Grid.Column="1" Click="OnCopySourceClick">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE8C8;" FontSize="13" />
+                                <TextBlock x:Name="CopySourceText" Text="Copy" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="2" Click="OnOpenFolderClick">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE838;" FontSize="13" />
+                                <TextBlock Text="Open folder" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <TextBox Grid.Row="1" x:Name="SourceText"
+                             IsReadOnly="True"
+                             AcceptsReturn="True"
+                             TextWrapping="NoWrap"
+                             FontFamily="Consolas"
+                             FontSize="13"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             AutomationProperties.Name="NFO file contents" />
+                </Grid>
+            </Grid>
+        </NavigationView>
+    </Grid>
+</Window>

@@ -31,6 +31,12 @@ public class MovieMetadata
     [JsonPropertyName("vote_count")]
     public int VoteCount { get; set; }
 
+    /// <summary>IMDb rating (0 when unknown). Filled from ImdbRatingService, not TMDb.</summary>
+    [JsonIgnore] public double ImdbRating { get; set; }
+
+    /// <summary>IMDb vote count (0 when unknown).</summary>
+    [JsonIgnore] public int ImdbVotes { get; set; }
+
     [JsonPropertyName("runtime")]
     public int Runtime { get; set; }
 
@@ -120,6 +126,12 @@ public class TvShowMetadata
     [JsonPropertyName("vote_count")]
     public int VoteCount { get; set; }
 
+    /// <summary>IMDb rating for the show (0 when unknown). Filled from ImdbRatingService.</summary>
+    [JsonIgnore] public double ImdbRating { get; set; }
+
+    /// <summary>IMDb vote count for the show (0 when unknown).</summary>
+    [JsonIgnore] public int ImdbVotes { get; set; }
+
     /// <summary>Typical episode runtime in minutes (TMDb returns an array; we average it).</summary>
     public int EpisodeRunTime { get; set; }
 
@@ -153,8 +165,29 @@ public class TvShowMetadata
     /// <summary>Content rating ("TV-MA", "PG-13"). Falls back to first non-empty region.</summary>
     public string ContentRating { get; set; } = string.Empty;
 
+    /// <summary>Every season TMDb knows, with its episode count (for the missing-episodes check).</summary>
+    [JsonPropertyName("seasons")]
+    public List<TvSeasonInfo> Seasons { get; set; } = new();
+
+    /// <summary>The newest episode that has aired, so unaired ones are never reported missing.</summary>
+    [JsonPropertyName("last_episode_to_air")]
+    public TvEpisodeMetadata? LastEpisodeToAir { get; set; }
+
     public int Year => !string.IsNullOrEmpty(FirstAirDate) && DateTime.TryParse(FirstAirDate, out var d)
         ? d.Year : 0;
+}
+
+/// <summary>One entry of a show's season list (counts only, no episodes).</summary>
+public class TvSeasonInfo
+{
+    [JsonPropertyName("season_number")]
+    public int SeasonNumber { get; set; }
+
+    [JsonPropertyName("episode_count")]
+    public int EpisodeCount { get; set; }
+
+    [JsonPropertyName("air_date")]
+    public string? AirDate { get; set; }
 }
 
 public class TvEpisodeMetadata

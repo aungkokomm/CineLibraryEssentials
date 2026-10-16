@@ -45,7 +45,7 @@
         </StackPanel>
 
         <!-- Description -->
-        <TextBlock Text="Clean, organize, and enrich your movie library. Renames messy filenames, sorts each movie into its own Title (Year)/ folder, and downloads metadata, posters and actor photos from TMDb — fully Plex/Kodi/Jellyfin compatible."
+        <TextBlock Text="Clean, organize, and enrich your movie library. Renames messy filenames, sorts each movie into its own Title (Year)/ folder, and downloads metadata, posters and actor photos from TMDb - fully Plex/Kodi/Jellyfin compatible."
                    TextWrapping="Wrap"
                    FontSize="13"
                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -92,6 +92,24 @@
                     <TextBlock Text="MKV cleanup powered by MKVToolNix (GPL v2)" />
                 </StackPanel>
             </HyperlinkButton>
+
+            <!-- For bug reports: version, settings and this session's problems -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <HyperlinkButton Click="OnCopyDiagnosticsClick"
+                                 Padding="0"
+                                 ToolTipService.ToolTip="Copies the app version, your settings (never your API key) and this session's warnings, to paste into a GitHub issue. Have a look before sharing.">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE8C8;" FontSize="14" />
+                        <TextBlock Text="Copy diagnostics (for bug reports)" />
+                    </StackPanel>
+                </HyperlinkButton>
+                <TextBlock x:Name="CopiedText"
+                           Text="Copied"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           Visibility="Collapsed"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
         </StackPanel>
 
         <!-- Attributions -->
@@ -100,7 +118,11 @@
                        FontSize="11"
                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                        TextWrapping="Wrap" />
-            <TextBlock Text="Bundles mkvpropedit.exe from MKVToolNix (GPL v2) — see Tools/MKVToolNix/LICENSE.txt"
+            <TextBlock Text="IMDb ratings: information courtesy of IMDb (imdb.com), used with permission, fetched through the free Agregarr ratings service."
+                       FontSize="11"
+                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                       TextWrapping="Wrap" />
+            <TextBlock Text="Bundles mkvpropedit.exe from MKVToolNix (GPL v2) - see Tools/MKVToolNix/LICENSE.txt"
                        FontSize="11"
                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                        TextWrapping="Wrap" />

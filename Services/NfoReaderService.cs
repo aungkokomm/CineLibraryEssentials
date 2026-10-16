@@ -13,6 +13,8 @@ public class NfoReaderService
     public class MovieDetail
     {
         public string FolderPath { get; set; } = string.Empty;
+        /// <summary>True when read from a show's tvshow.nfo.</summary>
+        public bool IsTvShow { get; set; }
         public string? VideoFilePath { get; set; }
         public string? PosterPath { get; set; }
         public string? FanartPath { get; set; }
@@ -28,6 +30,8 @@ public class NfoReaderService
         public int Runtime { get; set; }
         public double Rating { get; set; }
         public int VoteCount { get; set; }
+        /// <summary>Every source in &lt;ratings&gt; (IMDb, TMDb, ...), main one first.</summary>
+        public List<RatingsXml.Entry> Ratings { get; set; } = new();
 
         public string ImdbId { get; set; } = string.Empty;
         public string TmdbId { get; set; } = string.Empty;
@@ -56,6 +60,26 @@ public class NfoReaderService
         public string DisplayName => Year > 0 ? $"{Title} ({Year})" : Title;
         public string RuntimeDisplay => Runtime > 0 ? $"{Runtime} min" : string.Empty;
         public string RatingDisplay => Rating > 0 ? $"★ {Rating:F1}" : string.Empty;
+
+        /// <summary>Chip text for one rating source, e.g. "IMDb ★ 8.8 · 2.6M votes".</summary>
+        public static string RatingLabel(RatingsXml.Entry r)
+        {
+            var source = r.Name switch
+            {
+                RatingsXml.Imdb => "IMDb",
+                RatingsXml.Tmdb => "TMDb",
+                "" => string.Empty,
+                _ => char.ToUpperInvariant(r.Name[0]) + r.Name[1..],
+            };
+            var votes = r.Votes switch
+            {
+                >= 1_000_000 => $" · {r.Votes / 1_000_000.0:0.#}M votes",
+                >= 1_000 => $" · {r.Votes / 1_000.0:0.#}K votes",
+                > 0 => $" · {r.Votes} votes",
+                _ => string.Empty,
+            };
+            return $"{source} ★ {r.Value:F1}{votes}".Trim();
+        }
         public bool HasOriginalTitle =>
             !string.IsNullOrWhiteSpace(OriginalTitle)
             && !string.Equals(OriginalTitle, Title, StringComparison.Ordinal);
@@ -68,6 +92,43 @@ public class NfoReaderService
         public string? PhotoPath { get; set; }
     }
 
+    /// <summary>One episode on disk, for the details window's episode list.</summary>
+    public record EpisodeEntry(int Season, int Episode, int LastEpisode, string Title, string Aired,
+        string? ThumbPath, string VideoFile);
+
+    /// <summary>
+    /// The show's episodes on disk, sorted, with title and air date from each
+    /// episode's .nfo (falling back to the filename) and its -thumb.jpg.
+    /// </summary>
+    public static List<EpisodeEntry> ReadEpisodes(string showFolder)
+    {
+        var list = new List<EpisodeEntry>();
+        foreach (var f in TvEpisodeScanner.Scan(showFolder))
+        {
+            var basePath = Path.Combine(Path.GetDirectoryName(f.VideoFile)!, Path.GetFileNameWithoutExtension(f.VideoFile));
+            string title = string.Empty, aired = string.Empty;
+            try
+            {
+                if (File.Exists(basePath + ".nfo"))
+                {
+                    var root = XDocument.Load(basePath + ".nfo").Root;
+                    if (root != null)
+                    {
+                        title = Read(root, "title");
+                        aired = Read(root, "aired");
+                    }
+                }
+            }
+            catch { /* unreadable NFO: fall back to the filename */ }
+
+            if (string.IsNullOrEmpty(title)) title = Path.GetFileNameWithoutExtension(f.VideoFile);
+            var thumb = basePath + "-thumb.jpg";
+            list.Add(new EpisodeEntry(f.Season, f.Episode, f.LastEpisode, title, aired,
+                File.Exists(thumb) ? thumb : null, f.VideoFile));
+        }
+        return list.OrderBy(e => e.Season).ThenBy(e => e.Episode).ToList();
+    }
+
     /// <summary>
     /// Reads the first .nfo file in the given folder and returns a populated
     /// MovieDetail (with local image paths resolved). Returns null if no .nfo
@@ -78,8 +139,10 @@ public class NfoReaderService
         if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
             return null;
 
-        var nfoFile = Directory.EnumerateFiles(folderPath, "*.nfo").FirstOrDefault();
+        // Prefer tvshow.nfo, never an episode's NFO (see NfoLocator).
+        var nfoFile = NfoLocator.FindMainNfo(folderPath);
         if (nfoFile == null) return null;
+        var isTvShow = Path.GetFileName(nfoFile).Equals("tvshow.nfo", StringComparison.OrdinalIgnoreCase);
 
         try
         {
@@ -87,7 +150,7 @@ public class NfoReaderService
             var root = doc.Root;
             if (root == null) return null;
 
-            var detail = new MovieDetail { FolderPath = folderPath };
+            var detail = new MovieDetail { FolderPath = folderPath, IsTvShow = isTvShow };
 
             detail.Title          = Read(root, "title");
             detail.OriginalTitle  = Read(root, "originaltitle");
@@ -117,6 +180,9 @@ public class NfoReaderService
             var ratingsEl = root.Element("ratings");
             if (ratingsEl != null)
             {
+                detail.Ratings = RatingsXml.ReadAll(root)
+                    .OrderByDescending(r => r.IsDefault)
+                    .ToList();
                 var first = ratingsEl.Elements("rating").FirstOrDefault();
                 if (first != null)
                 {
@@ -207,8 +273,13 @@ public class NfoReaderService
             // Resolve local image paths. NFO references like "<basename>-poster.jpg"
             // are relative to the folder; fall back to scanning for any *-poster.jpg
             // / *-fanart.jpg if the exact name doesn't exist.
-            detail.PosterPath = ResolveLocalImage(folderPath, root.Element("poster")?.Value, "-poster.jpg");
-            detail.FanartPath = ResolveLocalImage(folderPath, root.Element("fanart")?.Value, "-fanart.jpg");
+            // TV shows use plain "poster.jpg" / "fanart.jpg" at the show root (the
+            // root may also hold "season01-poster.jpg", so check the plain name
+            // first); movies use "<basename>-poster.jpg".
+            detail.PosterPath = ResolveLocalImage(folderPath, root.Element("poster")?.Value, "-poster.jpg",
+                                                  isTvShow ? "poster.jpg" : null);
+            detail.FanartPath = ResolveLocalImage(folderPath, root.Element("fanart")?.Value, "-fanart.jpg",
+                                                  isTvShow ? "fanart.jpg" : null);
 
             // Find the video file (first supported extension in the folder)
             detail.VideoFilePath = Directory.EnumerateFiles(folderPath)
@@ -232,12 +303,17 @@ public class NfoReaderService
         return int.TryParse(s, out var v) ? v : 0;
     }
 
-    private static string? ResolveLocalImage(string folderPath, string? nfoValue, string suffix)
+    private static string? ResolveLocalImage(string folderPath, string? nfoValue, string suffix, string? plainName = null)
     {
         if (!string.IsNullOrWhiteSpace(nfoValue))
         {
             var candidate = Path.IsPathRooted(nfoValue) ? nfoValue : Path.Combine(folderPath, nfoValue);
             if (File.Exists(candidate)) return candidate;
+        }
+        if (plainName != null)
+        {
+            var plain = Path.Combine(folderPath, plainName);
+            if (File.Exists(plain)) return plain;
         }
         // Fallback: first file ending in the suffix
         var match = Directory.EnumerateFiles(folderPath)

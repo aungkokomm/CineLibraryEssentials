@@ -10,6 +10,9 @@ namespace CineLibraryEssentials.Services;
 /// </summary>
 public class NfoGeneratorService
 {
+    /// <summary>Make the IMDb rating the NFO's main rating when it's known (Settings).</summary>
+    public bool PreferImdbRating { get; set; } = true;
+
     public string GenerateNfoXml(
         MovieMetadata metadata,
         string movieFolderPath,
@@ -27,18 +30,10 @@ public class NfoGeneratorService
             AddText(root, "originaltitle", metadata.OriginalTitle);
         }
 
-        // ---- Ratings (Kodi <ratings> block — supports multiple sources) ----
-        if (metadata.Rating > 0)
-        {
-            var ratings = new XElement("ratings",
-                new XElement("rating",
-                    new XAttribute("name", "themoviedb"),
-                    new XAttribute("default", "true"),
-                    new XAttribute("max", "10"),
-                    new XElement("value", metadata.Rating.ToString("F1")),
-                    new XElement("votes", metadata.VoteCount)));
-            root.Add(ratings);
-        }
+        // ---- Ratings (Kodi <ratings> block: TMDb, plus IMDb when known) ----
+        var ratings = RatingsXml.Build(metadata.Rating, metadata.VoteCount,
+                                       metadata.ImdbRating, metadata.ImdbVotes, PreferImdbRating);
+        if (ratings != null) root.Add(ratings);
 
         AddText(root, "userrating", "0");
         AddText(root, "top250", "0");
@@ -238,16 +233,9 @@ public class NfoGeneratorService
             && !string.Equals(show.OriginalName, show.Name, StringComparison.Ordinal))
             AddText(root, "originaltitle", show.OriginalName);
 
-        if (show.Rating > 0)
-        {
-            root.Add(new XElement("ratings",
-                new XElement("rating",
-                    new XAttribute("name", "themoviedb"),
-                    new XAttribute("default", "true"),
-                    new XAttribute("max", "10"),
-                    new XElement("value", show.Rating.ToString("F1")),
-                    new XElement("votes", show.VoteCount))));
-        }
+        var ratings = RatingsXml.Build(show.Rating, show.VoteCount,
+                                       show.ImdbRating, show.ImdbVotes, PreferImdbRating);
+        if (ratings != null) root.Add(ratings);
 
         AddText(root, "userrating", "0");
         AddText(root, "plot", show.Overview);
@@ -325,16 +313,9 @@ public class NfoGeneratorService
         AddText(root, "season", episode.SeasonNumber.ToString());
         AddText(root, "episode", episode.EpisodeNumber.ToString());
 
-        if (episode.Rating > 0)
-        {
-            root.Add(new XElement("ratings",
-                new XElement("rating",
-                    new XAttribute("name", "themoviedb"),
-                    new XAttribute("default", "true"),
-                    new XAttribute("max", "10"),
-                    new XElement("value", episode.Rating.ToString("F1")),
-                    new XElement("votes", episode.VoteCount))));
-        }
+        // TMDb-only for episodes; written with a dot decimal on any PC language.
+        if (RatingsXml.Build(episode.Rating, episode.VoteCount, 0, 0, preferImdb: false) is { } ratings)
+            root.Add(ratings);
 
         AddText(root, "plot", episode.Overview);
         if (episode.Runtime > 0) AddText(root, "runtime", episode.Runtime.ToString());

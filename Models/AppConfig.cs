@@ -53,4 +53,14 @@ public class AppConfig
     // ----- Wizard mode (v1.2) -----
     /// <summary>"Auto" / "Movies" / "TvShows" — controls how Step 1 parses + Step 2 lays out.</summary>
     public string WizardMode { get; set; } = "Auto";
+
+    // ----- v1.3 -----
+    /// <summary>User-defined words/tags Step 1 always strips from filenames (e.g. "ION10", "mSD").</summary>
+    public List<string> CustomRemoveWords { get; set; } = new();
+
+    /// <summary>When true (default), the IMDb rating is the NFO's main rating when known; else TMDb.</summary>
+    public bool PreferImdbRating { get; set; } = true;
+
+    /// <summary>Opt-in: after a TV scrape, add the episode title to file names that don't have one.</summary>
+    public bool AddEpisodeTitlesToFilenames { get; set; }
 }

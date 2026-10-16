@@ -109,6 +109,14 @@ public partial class RenameViewModel : ObservableObject
     [ObservableProperty]
     private string statsSummary = "No files loaded";
 
+    /// <summary>Footer link next to the stats: "Show only warnings" / "Show all files" (empty = hidden).</summary>
+    [ObservableProperty]
+    private string warningsLinkText = string.Empty;
+
+    /// <summary>One click between the warning rows and the full list.</summary>
+    public void ToggleWarningsOnly()
+        => ConfidenceFilter = ConfidenceFilter == "Warnings" ? "All" : "Warnings";
+
     public RenameViewModel(WizardViewModel parentViewModel, ConfigService? configService = null)
     {
         _parentViewModel = parentViewModel;
@@ -364,16 +372,23 @@ public partial class RenameViewModel : ObservableObject
             if (p.CleanedName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
                 warnings.Add("Contains invalid filename characters");
 
-            if (p.Year == 0 && p.IsSelected)
+            // Mode-aware checks. TV episodes are expected in Auto / TvShows mode and
+            // don't need a year, so they shouldn't carry a warning on every row.
+            if (p.Year == 0 && p.IsSelected && !p.IsTvEpisode && WizardMode != "TvShows")
                 warnings.Add("No year detected");
 
             // Implausible year
             if (p.Year > 0 && (p.Year < 1900 || p.Year > DateTime.Now.Year + 2))
                 warnings.Add($"Implausible year ({p.Year})");
 
-            // TV episode detection
-            if (p.IsTvEpisode)
-                warnings.Add("Looks like a TV episode, not a movie");
+            // Movies mode turns TV detection off, so check the original name: an
+            // SxxExx file here is probably in the wrong mode.
+            if (WizardMode == "Movies" && RegexPatterns.IsTvEpisode(p.OriginalName))
+                warnings.Add("Looks like a TV episode. Switch mode to Auto or TV Shows.");
+
+            // TvShows mode: a file without an SxxExx pattern needs a manual name.
+            if (WizardMode == "TvShows" && !p.IsTvEpisode)
+                warnings.Add("No S/E pattern found. Edit the name to match \"Show - S01E01\".");
 
             // Filename too long (Windows MAX_PATH risk when combined with output folder)
             if (p.CleanedName.Length > 200)
@@ -406,8 +421,13 @@ public partial class RenameViewModel : ObservableObject
         if (AllPreviews.Count == 0)
         {
             StatsSummary = "No files loaded";
+            WarningsLinkText = string.Empty;
             return;
         }
+
+        WarningsLinkText = ConfidenceFilter == "Warnings" ? "Show all files"
+                         : WarningCount > 0 ? "Show only warnings"
+                         : string.Empty;
 
         var parts = new List<string> { $"{TotalCount} file{(TotalCount == 1 ? "" : "s")}" };
 
@@ -569,7 +589,7 @@ public partial class RenameViewModel : ObservableObject
             ProgressMax = p.Total <= 0 ? 1 : p.Total;
             ProgressText = string.IsNullOrEmpty(p.CurrentFile)
                 ? $"{verb} {p.Done} of {p.Total}…"
-                : $"{verb} {Math.Min(p.Done + 1, p.Total)} of {p.Total} — {p.CurrentFile}";
+                : $"{verb} {Math.Min(p.Done + 1, p.Total)} of {p.Total} - {p.CurrentFile}";
         });
 
         try

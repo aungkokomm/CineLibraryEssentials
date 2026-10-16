@@ -32,6 +32,7 @@
                              x:Name="BrowseButton"
                              Click="OnBrowseClick"
                              VerticalAlignment="Center"
+                             AutomationProperties.Name="Browse for a folder"
                              ToolTipService.ToolTip="Pick source folder. Click ▾ for recent folders.">
                     <FontIcon Glyph="&#xE838;" FontSize="14" />
                     <SplitButton.Flyout>
@@ -43,6 +44,7 @@
                     <ComboBox SelectedItem="{Binding WizardMode, Mode=TwoWay}"
                               VerticalAlignment="Center"
                               MinWidth="110"
+                              AutomationProperties.Name="Mode"
                               ToolTipService.ToolTip="How files are parsed: Auto detects per-file, Movies forces all to be movies, TV Shows treats every file as an episode (rows without S/E patterns get flagged).">
                         <x:String>Auto</x:String>
                         <x:String>Movies</x:String>
@@ -62,6 +64,7 @@
                           SelectedItem="{Binding OutputTemplate, Mode=TwoWay}"
                           VerticalAlignment="Center"
                           MinWidth="130"
+                          AutomationProperties.Name="Output filename format"
                           ToolTipService.ToolTip="Output filename format">
                     <x:String>{Title} ({Year})</x:String>
                     <x:String>{Year} - {Title}</x:String>
@@ -89,6 +92,7 @@
                           SelectedItem="{Binding ConfidenceFilter, Mode=TwoWay}"
                           VerticalAlignment="Center"
                           MinWidth="130"
+                          AutomationProperties.Name="Filter by confidence"
                           ToolTipService.ToolTip="Filter by confidence">
                     <x:String>All</x:String>
                     <x:String>High</x:String>
@@ -125,6 +129,7 @@
 
                 <Button Grid.Column="9"
                         VerticalAlignment="Center"
+                        AutomationProperties.Name="More actions"
                         ToolTipService.ToolTip="More actions">
                     <FontIcon Glyph="&#xE712;" FontSize="14" />
                     <Button.Flyout>
@@ -217,6 +222,8 @@
             <ListView Grid.Row="3"
                       x:Name="FilePreviewList"
                       SelectionMode="None"
+                      AutomationProperties.Name="Files to rename"
+                      AutomationProperties.HelpText="F2 edits the cleaned name of the focused row, Delete removes the row from the list, Enter finishes editing."
                       ItemsSource="{Binding FilePreviews}"
                       BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                       BorderThickness="1,0,1,1"
@@ -274,6 +281,7 @@
                                        Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
 
                             <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                      AutomationProperties.Name="{Binding OriginalName}"
                                       VerticalAlignment="Center" />
 
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,0" Spacing="1">
@@ -288,14 +296,15 @@
 
                             <StackPanel Grid.Column="3" Orientation="Vertical" Margin="4,0" VerticalAlignment="Center" Spacing="2">
                                 <TextBox Text="{Binding CleanedName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                         FontSize="12" />
+                                         FontSize="12"
+                                         AutomationProperties.Name="Cleaned name" />
                                 <!-- Edition chip — visible only when an edition was detected -->
                                 <Border CornerRadius="4"
                                         Padding="6,1"
                                         HorizontalAlignment="Left"
                                         Background="{ThemeResource AccentFillColorTertiaryBrush}"
                                         Visibility="{Binding Edition, Converter={StaticResource StringNonEmptyToVisibilityConverter}}"
-                                        ToolTipService.ToolTip="Detected edition — written to NFO as &lt;edition&gt;">
+                                        ToolTipService.ToolTip="Detected edition - written to NFO as &lt;edition&gt;">
                                     <TextBlock Text="{Binding Edition}"
                                                Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                                FontWeight="SemiBold"
@@ -333,6 +342,7 @@
                                     Width="28" Height="28"
                                     Padding="0"
                                     VerticalAlignment="Center"
+                                    AutomationProperties.Name="Search TMDb"
                                     ToolTipService.ToolTip="Search TMDb">
                                 <FontIcon Glyph="&#xE721;" FontSize="13" />
                             </Button>
@@ -354,11 +364,22 @@
 
                 <!-- Middle: stats line OR (while processing) a progress bar + label -->
                 <Grid Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding StatsSummary}"
-                               FontSize="11"
-                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                               VerticalAlignment="Center"
-                               Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVisibilityReverseConverter}}" />
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="4"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVisibilityReverseConverter}}">
+                        <TextBlock Text="{Binding StatsSummary}"
+                                   FontSize="11"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   VerticalAlignment="Center" />
+                        <!-- One click to just the rows with a ⚠, and back -->
+                        <HyperlinkButton Content="{Binding WarningsLinkText}"
+                                         Click="OnWarningsLinkClick"
+                                         FontSize="11"
+                                         Padding="4,0"
+                                         VerticalAlignment="Center"
+                                         Visibility="{Binding WarningsLinkText, Converter={StaticResource StringNonEmptyToVisibilityConverter}}" />
+                    </StackPanel>
 
                     <StackPanel Spacing="3"
                                 VerticalAlignment="Center"

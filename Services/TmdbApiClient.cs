@@ -91,8 +91,7 @@ public class TmdbApiClient
 
             var json = await response.Content.ReadAsStringAsync();
 
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var metadata = JsonSerializer.Deserialize<MovieMetadata>(json, options);
+            var metadata = JsonSerializer.Deserialize<MovieMetadata>(json, TmdbJson.Options);
             if (metadata == null) return null;
 
             // Parse the appended sub-objects that don't deserialize automatically
@@ -362,8 +361,7 @@ public class TmdbApiClient
             var resp = await _httpClient.GetAsync(url);
             resp.EnsureSuccessStatusCode();
             var json = await resp.Content.ReadAsStringAsync();
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var show = JsonSerializer.Deserialize<TvShowMetadata>(json, options);
+            var show = JsonSerializer.Deserialize<TvShowMetadata>(json, TmdbJson.Options);
             if (show == null) return null;
 
             using var doc = JsonDocument.Parse(json);
@@ -441,10 +439,9 @@ public class TmdbApiClient
                 return new List<TvEpisodeMetadata>();
 
             var list = new List<TvEpisodeMetadata>();
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             foreach (var e in epsEl.EnumerateArray())
             {
-                var ep = JsonSerializer.Deserialize<TvEpisodeMetadata>(e.GetRawText(), options);
+                var ep = JsonSerializer.Deserialize<TvEpisodeMetadata>(e.GetRawText(), TmdbJson.Options);
                 if (ep != null) list.Add(ep);
             }
             return list;
@@ -482,6 +479,57 @@ public class TmdbApiClient
             }
         }
         return string.Empty;
+    }
+
+    /// <summary>One picture TMDb has for a title. Language is null for pictures without text.</summary>
+    public record ImageOption(string FilePath, int Width, int Height, string? Language, double Vote);
+
+    /// <summary>
+    /// Every poster, backdrop and logo TMDb has for a movie or show, in all
+    /// languages (the NFO editor filters them), best-voted first. Empty lists
+    /// when TMDb can't be reached.
+    /// </summary>
+    public async Task<(List<ImageOption> Posters, List<ImageOption> Backdrops, List<ImageOption> Logos)> GetImagesAsync(int tmdbId, bool tv)
+    {
+        await RateLimitAsync();
+        // No &language=: that would hide every picture in other languages
+        var url = $"{BaseUrl}/{(tv ? "tv" : "movie")}/{tmdbId}/images?api_key={_apiKey}";
+        try
+        {
+            var resp = await _httpClient.GetAsync(url);
+            resp.EnsureSuccessStatusCode();
+            return ParseImages(await resp.Content.ReadAsStringAsync());
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"GetImagesAsync error: {ex.Message}");
+            return (new(), new(), new());
+        }
+    }
+
+    /// <summary>Parses /images. Logos are PNG only: Kodi's clear logo can't be SVG.</summary>
+    public static (List<ImageOption> Posters, List<ImageOption> Backdrops, List<ImageOption> Logos) ParseImages(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        List<ImageOption> Read(string key, bool pngOnly)
+        {
+            var list = new List<ImageOption>();
+            if (!doc.RootElement.TryGetProperty(key, out var arr) || arr.ValueKind != JsonValueKind.Array) return list;
+            foreach (var e in arr.EnumerateArray())
+            {
+                var path = e.TryGetProperty("file_path", out var p) ? p.GetString() : null;
+                if (string.IsNullOrEmpty(path)) continue;
+                if (pngOnly && !path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)) continue;
+                list.Add(new ImageOption(
+                    path,
+                    e.TryGetProperty("width", out var w) && w.ValueKind == JsonValueKind.Number ? w.GetInt32() : 0,
+                    e.TryGetProperty("height", out var h) && h.ValueKind == JsonValueKind.Number ? h.GetInt32() : 0,
+                    e.TryGetProperty("iso_639_1", out var l) && l.ValueKind == JsonValueKind.String ? l.GetString() : null,
+                    e.TryGetProperty("vote_average", out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : 0));
+            }
+            return list.OrderByDescending(i => i.Vote).ThenByDescending(i => i.Width).ToList();
+        }
+        return (Read("posters", false), Read("backdrops", false), Read("logos", true));
     }
 
     /// <summary>

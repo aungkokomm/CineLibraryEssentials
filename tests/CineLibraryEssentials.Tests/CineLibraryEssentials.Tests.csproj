@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Unit tests for the app's pure (WinUI-free) logic. The app itself is a WinUI
+       exe, so instead of referencing it we compile the plain C# source files we
+       test directly into this project. Run with:  dotnet test tests\CineLibraryEssentials.Tests -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Utilities\RegexPatterns.cs" Link="Linked\RegexPatterns.cs" />
+    <Compile Include="..\..\Services\ConfigService.cs" Link="Linked\ConfigService.cs" />
+    <Compile Include="..\..\Models\AppConfig.cs" Link="Linked\AppConfig.cs" />
+    <Compile Include="..\..\Models\MovieMetadata.cs" Link="Linked\MovieMetadata.cs" />
+    <Compile Include="..\..\Services\ImdbRatingService.cs" Link="Linked\ImdbRatingService.cs" />
+    <Compile Include="..\..\Services\RatingsXml.cs" Link="Linked\RatingsXml.cs" />
+    <Compile Include="..\..\Services\NfoLocator.cs" Link="Linked\NfoLocator.cs" />
+    <Compile Include="..\..\Services\NfoFile.cs" Link="Linked\NfoFile.cs" />
+    <Compile Include="..\..\Services\ImdbRefreshService.cs" Link="Linked\ImdbRefreshService.cs" />
+    <Compile Include="..\..\Services\NfoReaderService.cs" Link="Linked\NfoReaderService.cs" />
+    <Compile Include="..\..\Services\ImageDownloadService.cs" Link="Linked\ImageDownloadService.cs" />
+    <Compile Include="..\..\Utilities\FileFormatValidator.cs" Link="Linked\FileFormatValidator.cs" />
+    <Compile Include="..\..\Services\TvEpisodeScanner.cs" Link="Linked\TvEpisodeScanner.cs" />
+    <Compile Include="..\..\Services\MissingEpisodes.cs" Link="Linked\MissingEpisodes.cs" />
+    <Compile Include="..\..\Services\TmdbJson.cs" Link="Linked\TmdbJson.cs" />
+    <Compile Include="..\..\Services\TmdbApiClient.cs" Link="Linked\TmdbApiClient.cs" />
+    <Compile Include="..\..\Services\EpisodeFileRenamer.cs" Link="Linked\EpisodeFileRenamer.cs" />
+    <Compile Include="..\..\Services\NfoEditor.cs" Link="Linked\NfoEditor.cs" />
+    <Compile Include="..\..\Services\NfoBackup.cs" Link="Linked\NfoBackup.cs" />
+    <Compile Include="..\..\Services\LibraryVocabulary.cs" Link="Linked\LibraryVocabulary.cs" />
+    <Compile Include="..\..\Services\BulkNfoEdit.cs" Link="Linked\BulkNfoEdit.cs" />
+    <Compile Include="..\..\Services\DiagnosticsService.cs" Link="Linked\DiagnosticsService.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+</Project>

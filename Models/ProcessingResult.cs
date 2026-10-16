@@ -236,6 +236,12 @@ public partial class MovieFolderItem : ObservableObject
     /// <summary>True when this folder is a TV show root (has Season XX subfolders).</summary>
     [ObservableProperty] private bool isTvShow;
 
+    /// <summary>TV card line, e.g. "TV · 3 seasons · 24 episodes · 2 missing". Empty for movies.</summary>
+    [ObservableProperty] private string tvSummary = string.Empty;
+
+    /// <summary>Aired episodes not on disk, as found by this session's scrape (0 = none or not checked).</summary>
+    public int MissingEpisodes { get; set; }
+
     /// <summary>True when every asset (NFO + poster + fanart + actor photos) is present.</summary>
     public bool IsComplete => HasNfo && HasPoster && HasFanart && HasActorPhotos;
 

@@ -72,6 +72,7 @@
                     Padding="8,4"
                     Background="Transparent"
                     BorderThickness="0"
+                    AutomationProperties.Name="Settings"
                     ToolTipService.ToolTip="Settings">
                 <FontIcon Glyph="&#xE713;" FontSize="14" />
             </Button>
@@ -79,6 +80,7 @@
                     Padding="8,4"
                     Background="Transparent"
                     BorderThickness="0"
+                    AutomationProperties.Name="About"
                     ToolTipService.ToolTip="About CineLibrary Essentials">
                 <FontIcon Glyph="&#xE946;" FontSize="14" />
             </Button>

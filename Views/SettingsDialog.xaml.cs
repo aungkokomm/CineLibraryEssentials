@@ -33,7 +33,36 @@ public sealed partial class SettingsDialog : ContentDialog
         // Language
         SelectComboByTag(LanguageCombo, _config.GetScrapeLanguage());
 
+        // Main rating
+        SelectComboByTag(RatingCombo, _config.GetPreferImdbRating() ? "imdb" : "tmdb");
+        EpisodeTitlesToggle.IsOn = _config.GetAddEpisodeTitles();
+
+        // Words to always remove
+        RemoveWordsBox.Text = string.Join(Environment.NewLine, _config.GetCustomRemoveWords());
+
         _isLoading = false;
+    }
+
+    /// <summary>True when the "Words to always remove" list was changed and saved,
+    /// so the caller can re-clean the files Step 1 is showing.</summary>
+    public bool RemoveWordsChanged { get; private set; }
+
+    private void OnDialogClosing(ContentDialog sender, ContentDialogClosingEventArgs args)
+    {
+        var words = RemoveWordsBox.Text
+            .Split(new[] { '\r', '\n', ',' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(w => w.Trim())
+            .Where(w => w.Length > 0)
+            .ToList();
+
+        var before = _config.GetCustomRemoveWords();
+        if (words.Count == before.Count
+            && words.Zip(before).All(p => string.Equals(p.First, p.Second, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        _config.SetCustomRemoveWords(words);
+        Utilities.RegexPatterns.SetCustomRemoveWords(_config.GetCustomRemoveWords());
+        RemoveWordsChanged = true;
     }
 
     private static void SelectComboByTag(ComboBox combo, string tag)
@@ -75,6 +104,19 @@ public sealed partial class SettingsDialog : ContentDialog
     {
         if (_isLoading) return;
         _config.SetAutoCheckForUpdates(AutoUpdateToggle.IsOn);
+    }
+
+    private void OnRatingChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoading) return;
+        if (RatingCombo.SelectedItem is ComboBoxItem cbi && cbi.Tag is string source)
+            _config.SetPreferImdbRating(source == "imdb");
+    }
+
+    private void OnEpisodeTitlesToggled(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (_isLoading) return;
+        _config.SetAddEpisodeTitles(EpisodeTitlesToggle.IsOn);
     }
 
     private void OnLanguageChanged(object sender, SelectionChangedEventArgs e)

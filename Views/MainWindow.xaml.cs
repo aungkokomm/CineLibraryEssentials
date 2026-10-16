@@ -84,8 +84,8 @@ public sealed partial class MainWindow : Window
 
         ToastService.ShowAction(
             message: hasInstallerAsset
-                ? $"Version {info.LatestVersion} is available — you're on {info.CurrentVersion}."
-                : $"Version {info.LatestVersion} is available — open the release page to download.",
+                ? $"Version {info.LatestVersion} is available - you're on {info.CurrentVersion}."
+                : $"Version {info.LatestVersion} is available - open the release page to download.",
             title: "Update available",
             actionText: hasInstallerAsset ? "Download and install" : "Open release page",
             onAction: () =>
@@ -106,7 +106,7 @@ public sealed partial class MainWindow : Window
     private async Task DownloadAndInstallAsync(UpdateService.UpdateInfo info)
     {
         var progressToast = ToastService.ShowAction(
-            message: "Starting download — 0%",
+            message: "Starting download - 0%",
             title: $"Downloading v{info.LatestVersion}",
             actionText: "Cancel",
             onAction: () => { /* set by cancel token below */ },

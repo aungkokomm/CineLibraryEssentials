@@ -23,6 +23,23 @@ public partial class ScrapingViewModel : ObservableObject
     [ObservableProperty]
     private string statusMessage = string.Empty;
 
+    // ---- Batch progress bar (Step 3 footer), shown while IsWorking ----
+    /// <summary>Items finished so far in the current batch.</summary>
+    [ObservableProperty]
+    private double progressValue;
+
+    /// <summary>Items in the current batch.</summary>
+    [ObservableProperty]
+    private double progressMax = 1;
+
+    /// <summary>True for one-shot work with no item count (e.g. the IMDb refresh request).</summary>
+    [ObservableProperty]
+    private bool isProgressIndeterminate;
+
+    /// <summary>Label under the bar, e.g. "Scraping 3 of 12: Dune (2021)".</summary>
+    [ObservableProperty]
+    private string progressText = string.Empty;
+
     /// <summary>
     /// "Auto", "Movies", or "TvShows" — wizard mode. Mirrors Step 1's setting via
     /// the shared config so changing it in either place propagates. In Step 3 it
@@ -122,11 +139,15 @@ public partial class ScrapingViewModel : ObservableObject
         if (string.IsNullOrEmpty(outputFolder) || !Directory.Exists(outputFolder))
             return;
 
-        // Get unique destination folders from Step 2's operations
+        // Get unique destination folders from Step 2's operations. TV episodes
+        // were moved into "Show/Season XX", so map those to the show folder;
+        // several seasons of one show become a single card.
+        _repairedShowCount = 0;
         var folderPaths = _parentViewModel.AllFileOperations
             .Select(op => op.DestinationFolder)
-            .Distinct()
             .Where(Directory.Exists)
+            .Select(NormalizeToShowRoot)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         foreach (var folderPath in folderPaths)
@@ -138,7 +159,17 @@ public partial class ScrapingViewModel : ObservableObject
 
             AddItem(CreateMovieItem(folderPath));
         }
+
+        if (_repairedShowCount > 0)
+            StatusMessage = RepairedNote();
     }
+
+    // Shows whose misplaced files were moved up by RepairMisplacedShowFiles
+    // during the current add, so the status line can say so.
+    private int _repairedShowCount;
+
+    private string RepairedNote()
+        => $"Moved show files (tvshow.nfo, poster, fanart, cast photos) out of the Season folder for {_repairedShowCount} show(s).";
 
     [RelayCommand]
     public async Task AddFolderAsync()
@@ -169,6 +200,24 @@ public partial class ScrapingViewModel : ObservableObject
     public void AddFromRootFolder(string rootPath)
     {
         if (string.IsNullOrEmpty(rootPath) || !Directory.Exists(rootPath)) return;
+        _repairedShowCount = 0;
+
+        // Picked a "Season XX" folder: add its show as one card, without walking
+        // the parent (which could hold other content) as a library.
+        var showRoot = NormalizeToShowRoot(rootPath);
+        if (!string.Equals(showRoot, rootPath, StringComparison.OrdinalIgnoreCase))
+        {
+            if (_allFolders.Any(m => string.Equals(m.FolderPath, showRoot, StringComparison.OrdinalIgnoreCase)))
+            {
+                StatusMessage = $"\"{Path.GetFileName(showRoot)}\" is already in the list.";
+                return;
+            }
+            AddItem(CreateMovieItem(showRoot));
+            StatusMessage = _repairedShowCount > 0
+                ? RepairedNote()
+                : $"Added the show \"{Path.GetFileName(showRoot)}\" (you picked one of its season folders).";
+            return;
+        }
 
         int added = 0, hidden = 0;
         foreach (var movieFolder in EnumerateMovieFolders(rootPath))
@@ -199,13 +248,16 @@ public partial class ScrapingViewModel : ObservableObject
         {
             var label = WizardMode == "TvShows" ? "movies" : "TV shows";
             StatusMessage = added > 0
-                ? $"Added {added} item(s). {hidden} {label} hidden by the Mode filter — switch to Auto to see them."
+                ? $"Added {added} item(s). {hidden} {label} hidden by the Mode filter - switch to Auto to see them."
                 : $"Added {hidden} {label}, but Mode filter is hiding them. Switch to Auto to see them.";
         }
         else
         {
             StatusMessage = $"Added {added} folder(s).";
         }
+
+        if (_repairedShowCount > 0)
+            StatusMessage += " " + RepairedNote();
     }
 
     /// <summary>
@@ -345,8 +397,68 @@ public partial class ScrapingViewModel : ObservableObject
         new(@"^(?:Season|Specials?)[\s_\.]?(\d{1,3})?$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
-    private static bool LooksLikeSeasonFolder(string folderName)
+    /// <summary>"Season 01", "Season 1", "Specials" and the like (also used by Step 1).</summary>
+    public static bool LooksLikeSeasonFolder(string folderName)
         => !string.IsNullOrEmpty(folderName) && SeasonFolderPattern.IsMatch(folderName);
+
+    /// <summary>
+    /// A "Season 01" / "Specials" folder belongs to the show folder above it.
+    /// Step 2 hands Step 3 the Season folder it moved episodes into, and users
+    /// can pick a Season folder in Add Folder; either way the card (and
+    /// tvshow.nfo, poster, fanart, .actors) must live at the show root.
+    /// Never promotes to a drive root (D:\Season 01 has no show folder above it).
+    /// </summary>
+    private static string NormalizeToShowRoot(string folder)
+    {
+        var trimmed = folder.TrimEnd(Path.DirectorySeparatorChar);
+        if (!LooksLikeSeasonFolder(Path.GetFileName(trimmed))) return folder;
+
+        var parent = Path.GetDirectoryName(trimmed);
+        if (string.IsNullOrEmpty(parent)
+            || string.Equals(Path.GetPathRoot(parent), parent, StringComparison.OrdinalIgnoreCase))
+            return folder;
+        return parent;
+    }
+
+    /// <summary>
+    /// Repairs shows scraped by v1.2.10 and earlier, which wrote the show-level
+    /// files into "Season XX" instead of the show folder. Moves tvshow.nfo,
+    /// poster.jpg, fanart.jpg and .actors up to the show root, only when the
+    /// root doesn't already have that item, so nothing is overwritten.
+    /// tvshow.nfo refers to .actors relative to itself, so they move together.
+    /// Returns how many items were moved.
+    /// </summary>
+    private static int RepairMisplacedShowFiles(string showRoot)
+    {
+        int moved = 0;
+        try
+        {
+            foreach (var season in Directory.EnumerateDirectories(showRoot))
+            {
+                if (!LooksLikeSeasonFolder(Path.GetFileName(season))) continue;
+
+                foreach (var name in new[] { "tvshow.nfo", "poster.jpg", "fanart.jpg" })
+                {
+                    var src = Path.Combine(season, name);
+                    var dst = Path.Combine(showRoot, name);
+                    if (File.Exists(src) && !File.Exists(dst)) { File.Move(src, dst); moved++; }
+                }
+
+                var srcActors = Path.Combine(season, ".actors");
+                var dstActors = Path.Combine(showRoot, ".actors");
+                if (Directory.Exists(srcActors) && !Directory.Exists(dstActors))
+                {
+                    Directory.Move(srcActors, dstActors);
+                    moved++;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"RepairMisplacedShowFiles failed for {showRoot}: {ex.Message}");
+        }
+        return moved;
+    }
 
     private static bool IsUnderAnyShown(string path, HashSet<string> shownRoots)
     {
@@ -389,17 +501,20 @@ public partial class ScrapingViewModel : ObservableObject
         // episode .nfo + episode thumbnails). Movies go through the movie path.
         if (item.IsTvShow)
         {
-            var (tvOk, tvMsg) = await _scraperService!.ScrapeTvShowAsync(item.FolderPath, progressInner);
+            var tv = await _scraperService!.ScrapeTvShowAsync(item.FolderPath, progressInner);
             item.IsScraping = false;
-            if (tvOk)
+            if (tv.Success)
             {
+                item.MissingEpisodes = tv.Missing;
                 RefreshAssetFlags(item);
-                item.Status = tvMsg; // "Scraped 'Show' — 23 episode(s)"
+                item.Status = tv.Message; // "Scraped 'Show' - 23 episode(s)"
+                ReportEpisodeRenames(tv.Renamed);
             }
             else
             {
                 item.Status = "Failed";
-                item.ErrorMessage = tvMsg;
+                item.ErrorMessage = tv.Message;
+                DiagnosticsService.Record($"Scrape failed: {tv.Message}");
             }
             return;
         }
@@ -424,6 +539,7 @@ public partial class ScrapingViewModel : ObservableObject
         {
             item.Status = "Failed";
             item.ErrorMessage = message;
+            DiagnosticsService.Record($"Scrape failed: {message}");
         }
     }
 
@@ -469,20 +585,9 @@ public partial class ScrapingViewModel : ObservableObject
             item.PosterPath = poster;
             item.IsScraped = item.IsComplete;
 
-            // Keep the TV "N seasons" prefix when refreshing a TV show.
-            var verify = BuildVerifyStatus(nfo, poster != null, fanart != null, actors);
+            item.Status = BuildVerifyStatus(nfo, poster != null, fanart != null, actors);
             if (item.IsTvShow)
-            {
-                var seasonCount = CountSeasons(item.FolderPath);
-                var label = seasonCount > 0
-                    ? $"TV · {seasonCount} season{(seasonCount == 1 ? "" : "s")}"
-                    : "TV";
-                item.Status = $"{label} · {verify}";
-            }
-            else
-            {
-                item.Status = verify;
-            }
+                item.TvSummary = TvEpisodeScanner.Summary(TvEpisodeScanner.Scan(item.FolderPath), item.MissingEpisodes);
         }
         catch { /* permissions / disconnected drive — leave existing state */ }
     }
@@ -517,8 +622,13 @@ public partial class ScrapingViewModel : ObservableObject
         {
             // TV path: use the TV id directly — no auto-search. ScrapeTvShowAsync's
             // overload accepts a known id so we skip the "pick best match" step.
-            (success, message) = await _scraperService!.ScrapeTvShowByIdAsync(
-                item.FolderPath, tmdbId, progress);
+            var tv = await _scraperService!.ScrapeTvShowByIdAsync(item.FolderPath, tmdbId, progress);
+            (success, message) = (tv.Success, tv.Message);
+            if (success)
+            {
+                item.MissingEpisodes = tv.Missing;
+                ReportEpisodeRenames(tv.Renamed);
+            }
         }
         else
         {
@@ -541,23 +651,100 @@ public partial class ScrapingViewModel : ObservableObject
     [RelayCommand]
     public async Task ScrapeSelectedAsync()
     {
-        IsWorking = true;
-        StatusMessage = "Scraping selected movies...";
+        if (IsWorking) return;   // one batch at a time
 
         // TV shows are scraped via the dedicated TV path inside ScrapeOneAsync,
         // so we include them here just like movies.
         var selected = MovieFolders
             .Where(m => m.IsSelected && !m.IsScraped)
             .ToList();
-        for (int i = 0; i < selected.Count; i++)
-        {
-            StatusMessage = $"Scraping {i + 1} of {selected.Count}: {selected[i].DisplayName}";
-            await ScrapeOneAsync(selected[i]);
-            await Task.Delay(200);
-        }
 
-        IsWorking = false;
+        await RunBatchAsync(selected, "Scraping");
         StatusMessage = $"Done. {selected.Count(s => s.IsScraped)} of {selected.Count} succeeded.";
+    }
+
+    /// <summary>
+    /// Scrapes items one by one with the footer progress bar showing
+    /// "<verb> 3 of 12: Title". Always clears the busy state, even on error.
+    /// </summary>
+    private async Task RunBatchAsync(List<MovieFolderItem> items, string verb)
+    {
+        IsWorking = true;
+        IsProgressIndeterminate = false;
+        ProgressMax = Math.Max(items.Count, 1);
+        ProgressValue = 0;
+        StatusMessage = string.Empty;   // the footer bar carries the live text
+        _batchRenames = new();
+        try
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                ProgressText = $"{verb} {i + 1} of {items.Count}: {items[i].DisplayName}";
+                await ScrapeOneAsync(items[i]);
+                ProgressValue = i + 1;
+                await Task.Delay(200);
+            }
+        }
+        finally
+        {
+            IsWorking = false;
+            ProgressText = string.Empty;
+            // One Undo for the whole batch
+            var renames = _batchRenames!;
+            _batchRenames = null;
+            ReportEpisodeRenames(renames);
+        }
+    }
+
+    /// <summary>
+    /// Raised after a scrape added episode titles to file names (the opt-in
+    /// setting), with what was renamed, so the page can offer Undo.
+    /// </summary>
+    public event Action<List<EpisodeFileRenamer.Rename>>? EpisodeTitlesAdded;
+
+    // Collects renames during a batch so the user gets one Undo, not one per show.
+    private List<EpisodeFileRenamer.Rename>? _batchRenames;
+
+    private void ReportEpisodeRenames(List<EpisodeFileRenamer.Rename> renames)
+    {
+        if (renames.Count == 0) return;
+        if (_batchRenames != null)
+            _batchRenames.AddRange(renames);   // inside a batch: reported once at the end
+        else
+            EpisodeTitlesAdded?.Invoke(renames);
+    }
+
+    /// <summary>
+    /// Updates the IMDb rating + votes in the NFOs of the checked items (or every
+    /// item when none are checked), without re-scraping anything else.
+    /// </summary>
+    public async Task<ImdbRefreshService.Result?> RefreshImdbRatingsAsync()
+    {
+        if (IsWorking) return null;   // one batch at a time
+
+        var targets = MovieFolders.Where(m => m.IsSelected).ToList();
+        if (targets.Count == 0) targets = MovieFolders.ToList();
+
+        IsWorking = true;
+        IsProgressIndeterminate = true;
+        ProgressText = $"Getting IMDb ratings for {targets.Count} item(s)...";
+        StatusMessage = string.Empty;
+        try
+        {
+            var r = await new ImdbRefreshService().RefreshAsync(
+                targets.Select(t => t.FolderPath), _configService.GetPreferImdbRating());
+            StatusMessage = $"IMDb ratings: {r.Updated} updated, {r.AlreadyCurrent} already current"
+                + (r.NoImdbId + r.NoNfo > 0 ? $", {r.NoImdbId + r.NoNfo} not scraped yet or without an IMDb id" : "")
+                + (r.NoRating > 0 ? $", {r.NoRating} with no IMDb rating" : "")
+                + (r.Failed > 0 ? $", {r.Failed} failed" : "") + ".";
+            return r;
+        }
+        finally
+        {
+            IsWorking = false;
+            IsProgressIndeterminate = false;
+            ProgressText = string.Empty;
+        }
     }
 
     /// <summary>
@@ -569,6 +756,8 @@ public partial class ScrapingViewModel : ObservableObject
     [RelayCommand]
     public async Task ScrapeGapsOnlyAsync()
     {
+        if (IsWorking) return;   // one batch at a time
+
         var gaps = MovieFolders.Where(m => !m.IsComplete).ToList();
         if (gaps.Count == 0)
         {
@@ -576,17 +765,7 @@ public partial class ScrapingViewModel : ObservableObject
             return;
         }
 
-        IsWorking = true;
-        StatusMessage = $"Filling gaps in {gaps.Count} folder(s)...";
-
-        for (int i = 0; i < gaps.Count; i++)
-        {
-            StatusMessage = $"Filling gaps {i + 1} of {gaps.Count}: {gaps[i].DisplayName}";
-            await ScrapeOneAsync(gaps[i]);
-            await Task.Delay(200);
-        }
-
-        IsWorking = false;
+        await RunBatchAsync(gaps, "Filling gaps");
         StatusMessage = $"Done. {gaps.Count(g => g.IsComplete)} of {gaps.Count} folder(s) now complete.";
     }
 
@@ -636,7 +815,12 @@ public partial class ScrapingViewModel : ObservableObject
         int year;
         bool hasNfo, hasPoster, hasFanart, hasActorPhotos;
         string? posterForCard;
-        int seasonCount = 0;
+        var tvSummary = string.Empty;
+
+        // Fix show-level files an older version left inside "Season XX" before
+        // checking what the show root has, so the card reflects the repair.
+        if (isShowRoot && RepairMisplacedShowFiles(folderPath) > 0)
+            _repairedShowCount++;
 
         if (isTvShow)
         {
@@ -645,9 +829,7 @@ public partial class ScrapingViewModel : ObservableObject
             // cleaning the folder name if no parseable episode exists.
             title = isShowRoot ? folderName : ExtractShowNameFromFiles(folderPath, folderName);
             year = 0;
-            seasonCount = isShowRoot
-                ? CountSeasons(folderPath)
-                : CountSeasonsInFlatFolder(folderPath);
+            tvSummary = TvEpisodeScanner.Summary(TvEpisodeScanner.Scan(folderPath));
 
             hasNfo    = File.Exists(Path.Combine(folderPath, "tvshow.nfo"));
             hasPoster = File.Exists(Path.Combine(folderPath, "poster.jpg"));
@@ -675,28 +857,16 @@ public partial class ScrapingViewModel : ObservableObject
 
         var isComplete = hasNfo && hasPoster && hasFanart && hasActorPhotos;
 
-        string statusText;
-        if (isTvShow)
-        {
-            // Show "Complete" / "Missing: …" plus the season count for context.
-            var verify = BuildVerifyStatus(hasNfo, hasPoster, hasFanart, hasActorPhotos);
-            var seasonLabel = seasonCount > 0
-                ? $"TV · {seasonCount} season{(seasonCount == 1 ? "" : "s")}"
-                : "TV";
-            statusText = $"{seasonLabel} · {verify}";
-        }
-        else
-        {
-            statusText = BuildVerifyStatus(hasNfo, hasPoster, hasFanart, hasActorPhotos);
-        }
-
+        // TV season/episode counts go on their own card line (TvSummary), so
+        // the pill stays "Complete" / "Missing: ..." and keeps its color.
         return new MovieFolderItem
         {
             FolderPath = folderPath,
             MovieTitle = title,
             Year = year,
             IsTvShow = isTvShow,
-            Status = statusText,
+            TvSummary = tvSummary,
+            Status = BuildVerifyStatus(hasNfo, hasPoster, hasFanart, hasActorPhotos),
             IsScraped = isComplete,
             PosterPath = posterForCard,
             HasNfo = hasNfo,
@@ -705,41 +875,6 @@ public partial class ScrapingViewModel : ObservableObject
             HasActorPhotos = hasActorPhotos,
             IsSelected = false
         };
-    }
-
-    /// <summary>Counts "Season XX" subfolders inside a TV show root.</summary>
-    private static int CountSeasons(string showFolder)
-    {
-        if (!Directory.Exists(showFolder)) return 0;
-        try
-        {
-            int count = 0;
-            foreach (var sub in Directory.EnumerateDirectories(showFolder))
-            {
-                if (LooksLikeSeasonFolder(Path.GetFileName(sub))) count++;
-            }
-            return count;
-        }
-        catch { return 0; }
-    }
-
-    /// <summary>
-    /// Counts the distinct season numbers found by parsing the SxxExx pattern
-    /// out of episode filenames in a flat TV folder. Typically returns 1.
-    /// </summary>
-    private static int CountSeasonsInFlatFolder(string folder)
-    {
-        try
-        {
-            return Directory.EnumerateFiles(folder)
-                .Where(f => Utilities.FileFormatValidator.IsVideoFile(f))
-                .Select(f => Utilities.RegexPatterns.ParseTvEpisode(Path.GetFileName(f)))
-                .Where(p => p != null)
-                .Select(p => p!.Season)
-                .Distinct()
-                .Count();
-        }
-        catch { return 0; }
     }
 
     /// <summary>
@@ -818,25 +953,22 @@ public partial class ScrapingViewModel : ObservableObject
         OnPropertyChanged(nameof(IsNoneSelected));
     }
 
-    /// <summary>Manually adds a single folder to the scraping list.</summary>
-    public void AddSingleFolder(string folderPath)
-    {
-        if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath)) return;
-        if (_allFolders.Any(m => string.Equals(m.FolderPath, folderPath, StringComparison.OrdinalIgnoreCase)))
-            return;
-        if (IsTvShowRoot(folderPath) || HasVideoFile(folderPath))
-            AddItem(CreateMovieItem(folderPath));
-    }
-
     public void ClearAll() => ClearItems();
+
+    // Settings the current scraper was built with. If the user changes the
+    // language, main rating or episode-title option in Settings, the next
+    // scrape builds a new one.
+    private (string Lang, bool PreferImdb, bool EpisodeTitles) _scraperSettings;
 
     private void EnsureScraperService()
     {
-        if (_scraperService == null)
+        var current = (_configService.GetScrapeLanguage(), _configService.GetPreferImdbRating(),
+                       _configService.GetAddEpisodeTitles());
+        if (_scraperService == null || current != _scraperSettings)
         {
             var apiKey = _configService.GetApiKey() ?? string.Empty;
-            var lang = _configService.GetScrapeLanguage();
-            _scraperService = new ScraperService(apiKey, lang);
+            _scraperService = new ScraperService(apiKey, current.Item1, current.Item2, current.Item3);
+            _scraperSettings = current;
         }
     }
 

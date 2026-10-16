@@ -54,11 +54,13 @@ TV/
     ├── fanart.jpg
     ├── .actors/
     └── Season 01/
-        ├── Breaking Bad - S01E01 - Pilot.mkv
-        ├── Breaking Bad - S01E01 - Pilot.nfo
-        ├── Breaking Bad - S01E01 - Pilot-thumb.jpg
+        ├── Breaking Bad - S01E01.mkv
+        ├── Breaking Bad - S01E01.nfo
+        ├── Breaking Bad - S01E01-thumb.jpg
         └── ...
 ```
+
+The real episode title (e.g. "Pilot") comes from TMDb and is written into each episode's `.nfo`, which Kodi, Plex, Jellyfin and CineLibrary display. It stays in the filename only if the original filename already had it, unless you turn on **Settings → Add episode titles to file names**, which gives you `Breaking Bad - S01E01 - Pilot.mkv` (with an Undo).
 
 This is the **Plex / Kodi / Jellyfin / MediaElch** standard layout - readable by every major media player and library manager.
 
@@ -110,19 +112,23 @@ A **Mode** selector (Auto · Movies · TV Shows) lets you tell the app what you'
 Pick a folder (or **drag-and-drop** one onto the window).
 
 - **Auto-detect** - extracts title + year for movies, or show + season + episode for TV, and strips technical tags (`1080p`, `x265`, `BluRay`, `WEB-HDRip`, `Atmos`, release-group prefixes, etc.)
-- **TV episodes** → `Show - S01E01 - Episode Title` (Kodi convention); **Movies** → `Title (Year)`
+- **TV episodes** → `Show - S01E01` (plus the episode title if the original filename has one); **Movies** → `Title (Year)`
 - **Edition detection** - Director's Cut, Extended, IMAX, 4K Remaster, Theatrical, Unrated, Criterion … shown as a chip and written to the NFO
 - **Diff highlight** - original filename shows kept tokens in grey, removed tokens in **red strikethrough**
 - **Confidence chip**, editable rows, bulk Find & Replace / Title Case / Reset, search + filters
 - **Per-row 🔍 Scrape** - search TMDb (movies or TV) to confirm the exact match
 - Subtitles (incl. language-tagged like `.en.forced.srt`) follow the rename automatically
+- **Words to always remove** - teach it the tags it doesn't know (a release group's name, a site watermark) once in Settings
+- **Show only warnings** - one click next to the file count shows just the rows with a ⚠, and one click goes back
+- **Keyboard** - `Ctrl+A` selects or clears all, `F2` edits the focused row's new name, `Enter` finishes, `Delete` removes the row from the list (the file is untouched)
+- Picked a `Season 01` folder? It offers to load the whole show folder instead, so Steps 2 and 3 see every season
 
 ### Step 2 · Organize
 
-Files carry over from Step 1. The output folder defaults to your source folder.
+Files carry over from Step 1, or add a folder directly. Each loose file gets its own folder, created right where the file already is. Files that are already in their own folder are skipped.
 
 - **Movies** → `Title (Year)/Title (Year).ext`
-- **TV** → `Show/Season XX/Show - S01E01 - Title.ext`
+- **TV** → `Show/Season XX/Show - S01E01.ext`
 - **Folder merging** - if a destination already exists, files merge in instead of erroring (nothing overwritten)
 - Click **Run File to Folder** - moves everything (subtitles included), then auto-advances to Step 3
 
@@ -131,9 +137,13 @@ Files carry over from Step 1. The output folder defaults to your source folder.
 Folders from Step 2 are auto-listed. You can also **+ Add Folder** for any existing library folder.
 
 - **Movies** → downloads `Title (Year).nfo`, original-resolution poster + fanart, and a `.actors/` folder with the full cast's photos
-- **TV shows** → downloads `tvshow.nfo` + show poster/fanart/cast, then per-episode `.nfo` + episode thumbnail for every episode
-- **Double-tap a scraped card** → a rich **Movie Details** window (hero fanart, poster, plot, color-coded crew/studio/country/genres/IDs/file-info, scrollable cast)
-- **Scrape Selected (auto)** - batch-scrape everything checked
+- **TV shows** → downloads `tvshow.nfo` + show poster/fanart/cast into the show folder, then a per-episode `.nfo` (with the real episode title) + episode thumbnail for every episode
+- **IMDb + TMDb ratings** - every NFO gets both, with vote counts. Pick which one players show first in Settings, and update them any time with **⋯ → Refresh IMDb ratings** (only the ratings change, nothing is re-scraped)
+- **Double-tap a scraped card** → a rich **Movie Details** window (hero fanart, poster, plot, both ratings, color-coded crew/studio/country/genres/IDs/file-info, scrollable cast)
+- **TV shows** - cards read `TV · 3 seasons · 24 episodes`, and the details window lists every episode with its thumbnail and air date, plus the aired episodes you're **missing**
+- **Edit NFO** - right-click a card for a full, resizable editor: every detail field, genres and tags as chips with suggestions from your library, a cast editor, TV episodes, fetch any field from TMDb in another language, and artwork picked from everything TMDb has (poster, fanart, clear logo, landscape). Only what you change is written, every save can be restored, and your edits are protected from Fill gaps and Scrape Selected
+- **Bulk edit** - set a collection, age rating, genres, tags or protection for all checked cards at once
+- **Scrape Selected (auto)** - batch-scrape everything checked, with a progress bar
 - **Fill gaps only** - *Verify-library* sweep: scrapes only folders missing the NFO, poster, fanart, or actor photos; skips complete ones
 - **16 languages** - set the scrape language in Settings (English, Burmese, Hindi, Tamil, Telugu, Thai, Chinese, Japanese, Korean, and more)
 
@@ -152,6 +162,8 @@ Download the latest installer from [Releases](../../releases) and run:
 
 Once installed, the app **checks for updates on startup** (once per day) and offers to download + install new versions for you - no need to come back here.
 
+**Found a bug?** Open **ⓘ About → Copy diagnostics** and paste it into a [GitHub issue](../../issues). It holds the app version, your settings (never your API key) and this session's warnings; have a look before you post it.
+
 ---
 
 ## Build from Source
@@ -164,6 +176,9 @@ dotnet build -p:Platform=x64 -p:RuntimeIdentifier=win-x64
 
 # Build the installer (publishes self-contained Release + runs Inno Setup)
 .\build-installer.ps1
+
+# Unit tests (filename parser, NFO ratings + editor, TV episode checks)
+dotnet test tests\CineLibraryEssentials.Tests
 ```
 
 Output: `release\CineLibraryEssentials_Setup_<version>.exe`
@@ -183,6 +198,7 @@ Output: `release\CineLibraryEssentials_Setup_<version>.exe`
 
 - Built by [@aungkokomm](https://github.com/aungkokomm)
 - Movie metadata by [TMDb](https://www.themoviedb.org/) (this product is not endorsed or certified by TMDb)
+- IMDb ratings: information courtesy of [IMDb](https://www.imdb.com), used with permission, fetched through the free Agregarr ratings service
 - Companion to [CineLibrary](https://github.com/aungkokomm/CineLibraryCS)
 
 ---

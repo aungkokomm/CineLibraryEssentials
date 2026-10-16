@@ -102,6 +102,7 @@
                                     </MenuFlyout>
                                 </Grid.ContextFlyout>
                                 <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          AutomationProperties.Name="{Binding OriginalFileName}"
                                           VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding OriginalFileName}"
