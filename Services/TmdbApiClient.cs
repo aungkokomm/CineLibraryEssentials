@@ -120,18 +120,30 @@ public class TmdbApiClient
         }
     }
 
-    private static List<CastMember> ParseCast(JsonElement creditsEl)
+    /// <summary>
+    /// The cast of credits or aggregate_credits; aggregate_credits gives each
+    /// actor's characters as roles[] instead of one character.
+    /// </summary>
+    internal static List<CastMember> ParseCast(JsonElement creditsEl)
     {
         var list = new List<CastMember>();
-        if (!creditsEl.TryGetProperty("cast", out var castArr)) return list;
+        if (!creditsEl.TryGetProperty("cast", out var castArr) || castArr.ValueKind != JsonValueKind.Array)
+            return list;
 
         foreach (var m in castArr.EnumerateArray().Take(50))
         {
+            var character = m.TryGetProperty("character", out var c) ? c.GetString() ?? "" : "";
+            if (character.Length == 0 && m.TryGetProperty("roles", out var roles) && roles.ValueKind == JsonValueKind.Array)
+                foreach (var role in roles.EnumerateArray())
+                {
+                    character = role.TryGetProperty("character", out var rc) ? rc.GetString() ?? "" : "";
+                    if (character.Length > 0) break;
+                }
             list.Add(new CastMember
             {
                 Id = m.TryGetProperty("id", out var i) ? i.GetInt32() : 0,
                 Name = m.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
-                Character = m.TryGetProperty("character", out var c) ? c.GetString() ?? "" : "",
+                Character = character,
                 ProfilePath = m.TryGetProperty("profile_path", out var pp) ? pp.GetString() : null,
                 Order = m.TryGetProperty("order", out var o) ? o.GetInt32() : 0,
             });
@@ -354,7 +366,7 @@ public class TmdbApiClient
         await RateLimitAsync();
         var url = AppendLanguage(
             $"{BaseUrl}/tv/{tvId}?api_key={_apiKey}" +
-            $"&append_to_response=credits,external_ids,content_ratings");
+            $"&append_to_response=credits,aggregate_credits,external_ids,content_ratings");
 
         try
         {
@@ -378,9 +390,14 @@ public class TmdbApiClient
                 show.EpisodeRunTime = count > 0 ? sum / count : 0;
             }
 
+            // Cast of every season: credits only has the latest season's
+            // (Dark: 1 actor), so it's the fallback
+            if (root.TryGetProperty("aggregate_credits", out var aggregateEl))
+                show.Cast = ParseCast(aggregateEl);
+
             if (root.TryGetProperty("credits", out var creditsEl))
             {
-                show.Cast = ParseCast(creditsEl);
+                if (show.Cast.Count == 0) show.Cast = ParseCast(creditsEl);
                 if (creditsEl.TryGetProperty("crew", out var crewArr))
                 {
                     foreach (var m in crewArr.EnumerateArray())
@@ -415,6 +432,30 @@ public class TmdbApiClient
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"GetTvDetailsAsync error: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The IMDb id TMDb has for a movie or show, for NFOs written before 1.1.10
+    /// that only kept the TMDb id. Null when TMDb doesn't know it or can't be reached.
+    /// </summary>
+    public async Task<string?> GetImdbIdAsync(int tmdbId, bool tv, CancellationToken ct = default)
+    {
+        await RateLimitAsync();
+        var url = $"{BaseUrl}/{(tv ? "tv" : "movie")}/{tmdbId}/external_ids?api_key={_apiKey}";
+        try
+        {
+            var json = await _httpClient.GetStringAsync(url, ct);
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("imdb_id", out var id) && id.ValueKind == JsonValueKind.String
+                ? id.GetString()
+                : null;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"GetImdbIdAsync error: {ex.Message}");
             return null;
         }
     }

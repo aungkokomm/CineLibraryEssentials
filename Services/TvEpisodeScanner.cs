@@ -96,4 +96,99 @@ public static class TvEpisodeScanner
     }
 
     private static string Plural(int n, string word) => $"{n} {word}{(n == 1 ? "" : "s")}";
+
+    private static readonly Regex SeasonFolderPattern = new(
+        @"^(?:Season|Specials?)[\s_\.]?(\d{1,3})?$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // "Dark Season 1 Complete", "Dark.S02.1080p", "Satyamev Jayate S 1": the show's name, then the season
+    private static readonly Regex NamedSeasonPattern = new(
+        @"^(?<show>.*?)(?:Season[\s_\.]?\d{1,3}|(?<![A-Za-z0-9])S\s?\d{1,2})(?![A-Za-z0-9])",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// A season of the show folder above it: "Season 01", "Specials", "Season 2 1080p",
+    /// or a show's name and a season, like "Dark Season 1 Complete", when the folder
+    /// above is named after the show ("Dark") or holds only that show's seasons
+    /// ("Billions (S1 S2 S3)" with "Billions S1" to "S3"; "GoT [Hindi]" with
+    /// "Game of Thrones - Season 1 Complete (Hindi)" and so on). Never a drive's.
+    /// </summary>
+    public static bool IsSeasonFolder(string folderPath)
+    {
+        var trimmed = folderPath.TrimEnd('\\', '/');
+        var name = Path.GetFileName(trimmed);
+        if (string.IsNullOrEmpty(name)) return false;
+        if (SeasonFolderPattern.IsMatch(name)) return true;
+
+        var show = ShowOfSeasonFolder(name);
+        if (show == null) return false;
+        if (show.Length == 0) return true;
+        var parent = Path.GetDirectoryName(trimmed);
+        if (string.IsNullOrEmpty(parent)
+            || string.Equals(Path.GetPathRoot(parent), parent, StringComparison.OrdinalIgnoreCase))
+            return false;
+        return show == WithoutYear(Simplify(Path.GetFileName(parent))) || OnlySeasonsOf(parent) == show;
+    }
+
+    // The show in a season folder's name ("dark" for "Dark Season 1 Complete"),
+    // "" for a season alone ("Season 1 Complete"), null when it's no season's
+    private static string? ShowOfSeasonFolder(string name)
+    {
+        if (SeasonFolderPattern.IsMatch(name)) return "";
+        var m = NamedSeasonPattern.Match(name);
+        return m.Success ? WithoutYear(Simplify(m.Groups["show"].Value)) : null;
+    }
+
+    // "freedomatmidnight2024" compares as "freedomatmidnight"; a show called "1923" stays
+    private static string WithoutYear(string simplified)
+    {
+        var s = Regex.Replace(simplified, @"(?:19|20)\d{2}$", "");
+        return s.Length > 0 ? s : simplified;
+    }
+
+    /// <summary>
+    /// The show whose seasons are all <paramref name="folder"/> holds: at least two
+    /// season folders with episodes, and nothing else with videos in it at any
+    /// depth (another show or a movie means it's a library folder). Null otherwise.
+    /// </summary>
+    private static string? OnlySeasonsOf(string folder)
+    {
+        string? show = null;
+        int seasons = 0;
+        try
+        {
+            foreach (var sub in Directory.EnumerateDirectories(folder))
+            {
+                var name = Path.GetFileName(sub);
+                if (name.StartsWith('.')) continue;   // .actors
+                var s = ShowOfSeasonFolder(name);
+                if (s == null || (s.Length > 0 && show != null && s != show))
+                {
+                    if (HasVideo(sub, recursive: true)) return null;
+                    continue;
+                }
+                if (!HasVideo(sub, recursive: false)) continue;
+                if (s.Length > 0) show = s;
+                seasons++;
+            }
+        }
+        catch { return null; }
+        return seasons >= 2 ? show : null;
+    }
+
+    private static bool HasVideo(string folder, bool recursive)
+    {
+        try
+        {
+            return Directory.EnumerateFiles(folder, "*",
+                    new EnumerationOptions { RecurseSubdirectories = recursive, IgnoreInaccessible = true })
+                .Any(Utilities.FileFormatValidator.IsVideoFile);
+        }
+        catch { return false; }
+    }
+
+    // "Dark (2017)" and "Dark." compare as "dark"
+    private static string Simplify(string name)
+        => Regex.Replace(Regex.Replace(name, @"[\(\[]\s*(?:19|20)\d{2}\s*[\)\]]", ""), @"[^\p{L}\p{N}]", "")
+            .ToLowerInvariant();
 }

@@ -205,6 +205,11 @@ public class ScraperService
         if (lockInfo.TmdbId is int lockedId)
             return await ScrapeTvShowWithDetailsAsync(showFolderPath, episodes, lockedId, progress, keepEdits: true);
 
+        // A show scraped before stays on its TMDb match (perhaps picked with
+        // Search TMDb); a name search could land on another show of that name.
+        if (ImdbRefreshService.ReadIds(Path.Combine(showFolderPath, "tvshow.nfo")).TmdbId is var knownId and > 0)
+            return await ScrapeTvShowWithDetailsAsync(showFolderPath, episodes, knownId, progress, keepEdits: lockInfo.Locked);
+
         // 2) Show name from filenames — far more reliable than the folder name
         //    (which is often "Show Name Season 1 Complete" or worse).
         var showName = PickConsensusShowName(episodes)

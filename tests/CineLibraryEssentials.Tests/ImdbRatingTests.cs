@@ -143,6 +143,39 @@ public class RatingsXmlTests
         Assert.True(RatingsXml.ApplyImdb(root, 8.7, 500000, preferImdb: true));
         Assert.Equal("ratings", ((XElement)root.Element("title")!.NextNode!).Name.LocalName);
     }
+
+    [Fact]
+    public void RefreshKeepsOldSingleRatingAsTmdb()
+    {
+        // An NFO from before 1.1.10: TMDb's rating in a single <rating>, no <ratings>
+        var root = XElement.Parse("<movie><title>Up</title><rating>7.9</rating><votes>19000</votes><tmdbid>14160</tmdbid></movie>");
+
+        Assert.True(RatingsXml.ApplyImdb(root, 8.3, 1100000, preferImdb: true));
+
+        var entries = RatingsXml.ReadAll(root);
+        Assert.Equal(new[] { ("imdb", 8.3, true), ("themoviedb", 7.9, false) },
+            entries.Select(e => (e.Name, e.Value, e.IsDefault)));
+        Assert.Equal(19000, entries[1].Votes);
+        Assert.False(RatingsXml.ApplyImdb(root, 8.3, 1100000, preferImdb: true));
+    }
+
+    [Fact]
+    public void RefreshKeepsOtherSourcesScale()
+    {
+        var root = XElement.Parse("""
+            <movie><title>Up</title><ratings>
+              <rating name="themoviedb" default="true" max="10"><value>7.9</value><votes>19000</votes></rating>
+              <rating name="tomatometerallcritics" max="100"><value>98</value><votes>290</votes></rating>
+            </ratings></movie>
+            """);
+
+        Assert.True(RatingsXml.ApplyImdb(root, 8.3, 1100000, preferImdb: true));
+
+        var rt = root.Element("ratings")!.Elements("rating").Single(r => (string?)r.Attribute("name") == "tomatometerallcritics");
+        Assert.Equal("100", (string?)rt.Attribute("max"));
+        Assert.Equal("98", rt.Element("value")!.Value);
+        Assert.Null(rt.Attribute("default"));
+    }
 }
 
 public class ImdbRefreshServiceTests : IDisposable
@@ -211,5 +244,53 @@ public class ImdbRefreshServiceTests : IDisposable
 
         Assert.Equal(1, r.NoRating);
         Assert.Equal(xml, File.ReadAllText(Path.Combine(movie, "X (1994).nfo")));
+    }
+
+    [Fact]
+    public async Task LooksUpImdbIdForTmdbOnlyNfos()
+    {
+        // As 1.0 wrote them (<tmdbid>), and a show with only a TMDb uniqueid
+        var movie = Folder("Up (2009)", ("Up (2009).nfo",
+            "<movie><title>Up</title><rating>7.9</rating><votes>19000</votes><tmdbid>14160</tmdbid></movie>"));
+        var show = Folder("Dark", ("tvshow.nfo", """<tvshow><title>Dark</title><uniqueid type="tmdb">70523</uniqueid></tvshow>"""));
+        var unknown = Folder("Rare (1950)", ("Rare (1950).nfo", "<movie><title>Rare</title><tmdbid>999</tmdbid></movie>"));
+
+        var asked = new List<(int, bool)>();
+        Task<string?> Find(int tmdbId, bool tv, CancellationToken ct)
+        {
+            asked.Add((tmdbId, tv));
+            return Task.FromResult<string?>(tmdbId switch { 14160 => "tt1049413", 70523 => "tt5753856", _ => null });
+        }
+        var fake = new Fake("""[{"imdbId":"tt1049413","rating":8.3,"votes":1100000},{"imdbId":"tt5753856","rating":8.7,"votes":500000}]""");
+        var svc = new ImdbRefreshService(new ImdbRatingService(new HttpClient(fake)), Find);
+
+        var r = await svc.RefreshAsync(new[] { movie, show, unknown }, preferImdb: true);
+
+        Assert.Equal(new[] { (14160, false), (70523, true), (999, false) }, asked);
+        Assert.Equal(2, r.Updated);
+        Assert.Equal(1, r.NoImdbId);
+
+        var movieRoot = XDocument.Load(Path.Combine(movie, "Up (2009).nfo")).Root!;
+        Assert.Equal("tt1049413", movieRoot.Elements("uniqueid").Single(u => (string?)u.Attribute("type") == "imdb").Value);
+        Assert.Equal("uniqueid", ((XElement)movieRoot.Element("tmdbid")!.NextNode!).Name.LocalName);
+        Assert.Equal(new[] { "imdb", "themoviedb" }, RatingsXml.ReadAll(movieRoot).Select(e => e.Name));
+        Assert.Equal("tt5753856", ImdbRefreshService.ReadImdbId(Path.Combine(show, "tvshow.nfo")));
+
+        // The ids are in the NFOs now: no more lookups
+        asked.Clear();
+        var again = await svc.RefreshAsync(new[] { movie, show }, preferImdb: true);
+        Assert.Empty(asked);
+        Assert.Equal(2, again.AlreadyCurrent);
+    }
+
+    [Fact]
+    public async Task WithoutLookupTmdbOnlyNfosCountAsNoId()
+    {
+        var movie = Folder("Up (2009)", ("Up (2009).nfo", "<movie><title>Up</title><tmdbid>14160</tmdbid></movie>"));
+        var fake = new Fake("[]");
+
+        var r = await new ImdbRefreshService(new ImdbRatingService(new HttpClient(fake))).RefreshAsync(new[] { movie }, true);
+
+        Assert.Equal(1, r.NoImdbId);
     }
 }

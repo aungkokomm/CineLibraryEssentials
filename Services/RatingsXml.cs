@@ -52,21 +52,37 @@ public static class RatingsXml
         if (rating <= 0) return false;
 
         var existing = ReadAll(nfoRoot);
-        var tmdb = existing.FirstOrDefault(e => e.Name == Tmdb);
+        var current = nfoRoot.Element("ratings");
+        // An NFO without a <ratings> block (written before 1.1.10) keeps TMDb's
+        // rating in the old single <rating>: carry it over as TMDb's.
+        if (current == null
+            && double.TryParse(nfoRoot.Element("rating")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var legacy)
+            && legacy > 0)
+        {
+            int.TryParse(nfoRoot.Element("votes")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var legacyVotes);
+            existing.Add(new Entry(Tmdb, legacy, legacyVotes, true));
+        }
+
+        var tmdb = existing.FirstOrDefault(e => e.Name is Tmdb or "tmdb");
         var old = existing.FirstOrDefault(e => e.Name == Imdb);
         if (old != null && Math.Abs(old.Value - Math.Round(rating, 1)) < 0.001 && old.Votes == votes
             && old.IsDefault == (preferImdb || tmdb == null))
             return false;   // already current
 
         // Rebuild the block from what's there plus the new IMDb value, keeping any
-        // other sources (e.g. ones written by other tools) after ours.
-        var others = existing.Where(e => e.Name != Imdb && e.Name != Tmdb).ToList();
+        // other sources (e.g. ones written by other tools) after ours as they are:
+        // one can be out of another scale (Rotten Tomatoes' max="100").
         var block = Build(tmdb?.Value ?? 0, tmdb?.Votes ?? 0, rating, votes, preferImdb)!;
-        foreach (var o in others) block.Add(Rating(o.Name, o.Value, o.Votes, false));
-
-        var current = nfoRoot.Element("ratings");
         if (current != null)
         {
+            foreach (var el in current.Elements("rating"))
+            {
+                var name = ((string?)el.Attribute("name") ?? string.Empty).Trim().ToLowerInvariant();
+                if (name is Imdb or Tmdb or "tmdb") continue;
+                var copy = new XElement(el);
+                copy.Attribute("default")?.Remove();
+                block.Add(copy);
+            }
             current.ReplaceWith(block);
         }
         else

@@ -98,7 +98,7 @@ TV episodes are renamed to the Kodi/Plex convention `Show - S01E01`, and all epi
 - **Movies** → `Title (Year).nfo`, original-resolution poster + fanart, `.actors/` cast photos
 - **TV shows** → `tvshow.nfo` + show poster/fanart/cast at the show root, plus a per-episode `.nfo` and episode thumbnail for every episode inside each season
 
-Flat single-season folders (e.g. `Breaking Bad Season 1 Complete/` with episodes directly inside) are recognized too - the show name is read from the episode filenames, not the folder name.
+Flat single-season folders (e.g. `Breaking Bad Season 1 Complete/` with episodes directly inside) are recognized too - the show name is read from the episode filenames, not the folder name. When such folders sit inside a folder named after the show (`Dark/Dark Season 1 Complete/`, `Dark/Dark Season 2 Complete/`), or inside a folder that holds only that show's seasons (`Billions (S1 S2 S3)/Billions S1/`, `GoT [Hindi]/Game of Thrones - Season 1 Complete (Hindi)/`), they're seasons of that show: one card, with `tvshow.nfo` and the show's artwork in the show's folder. A folder that also holds another show or a movie is never taken for one show.
 
 ---
 
@@ -118,7 +118,7 @@ Three ways:
 
 If you drop a *file* instead of a folder, the app uses the file's parent folder. Useful when you want to drag a single file from a deep path without navigating to its folder first.
 
-If the folder you load is a season folder (`Season 01`, `Specials`), a message offers **Use show folder**. That loads the show's folder with Subfolders on, so every season is cleaned together and Steps 2 and 3 see the whole show.
+If the folder you load is a season folder (`Season 01`, `Specials`, or `Dark Season 1 Complete` inside a `Dark` folder), a message offers **Use show folder**. That loads the show's folder with Subfolders on, so every season is cleaned together and Steps 2 and 3 see the whole show.
 
 ### Understanding each row
 
@@ -301,7 +301,13 @@ Click **Fill gaps only** → the app sweeps **every** folder in the list and scr
 
 TV folders show one card per show. Under the title, a line like *"TV · 3 seasons · 24 episodes"* counts what's on disk (double episodes like `S01E01E02` count as two), and after a scrape it adds how many aired episodes are missing, e.g. *"· 2 missing"*. The status pill shows *Complete* or what's missing, the same as for movies.
 
-Scraping a TV card writes `tvshow.nfo` + show artwork at the root and a per-episode `.nfo` + thumbnail for every episode. Right-click → **Search TMDb** searches the **TV** database (not movies) for TV cards. If you add a `Season 01` folder, the card is made for the show folder above it, which is where the show's files belong.
+Scraping a TV card writes `tvshow.nfo` + show artwork at the root and a per-episode `.nfo` + thumbnail for every episode. Right-click → **Search TMDb** searches the **TV** database (not movies) for TV cards. If you add a `Season 01` folder (or `Dark Season 1 Complete` inside `Dark`), the card is made for the show folder above it, which is where the show's files belong.
+
+Scraping a show again keeps the TMDb show its `tvshow.nfo` is already matched to, so a show you once corrected with **Search TMDb** stays correct. To match it to a different show, use **Search TMDb**.
+
+The cast comes from every season of the show, not just the latest one.
+
+Shows scraped by v1.3.0 and earlier as one show per `Dark Season 1 Complete` folder are fixed when you add them: the show's `tvshow.nfo`, poster, fanart and `.actors` move up from the first season folder into `Dark/` (only what `Dark/` doesn't have yet, nothing is overwritten). The copies left in the other season folders are no longer used. Scrape the show again for the full cast and the right missing-episode count.
 
 ### Episode titles in file names
 
@@ -317,7 +323,7 @@ Subtitles (`.en.srt` and so on), the episode `.nfo` and the thumbnail are rename
 
 Every NFO gets both ratings, each with its vote count, so Kodi, Jellyfin and CineLibrary can show either one. **Settings → Main rating** picks which one players show first (IMDb by default, when the title has one).
 
-IMDb ratings change over time. **⋯ → Refresh IMDb ratings** updates them for the checked cards (or all cards when none are checked) in one quick request. Only the ratings in the NFO change: nothing is re-scraped and nothing else in the file is touched.
+IMDb ratings change over time. **⋯ → Refresh IMDb ratings** updates them for the checked cards (or all cards when none are checked) in one quick request. Only the ratings in the NFO change: nothing is re-scraped and nothing else in the file is touched. NFOs scraped before v1.1.10 have only the TMDb id, so their IMDb id is looked up on TMDb first and added to the NFO. Ratings from other sources (such as Rotten Tomatoes) are kept as they are.
 
 ### Other things you can do
 

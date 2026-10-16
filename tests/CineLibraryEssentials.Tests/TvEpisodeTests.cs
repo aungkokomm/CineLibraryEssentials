@@ -49,6 +49,76 @@ public class TvEpisodeScannerTests : IDisposable
         Assert.Equal("TV · 2 seasons · 5 episodes · 3 missing", TvEpisodeScanner.Summary(files, missing: 3));
     }
 
+    [Theory]
+    [InlineData(@"Dark\Season 01", true)]
+    [InlineData(@"Dark\Specials", true)]
+    [InlineData(@"Dark\Dark Season 1 Complete", true)]
+    [InlineData(@"Dark (2017)\Dark Season 2", true)]
+    [InlineData(@"Dark\Dark (2017) Season 3 1080p", true)]
+    [InlineData(@"Breaking Bad\Breaking.Bad.S03.1080p.BluRay", true)]
+    [InlineData(@"Satyamev Jayate\Satyamev Jayate S 1", true)]
+    [InlineData(@"Dark\Season 1 Complete", true)]
+    [InlineData(@"Web Series\Dark Season 1 Complete", false)]   // its own show: no Dark folder above
+    [InlineData(@"Dark\Dark S01E01", false)]
+    [InlineData(@"Movies\Inception (2010)", false)]
+    [InlineData(@"Dark\Season 1080p", false)]
+    public void RecognizesSeasonFolders(string relative, bool expected)
+        => Assert.Equal(expected, TvEpisodeScanner.IsSeasonFolder(Path.Combine(@"D:\Web Series", relative)));
+
+    [Fact]
+    public void RecognizesSeasonsOfAShowInAnyNamedFolder()
+    {
+        Touch(@"Serials\Billions (S1 S2 S3)\Billions S1\Billions S01E01.mkv");
+        Touch(@"Serials\Billions (S1 S2 S3)\Billions S2\Billions S02E01.mkv");
+        Touch(@"Serials\Breaking Bad All 5 Seasons Complete\Breaking Bad Season 1 Complete\Breaking Bad S01E01.mkv");
+        Touch(@"Serials\Breaking Bad All 5 Seasons Complete\Breaking Bad Season 2 Complete\Breaking Bad S02E01.mkv");
+        Touch(@"Serials\GoT [Hindi]\Game of Thrones - Season 1 Complete (Hindi)\Game of Thrones S01E01.mkv");
+        Touch(@"Serials\GoT [Hindi]\Game of Thrones - Season 2 Complete (Hindi)\Game of Thrones S02E01.mkv");
+        Touch(@"Serials\GoT [Hindi]\.actors\Peter_Dinklage.jpg");
+        // Loose season folders in a library folder that also holds other shows
+        Touch(@"Serials\Dark Season 1 Complete\Dark S01E01.mkv");
+        Touch(@"Serials\Dark Season 2 Complete\Dark S02E01.mkv");
+        // One lone season folder isn't enough to make its folder a show
+        Touch(@"Misc\Billions S3\Billions S03E01.mkv");
+        // Two shows' seasons side by side
+        Touch(@"Mixed\Billions S1\Billions S01E01.mkv");
+        Touch(@"Mixed\Dark S1\Dark S01E01.mkv");
+        // A year in the season folder's name; a show named after a year
+        Touch(@"Freedom at Midnight\Freedom at Midnight 2024  S01\Freedom at Midnight S01E01.mkv");
+        Touch(@"1923\1923 Season 1\1923 S01E01.mkv");
+        Touch(@"Web\1923 Season 1\1923 S01E01.mkv");
+        Touch(@"Web\Dark\Dark S01E01.mkv");
+
+        bool Season(string relative) => TvEpisodeScanner.IsSeasonFolder(Path.Combine(_root, relative));
+        Assert.True(Season(@"Serials\Billions (S1 S2 S3)\Billions S1"));
+        Assert.True(Season(@"Serials\Breaking Bad All 5 Seasons Complete\Breaking Bad Season 2 Complete"));
+        Assert.True(Season(@"Serials\GoT [Hindi]\Game of Thrones - Season 1 Complete (Hindi)"));
+        Assert.False(Season(@"Serials\Billions (S1 S2 S3)"));
+        Assert.False(Season(@"Serials\Dark Season 1 Complete"));
+        Assert.False(Season(@"Misc\Billions S3"));
+        Assert.False(Season(@"Mixed\Billions S1"));
+        Assert.True(Season(@"Freedom at Midnight\Freedom at Midnight 2024  S01"));
+        Assert.True(Season(@"1923\1923 Season 1"));
+        Assert.False(Season(@"Web\1923 Season 1"));
+    }
+
+    [Fact]
+    public void ReadsCastOfEverySeason()
+    {
+        // aggregate_credits: characters under roles[]; credits: one character
+        using var aggregate = JsonDocument.Parse("""
+            {"cast":[{"id":1,"name":"Louis Hofmann","profile_path":"/l.jpg","order":0,
+                      "roles":[{"character":"","episode_count":1},{"character":"Jonas Kahnwald","episode_count":26}]},
+                     {"id":2,"name":"Lisa Vicari","profile_path":null,"order":1,"roles":[]}]}
+            """);
+        using var credits = JsonDocument.Parse("""{"cast":[{"id":1,"name":"Louis Hofmann","character":"Jonas","order":0}]}""");
+
+        var cast = TmdbApiClient.ParseCast(aggregate.RootElement);
+        Assert.Equal(new[] { ("Louis Hofmann", "Jonas Kahnwald"), ("Lisa Vicari", "") }, cast.Select(c => (c.Name, c.Character)));
+        Assert.Equal("/l.jpg", cast[0].ProfilePath);
+        Assert.Equal("Jonas", TmdbApiClient.ParseCast(credits.RootElement).Single().Character);
+    }
+
     [Fact]
     public void SummaryUsesSingularForOne()
     {

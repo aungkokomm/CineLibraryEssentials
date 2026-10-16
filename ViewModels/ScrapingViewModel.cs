@@ -345,7 +345,7 @@ public partial class ScrapingViewModel : ObservableObject
 
     /// <summary>True if <paramref name="folder"/> contains at least one
     /// "Season XX" subfolder that itself contains a video file. (Multi-season
-    /// show root — the classic Kodi/Plex layout.)</summary>
+    /// show root — the classic Kodi/Plex layout, or "Dark/Dark Season 1 Complete".)</summary>
     public static bool IsTvShowRoot(string folder)
     {
         if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder)) return false;
@@ -353,8 +353,7 @@ public partial class ScrapingViewModel : ObservableObject
         {
             foreach (var sub in Directory.EnumerateDirectories(folder))
             {
-                var name = Path.GetFileName(sub);
-                if (LooksLikeSeasonFolder(name) && HasVideoFile(sub))
+                if (HasVideoFile(sub) && TvEpisodeScanner.IsSeasonFolder(sub))
                     return true;
             }
         }
@@ -393,14 +392,6 @@ public partial class ScrapingViewModel : ObservableObject
     public static bool IsTvFolder(string folder)
         => IsTvShowRoot(folder) || IsFlatTvSeasonFolder(folder);
 
-    private static readonly System.Text.RegularExpressions.Regex SeasonFolderPattern =
-        new(@"^(?:Season|Specials?)[\s_\.]?(\d{1,3})?$",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
-
-    /// <summary>"Season 01", "Season 1", "Specials" and the like (also used by Step 1).</summary>
-    public static bool LooksLikeSeasonFolder(string folderName)
-        => !string.IsNullOrEmpty(folderName) && SeasonFolderPattern.IsMatch(folderName);
-
     /// <summary>
     /// A "Season 01" / "Specials" folder belongs to the show folder above it.
     /// Step 2 hands Step 3 the Season folder it moved episodes into, and users
@@ -411,7 +402,7 @@ public partial class ScrapingViewModel : ObservableObject
     private static string NormalizeToShowRoot(string folder)
     {
         var trimmed = folder.TrimEnd(Path.DirectorySeparatorChar);
-        if (!LooksLikeSeasonFolder(Path.GetFileName(trimmed))) return folder;
+        if (!TvEpisodeScanner.IsSeasonFolder(trimmed)) return folder;
 
         var parent = Path.GetDirectoryName(trimmed);
         if (string.IsNullOrEmpty(parent)
@@ -422,7 +413,9 @@ public partial class ScrapingViewModel : ObservableObject
 
     /// <summary>
     /// Repairs shows scraped by v1.2.10 and earlier, which wrote the show-level
-    /// files into "Season XX" instead of the show folder. Moves tvshow.nfo,
+    /// files into "Season XX" instead of the show folder, and by v1.3.0 and
+    /// earlier, which scraped each "Dark Season 1 Complete" folder as its own
+    /// show (the copies left in the other seasons are ignored). Moves tvshow.nfo,
     /// poster.jpg, fanart.jpg and .actors up to the show root, only when the
     /// root doesn't already have that item, so nothing is overwritten.
     /// tvshow.nfo refers to .actors relative to itself, so they move together.
@@ -435,7 +428,7 @@ public partial class ScrapingViewModel : ObservableObject
         {
             foreach (var season in Directory.EnumerateDirectories(showRoot))
             {
-                if (!LooksLikeSeasonFolder(Path.GetFileName(season))) continue;
+                if (!TvEpisodeScanner.IsSeasonFolder(season)) continue;
 
                 foreach (var name in new[] { "tvshow.nfo", "poster.jpg", "fanart.jpg" })
                 {
@@ -731,8 +724,11 @@ public partial class ScrapingViewModel : ObservableObject
         StatusMessage = string.Empty;
         try
         {
-            var r = await new ImdbRefreshService().RefreshAsync(
-                targets.Select(t => t.FolderPath), _configService.GetPreferImdbRating());
+            var tmdb = new TmdbApiClient(_configService.GetApiKey() ?? string.Empty);
+            var r = await new ImdbRefreshService(findImdbId: tmdb.GetImdbIdAsync).RefreshAsync(
+                targets.Select(t => t.FolderPath), _configService.GetPreferImdbRating(),
+                lookupProgress: new Progress<(int Done, int Total)>(p =>
+                    ProgressText = $"Finding IMDb ids on TMDb... {p.Done} of {p.Total}"));
             StatusMessage = $"IMDb ratings: {r.Updated} updated, {r.AlreadyCurrent} already current"
                 + (r.NoImdbId + r.NoNfo > 0 ? $", {r.NoImdbId + r.NoNfo} not scraped yet or without an IMDb id" : "")
                 + (r.NoRating > 0 ? $", {r.NoRating} with no IMDb rating" : "")

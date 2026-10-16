@@ -246,7 +246,7 @@ public sealed partial class RenameStep : UserControl
     {
         var trimmed = path.TrimEnd('\\', '/');
         var name = Path.GetFileName(trimmed);
-        if (!ScrapingViewModel.LooksLikeSeasonFolder(name)) return;
+        if (!TvEpisodeScanner.IsSeasonFolder(trimmed)) return;
 
         var parent = Path.GetDirectoryName(trimmed);
         if (string.IsNullOrEmpty(parent)
