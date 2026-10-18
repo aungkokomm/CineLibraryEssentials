@@ -5,7 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 namespace CineLibraryEssentials.Views;
 
 /// <summary>
-/// Step 3 "Bulk edit": one change (collection, age rating, genres, tags, lock)
+/// Step 3 "Bulk edit": one change (collection, certification, genres, tags, lock)
 /// applied to every checked card's NFO. Only what's ticked or filled in changes.
 /// </summary>
 public sealed partial class BulkEditDialog : ContentDialog

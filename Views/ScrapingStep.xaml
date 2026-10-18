@@ -68,7 +68,7 @@
                             ToolTipService.ToolTip="Verify library - auto-scrape every folder that's missing the NFO, poster, fanart, or actor photos. Skips folders that are already complete." />
                     <Button Content="Scrape Selected (auto)"
                             Click="OnScrapeSelectedClick"
-                            ToolTipService.ToolTip="Auto-scrape every checked movie using the first TMDb match" />
+                            ToolTipService.ToolTip="Scrape every checked movie and show: new ones with the first TMDb match, scraped ones again with their own match" />
                     <Button Padding="8,5" MinWidth="0"
                             AutomationProperties.Name="More actions"
                             ToolTipService.ToolTip="More actions">

@@ -647,13 +647,15 @@ public partial class ScrapingViewModel : ObservableObject
         if (IsWorking) return;   // one batch at a time
 
         // TV shows are scraped via the dedicated TV path inside ScrapeOneAsync,
-        // so we include them here just like movies.
+        // so we include them here just like movies. Checked cards that are
+        // already Complete are scraped again (they keep their TMDb match and
+        // pictures); Fill gaps only is the way to skip them.
         var selected = MovieFolders
-            .Where(m => m.IsSelected && !m.IsScraped)
+            .Where(m => m.IsSelected)
             .ToList();
 
         await RunBatchAsync(selected, "Scraping");
-        StatusMessage = $"Done. {selected.Count(s => s.IsScraped)} of {selected.Count} succeeded.";
+        StatusMessage = $"Done. {selected.Count(s => s.IsScraped && string.IsNullOrEmpty(s.ErrorMessage))} of {selected.Count} succeeded.";
     }
 
     /// <summary>

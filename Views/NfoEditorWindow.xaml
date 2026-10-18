@@ -147,7 +147,7 @@
                                      PlaceholderText="2010-07-15" TextChanged="OnAnyChange" />
                             <NumberBox Grid.Column="2" x:Name="RuntimeBox" Header="Runtime (minutes)"
                                        Minimum="0" Maximum="2000" SpinButtonPlacementMode="Hidden" ValueChanged="OnNumberChanged" />
-                            <ComboBox Grid.Column="3" x:Name="AgeRatingBox" Header="Age rating" IsEditable="True"
+                            <ComboBox Grid.Column="3" x:Name="AgeRatingBox" Header="Certification" IsEditable="True"
                                       HorizontalAlignment="Stretch" SelectionChanged="OnAgeRatingSelectionChanged" TextSubmitted="OnAgeRatingSubmitted" />
                         </Grid>
 
@@ -161,7 +161,7 @@
                             </Button>
                         </Grid>
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                            <TextBox x:Name="PlotBox" Header="Plot" AcceptsReturn="True" TextWrapping="Wrap"
+                            <TextBox x:Name="PlotBox" Header="Plot / Overview" AcceptsReturn="True" TextWrapping="Wrap"
                                      Height="170" TextChanged="OnAnyChange" />
                             <Button Grid.Column="1" x:Name="FetchPlotButton" Tag="plot" Style="{StaticResource FetchButton}"
                                     AutomationProperties.Name="Fetch the plot from TMDb"
@@ -183,10 +183,10 @@
                             <TextBlock Style="{StaticResource SectionHeader}" Text="Collection and edition" />
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
                                 <AutoSuggestBox x:Name="CollectionBox" Header="Collection"
-                                                PlaceholderText="The Dark Knight Collection"
+                                                PlaceholderText="Not in a collection"
                                                 TextChanged="OnSuggestTextChanged" />
                                 <AutoSuggestBox Grid.Column="1" x:Name="EditionBox" Header="Edition"
-                                                PlaceholderText="Director's Cut"
+                                                PlaceholderText="No special edition"
                                                 TextChanged="OnSuggestTextChanged" />
                             </Grid>
                         </StackPanel>
@@ -286,10 +286,10 @@
                             </StackPanel>
                         </Button>
 
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="My rating" />
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="User rating" />
                         <StackPanel Orientation="Horizontal" Spacing="12">
                             <RatingControl x:Name="UserRatingControl" MaxRating="10" IsClearEnabled="True"
-                                           ValueChanged="OnUserRatingChanged" AutomationProperties.Name="My rating" />
+                                           ValueChanged="OnUserRatingChanged" AutomationProperties.Name="User rating" />
                             <TextBlock x:Name="UserRatingText" VerticalAlignment="Center"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
@@ -373,7 +373,7 @@
                                 <TextBox Header="Title" Text="{Binding Title, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 <TextBox Header="Aired" PlaceholderText="2017-12-01"
                                          Text="{Binding Aired, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <TextBox Header="Plot" AcceptsReturn="True" TextWrapping="Wrap" Height="150"
+                                <TextBox Header="Plot / Overview" AcceptsReturn="True" TextWrapping="Wrap" Height="150"
                                          Text="{Binding Plot, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 <TextBlock Text="Thumbnail" />
                                 <StackPanel Orientation="Horizontal" Spacing="12">

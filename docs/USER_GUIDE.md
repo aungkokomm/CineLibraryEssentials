@@ -281,7 +281,7 @@ Status pills are colour-coded:
 | Green | *Complete* (just scraped) or *Already scraped* (folder already had .nfo + poster when loaded) |
 | Red | *Failed* - hover the warning, the error is in the row |
 
-If a folder was already scraped (it has both an `.nfo` and a `-poster.jpg`), the app **detects this on load** and pre-unchecks it so a bulk *Scrape Selected* won't redo it.
+If a folder was already scraped (it has both an `.nfo` and a `-poster.jpg`), the app **detects this on load** and pre-unchecks it, so a bulk *Scrape Selected* only redoes it if you check it.
 
 ### Per-movie scrape
 
@@ -290,6 +290,8 @@ Click **Scrape** on any card → the same TMDb search dialog as Step 1 opens, pr
 ### Bulk auto-scrape
 
 Click **Scrape Selected (auto)** at the top → every checked card is processed sequentially using the **first TMDb match** for each one (movie or TV show, depending on the card). Fast for batch processing, less precise than per-card. Use it after you've eyeballed the list and trust the auto-match.
+
+Checked cards that are already **Complete** are scraped again, for example to get the full cast of a TV show or to add episode titles to file names. An already-scraped movie or show keeps the TMDb match in its NFO and its poster and fanart (only missing pictures are added), and protected edits stay as they are. To scrape only what's missing, use **Fill gaps only**.
 
 The **Select all** box ticks every card (or clears them all), and a progress bar at the bottom shows *"Scraping 3 of 12: Title"* while a batch runs.
 
@@ -348,7 +350,7 @@ Scraped the right title but want to fix something? Right-click a card → **Edit
 
 | Section | What you can change |
 |---|---|
-| **Details** | Title, original title, sort title, year, premiered date, runtime, age rating, tagline, plot, outline, and for movies the collection and edition |
+| **Details** | Title, original title, sort title, year, premiered date, runtime, certification, tagline, plot (overview), outline, and for movies the collection and edition |
 | **Genres and tags** | Genres, tags (your own labels like *4K* or *Watched*), studios, countries |
 | **Cast and crew** | Director, writers (creators for TV), and the cast: add, remove, rename, change roles and photos, and drag rows (or use the arrows) to change the billing order |
 | **Ratings and IDs** | See the IMDb and TMDb ratings, refresh the IMDb one, give your own rating (0 to 10 stars), and edit the IMDb id, TMDb id and trailer link (each with an Open button) |
@@ -369,7 +371,7 @@ Some handy details:
 
 Tick several cards, then **⋯ → Bulk edit checked items...** to change them all at once:
 
-- Set (or clear) the **collection**, set the **age rating**
+- Set (or clear) the **collection**, set the **certification**
 - **Add** or **remove** genres and tags (each title keeps the ones you don't mention)
 - **Protect** or stop protecting them from re-scrapes
 

@@ -25,7 +25,7 @@
             </StackPanel>
 
             <StackPanel Spacing="6">
-                <CheckBox x:Name="AgeRatingCheck" Content="Set the age rating" />
+                <CheckBox x:Name="AgeRatingCheck" Content="Set the certification" />
                 <ComboBox x:Name="AgeRatingBox" IsEditable="True" MinWidth="200"
                           IsEnabled="{Binding IsChecked, ElementName=AgeRatingCheck}" />
             </StackPanel>

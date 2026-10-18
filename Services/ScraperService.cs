@@ -48,6 +48,13 @@ public class ScraperService
             if (lockInfo.TmdbId is int lockedId)
                 return await DownloadAllAssetsAsync(movieFolderPath, lockedId, progress, keepEdits: true);
 
+            // A movie scraped before stays on its TMDb match (perhaps picked with
+            // Search TMDb) and keeps its pictures; only missing ones are added.
+            if (NfoLocator.FindMainNfo(movieFolderPath) is { } nfo
+                && ImdbRefreshService.ReadIds(nfo).TmdbId is var knownId and > 0)
+                return await DownloadAllAssetsAsync(movieFolderPath, knownId, progress,
+                    keepEdits: lockInfo.Locked, keepImages: true);
+
             progress?.Report($"Searching for '{movieTitle}'...");
             var searchResults = await _tmdbClient.SearchMovieAsync(movieTitle, movieYear);
 
@@ -89,13 +96,16 @@ public class ScraperService
     /// Shared pipeline: details → cast → poster → fanart → actor photos → NFO file.
     /// keepEdits (a locked NFO, automatic scrape): the NFO and any existing poster
     /// or fanart are left as the user made them; only missing images are added.
+    /// keepImages (a rescrape): existing poster and fanart stay; the NFO is rewritten.
     /// </summary>
     private async Task<(bool success, string message)> DownloadAllAssetsAsync(
         string movieFolderPath,
         int tmdbId,
         IProgress<string>? progress,
-        bool keepEdits = false)
+        bool keepEdits = false,
+        bool keepImages = false)
     {
+        keepImages |= keepEdits;
         // Details — single batched call now returns cast + crew + certification + trailer.
         progress?.Report("Downloading metadata...");
         var details = await _tmdbClient.GetMovieDetailsAsync(tmdbId);
@@ -123,7 +133,7 @@ public class ScraperService
         // Poster — pull TMDb's "original" upload (typically 1500–2000px tall).
         // The previous w500 default produced blurry results on any modern display.
         if (!string.IsNullOrEmpty(details.PosterPath) && !string.IsNullOrEmpty(videoFile)
-            && !(keepEdits && HasImage(movieFolderPath, "-poster.jpg")))
+            && !(keepImages && HasImage(movieFolderPath, "-poster.jpg")))
         {
             progress?.Report("Downloading poster...");
             var posterUrl = _tmdbClient.GetImageUrl(details.PosterPath, "original");
@@ -132,7 +142,7 @@ public class ScraperService
 
         // Fanart — also "original" (typically 1920×1080+) for sharp 1080p/4K TVs.
         if (!string.IsNullOrEmpty(details.BackdropPath) && !string.IsNullOrEmpty(videoFile)
-            && !(keepEdits && HasImage(movieFolderPath, "-fanart.jpg")))
+            && !(keepImages && HasImage(movieFolderPath, "-fanart.jpg")))
         {
             progress?.Report("Downloading fanart...");
             var fanartUrl = _tmdbClient.GetImageUrl(details.BackdropPath, "original");

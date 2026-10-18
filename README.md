@@ -142,7 +142,7 @@ Folders from Step 2 are auto-listed. You can also **+ Add Folder** for any exist
 - **Double-tap a scraped card** → a rich **Movie Details** window (hero fanart, poster, plot, both ratings, color-coded crew/studio/country/genres/IDs/file-info, scrollable cast)
 - **TV shows** - cards read `TV · 3 seasons · 24 episodes`, and the details window lists every episode with its thumbnail and air date, plus the aired episodes you're **missing**
 - **Edit NFO** - right-click a card for a full, resizable editor: every detail field, genres and tags as chips with suggestions from your library, a cast editor, TV episodes, fetch any field from TMDb in another language, and artwork picked from everything TMDb has (poster, fanart, clear logo, landscape). Only what you change is written, every save can be restored, and your edits are protected from Fill gaps and Scrape Selected
-- **Bulk edit** - set a collection, age rating, genres, tags or protection for all checked cards at once
+- **Bulk edit** - set a collection, certification, genres, tags or protection for all checked cards at once
 - **Scrape Selected (auto)** - batch-scrape everything checked, with a progress bar
 - **Fill gaps only** - *Verify-library* sweep: scrapes only folders missing the NFO, poster, fanart, or actor photos; skips complete ones
 - **16 languages** - set the scrape language in Settings (English, Burmese, Hindi, Tamil, Telugu, Thai, Chinese, Japanese, Korean, and more)

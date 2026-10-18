@@ -49,6 +49,8 @@ public sealed partial class TmdbSearchDialog : Window
 
         // Default to a comfortably-large window. User can resize / move freely.
         AppWindow.Resize(new SizeInt32(760, 680));
+        // A plain title bar stays light in dark mode unless told to follow it
+        AppWindow.TitleBar.PreferredTheme = Microsoft.UI.Windowing.TitleBarTheme.UseDefaultAppMode;
 
         // Match the app icon on the title bar / taskbar instead of the WinUI default.
         try

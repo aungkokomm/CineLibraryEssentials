@@ -113,6 +113,8 @@ public sealed partial class NfoEditorWindow : Window
         _libraryFolders = libraryFolders.ToList();
 
         AppWindow.Resize(new SizeInt32(1240, 880));
+        // A plain title bar stays light in dark mode unless told to follow it
+        AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
         try
         {
             var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
@@ -838,7 +840,8 @@ public sealed partial class NfoEditorWindow : Window
         slot.Status.Text = current != null ? Path.GetFileName(current) : "None yet";
         slot.Status.Foreground = Brush("TextFillColorSecondaryBrush");
 
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        // Wraps, so both buttons stay whole on the narrow poster card
+        var buttons = new Controls.WrapPanel { Spacing = 6 };
         if (source != null)
         {
             var fromTmdb = new Button { Content = "From TMDb" };

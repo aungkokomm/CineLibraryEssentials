@@ -28,6 +28,8 @@ public sealed partial class MovieDetailsDialog : Window
 
         // Open at a comfortable size; user can resize / maximize freely.
         AppWindow.Resize(new SizeInt32(1180, 820));
+        // A plain title bar stays light in dark mode unless told to follow it
+        AppWindow.TitleBar.PreferredTheme = Microsoft.UI.Windowing.TitleBarTheme.UseDefaultAppMode;
 
         // Set the same app icon the MainWindow uses so the title bar / taskbar
         // shows the proper CineLibrary Essentials icon instead of the default.
