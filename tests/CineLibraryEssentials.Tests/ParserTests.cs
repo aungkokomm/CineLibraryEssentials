@@ -42,6 +42,32 @@ public class TvParserTests
     }
 
     [Theory]
+    // CineLibraryCS #25 (jo-el414): Step 1 renamed double episodes to the first number only
+    [InlineData("Defiance.S03E01E02.720p.WEB.x264-GRP.mkv", 1, 2, "")]
+    [InlineData("Defiance S03E01-E02.mkv", 1, 2, "")]
+    [InlineData("Defiance.S03E01-02.720p.mkv", 1, 2, "")]
+    [InlineData("Defiance - S03E01-E02 - Pilot.mkv", 1, 2, "Pilot")]
+    [InlineData("Show.S01E05E06E07.mkv", 5, 7, "")]
+    // Not double episodes
+    [InlineData("Show.S01E01-1080p.mkv", 1, 1, "")]
+    [InlineData("Show.S01E01.mkv", 1, 1, "")]
+    public void ParsesDoubleEpisodes(string file, int episode, int last, string title)
+    {
+        var r = RegexPatterns.ParseTvEpisode(file);
+        Assert.NotNull(r);
+        Assert.Equal(episode, r!.Episode);
+        Assert.Equal(last, r.LastEpisode);
+        Assert.Equal(title, r.EpisodeTitle);
+    }
+
+    [Theory]
+    [InlineData(3, 1, 1, "S03E01")]
+    [InlineData(3, 1, 2, "S03E01-E02")]
+    [InlineData(1, 5, 7, "S01E05-E06-E07")]   // every number: Kodi reads "-E07" as episode 7 only
+    public void EpisodeCodeKeepsBothNumbers(int season, int episode, int last, string code)
+        => Assert.Equal(code, RegexPatterns.EpisodeCode(season, episode, last));
+
+    [Theory]
     [InlineData("The.Matrix.1999.1080p.BluRay.mkv")]
     [InlineData("Movie.Title.2019.1080p.WEBRip.x264-RARBG.mp4")]
     public void MoviesAreNotEpisodes(string file)

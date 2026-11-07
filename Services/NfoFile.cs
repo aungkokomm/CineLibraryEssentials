@@ -26,4 +26,35 @@ public static class NfoFile
             doc.Save(writer);
         File.Move(tmp, path, overwrite: true);
     }
+
+    private static readonly System.Text.RegularExpressions.Regex Declaration =
+        new(@"^\s*<\?xml[^>]*\?>", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>
+    /// Every &lt;episodedetails&gt; in an episode NFO: one, or one per episode for a
+    /// double episode, which Kodi writes as several root elements in one file.
+    /// </summary>
+    public static List<XElement> LoadEpisodes(string path)
+    {
+        var body = Declaration.Replace(File.ReadAllText(path), string.Empty);
+        return XElement.Parse("<parts>" + body + "</parts>").Elements().ToList();
+    }
+
+    /// <summary>Saves episode details back, side by side for a double episode as Kodi reads them.</summary>
+    public static void SaveEpisodes(IReadOnlyList<XElement> parts, string path)
+    {
+        if (parts.Count == 1)
+        {
+            Save(new XDocument(new XDeclaration("1.0", "utf-8", "yes"), new XElement(parts[0])), path);
+            return;
+        }
+        var tmp = path + ".tmp";
+        File.WriteAllText(tmp, EpisodesXml(parts), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        File.Move(tmp, path, overwrite: true);
+    }
+
+    /// <summary>The text of an episode NFO with one or more &lt;episodedetails&gt;.</summary>
+    public static string EpisodesXml(IEnumerable<XElement> parts)
+        => "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>" + Environment.NewLine
+           + string.Join(Environment.NewLine, parts.Select(p => p.ToString()));
 }

@@ -80,7 +80,11 @@ public partial class FilePreview : ObservableObject
     public string ShowName { get; set; } = string.Empty;
     public int Season { get; set; }
     public int Episode { get; set; }
+    /// <summary>Above Episode for a double episode ("S03E01E02" → 2).</summary>
+    public int LastEpisode { get; set; }
     public string EpisodeTitle { get; set; } = string.Empty;
+    /// <summary>The show's first-air year, once picked with Search TMDb in Step 1 (0 = unknown).</summary>
+    public int ShowYear { get; set; }
 
     [ObservableProperty]
     private string cleanedName = string.Empty;

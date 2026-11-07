@@ -517,6 +517,24 @@ public partial class RenameViewModel : ObservableObject
     public void ApplyTmdbMatch(FilePreview preview, string canonicalTitle, int canonicalYear)
     {
         if (preview == null) return;
+        if (preview.IsTvEpisode)
+        {
+            // A show match: every episode of that show takes TMDb's name and year
+            // (for Step 2's "Show (Year)" folder) and keeps its own "S01E01", which
+            // the movie template would drop.
+            var show = preview.ShowName;
+            foreach (var p in AllPreviews.Where(p => p.IsTvEpisode
+                         && string.Equals(p.ShowName, show, StringComparison.OrdinalIgnoreCase)))
+            {
+                p.ShowName = canonicalTitle;
+                p.ShowYear = canonicalYear;
+                p.CleanedName = PathSanitizer.SanitizeFileName(RenameService.BuildTvFileName(
+                    canonicalTitle, p.Season, p.Episode, p.EpisodeTitle, p.LastEpisode)) + Path.GetExtension(p.OriginalName);
+                p.Confidence = 1.0;
+                p.IsReviewed = true;
+            }
+            return;
+        }
         var ext = Path.GetExtension(preview.OriginalName);
         var formatted = RenameService.ApplyTemplate(canonicalTitle, canonicalYear, OutputTemplate);
         preview.CleanedName = PathSanitizer.SanitizeFileName(formatted) + ext;

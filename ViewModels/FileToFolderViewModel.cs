@@ -132,6 +132,41 @@ public partial class FileToFolderViewModel : ObservableObject
         }
 
         UpdateStatusMessage();
+        _yearLookup = LookUpShowYearsAsync();
+    }
+
+    // Show name -> first-air year from TMDb (0 = not found), asked once per show
+    private readonly Dictionary<string, int> _showYears = new(StringComparer.OrdinalIgnoreCase);
+    private Task _yearLookup = Task.CompletedTask;
+
+    /// <summary>
+    /// TV shows get a "Show (Year)" folder like movies when the template has the
+    /// year. Episode file names rarely carry the show's year, so it comes from a
+    /// Step 1 match, else from TMDb's first match for the show's name.
+    /// </summary>
+    private async Task LookUpShowYearsAsync()
+    {
+        if (!_configService.GetLastTemplate().Contains("{Year}", StringComparison.OrdinalIgnoreCase)) return;
+        var shows = OperationsPreview
+            .Where(op => op.IsTvEpisode && op.Year == 0 && !_showYears.ContainsKey(op.ShowName))
+            .Select(op => op.ShowName)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (shows.Count > 0)
+        {
+            IsLoading = true;
+            StatusMessage = "Getting the shows' years from TMDb...";
+            var tmdb = new TmdbApiClient(_configService.GetApiKey() ?? string.Empty);
+            foreach (var show in shows)
+                _showYears[show] = (await tmdb.SearchTvAsync(show)).FirstOrDefault().Year;
+            IsLoading = false;
+        }
+        foreach (var op in OperationsPreview.Where(op => op.IsTvEpisode))
+        {
+            if (op.Year == 0 && _showYears.TryGetValue(op.ShowName, out var year)) op.Year = year;
+            RecomputeDestination(op);
+        }
+        UpdateStatusMessage();
     }
 
     /// <summary>
@@ -171,7 +206,7 @@ public partial class FileToFolderViewModel : ObservableObject
     ///   • Movie: &lt;fileDir&gt;/Title (Year)/
     ///   • TV:    &lt;fileDir&gt;/Show/Season XX/
     /// </summary>
-    private static void RecomputeDestination(FileOperation op)
+    private void RecomputeDestination(FileOperation op)
     {
         var baseDir = Path.GetDirectoryName(op.OriginalFilePath);
         if (string.IsNullOrEmpty(baseDir))
@@ -182,8 +217,8 @@ public partial class FileToFolderViewModel : ObservableObject
 
         if (op.IsTvEpisode)
         {
-            var showFolder = PathSanitizer.SanitizeFolderName(op.ShowName);
-            op.DestinationFolder = Path.Combine(baseDir, showFolder, $"Season {op.Season:D2}");
+            var showFolder = RenameService.ShowFolderPath(baseDir, op.ShowName, op.Year, _configService.GetLastTemplate());
+            op.DestinationFolder = Path.Combine(showFolder, $"Season {op.Season:D2}");
             return;
         }
 
@@ -218,7 +253,7 @@ public partial class FileToFolderViewModel : ObservableObject
             if (tv != null && !string.IsNullOrEmpty(tv.ShowName))
             {
                 var tvName = PathSanitizer.SanitizeFileName(
-                    RenameService.BuildTvFileName(tv.ShowName, tv.Season, tv.Episode, tv.EpisodeTitle)) + ext;
+                    RenameService.BuildTvFileName(tv.ShowName, tv.Season, tv.Episode, tv.EpisodeTitle, tv.LastEpisode)) + ext;
                 var tvOp = new FileOperation
                 {
                     OriginalFilePath = path,
@@ -260,6 +295,7 @@ public partial class FileToFolderViewModel : ObservableObject
             OperationsPreview.Add(op);
         }
         UpdateStatusMessage();
+        _yearLookup = LookUpShowYearsAsync();
     }
 
     /// <summary>Recursively pulls all videos from a folder and its subfolders.</summary>
@@ -310,6 +346,7 @@ public partial class FileToFolderViewModel : ObservableObject
     /// </summary>
     public async Task<ProcessingResult> RunAsync()
     {
+        await _yearLookup;   // so TV folders get their year before anything moves
         var toRun = OperationsPreview.Where(op => op.IsSelected).ToList();
         if (toRun.Count == 0)
             return new ProcessingResult { Success = true, Message = "No files selected." };

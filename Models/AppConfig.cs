@@ -63,4 +63,32 @@ public class AppConfig
 
     /// <summary>Opt-in: after a TV scrape, add the episode title to file names that don't have one.</summary>
     public bool AddEpisodeTitlesToFilenames { get; set; }
+
+    // ----- v1.4 -----
+    /// <summary>Where the details and editor windows were last left, by window name.</summary>
+    public Dictionary<string, WindowBounds> WindowPlacements { get; set; } = new();
+
+    // NFO and pictures (Settings). Defaults write and download everything, as before.
+    /// <summary>How many actors a scrape writes (and fetches photos for); 0 = all.</summary>
+    public int CastLimit { get; set; }
+    /// <summary>Write only the first studio (for TV: the first network, else studio).</summary>
+    public bool FirstStudioOnly { get; set; }
+    /// <summary>Write only the first director, writer and (TV) creator.</summary>
+    public bool FirstCrewOnly { get; set; }
+    /// <summary>TMDb sizes to download ("original", "w500", ...).</summary>
+    public string PosterSize { get; set; } = "original";
+    public string FanartSize { get; set; } = "original";
+    public string ThumbSize { get; set; } = "original";
+    public string ActorSize { get; set; } = "original";
+    public string LogoSize { get; set; } = "original";
+}
+
+/// <summary>A window's last size and position (the restored ones when it was maximized).</summary>
+public class WindowBounds
+{
+    public int X { get; set; }
+    public int Y { get; set; }
+    public int Width { get; set; }
+    public int Height { get; set; }
+    public bool Maximized { get; set; }
 }

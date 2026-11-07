@@ -13,6 +13,13 @@ public class FileToFolderService
 
         int organized = 0, merged = 0;
 
+        // Videos per source folder before anything moves: a Subs folder goes with
+        // a movie only when that movie was alone in its folder.
+        var videosIn = operations
+            .Select(o => Path.GetDirectoryName(o.OriginalFilePath) ?? string.Empty)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(d => d, CountVideos, StringComparer.OrdinalIgnoreCase);
+
         foreach (var operation in operations)
         {
             try
@@ -64,6 +71,9 @@ public class FileToFolderService
                 organized++;
 
                 await MoveCompanionFilesAsync(operation.OriginalFilePath, operation.DestinationFolder, operation.FinalFileName);
+                if (!operation.IsTvEpisode
+                    && videosIn.GetValueOrDefault(Path.GetDirectoryName(operation.OriginalFilePath) ?? string.Empty) == 1)
+                    MoveSubtitleFolders(Path.GetDirectoryName(operation.OriginalFilePath)!, operation.DestinationFolder);
 
                 // Optionally scrub embedded container metadata after the move.
                 // Done HERE (not just in Step 1's RenameInPlaceAsync) so that users
@@ -95,6 +105,34 @@ public class FileToFolderService
         result.Message = parts.Count > 0 ? string.Join(" · ", parts) : "Nothing to do";
 
         return result;
+    }
+
+    // The subtitle folders players look in (the same names CineLibrary reads)
+    private static readonly string[] SubtitleFolders = { "Subs", "Subtitles", "Sub" };
+
+    private static int CountVideos(string folder)
+    {
+        try { return Directory.EnumerateFiles(folder).Count(f => Utilities.FileFormatValidator.IsVideoFile(f)); }
+        catch { return 0; }
+    }
+
+    /// <summary>Moves a "Subs" folder (and the like) into the movie's new folder, unless one is already there.</summary>
+    private static void MoveSubtitleFolders(string sourceFolder, string destinationFolder)
+    {
+        foreach (var name in SubtitleFolders)
+        {
+            var source = Path.Combine(sourceFolder, name);
+            var dest = Path.Combine(destinationFolder, name);
+            if (!Directory.Exists(source) || Directory.Exists(dest)) continue;
+            try
+            {
+                Directory.Move(source, dest);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error moving subtitle folder: {ex.Message}");
+            }
+        }
     }
 
     private async Task MoveCompanionFilesAsync(string originalVideoPath, string destinationFolder, string renamedVideoFile)

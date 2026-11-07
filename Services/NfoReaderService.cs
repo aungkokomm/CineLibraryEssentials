@@ -111,12 +111,10 @@ public class NfoReaderService
             {
                 if (File.Exists(basePath + ".nfo"))
                 {
-                    var root = XDocument.Load(basePath + ".nfo").Root;
-                    if (root != null)
-                    {
-                        title = Read(root, "title");
-                        aired = Read(root, "aired");
-                    }
+                    // A double episode's NFO holds both episodes: "Part One / Part Two"
+                    var parts = NfoFile.LoadEpisodes(basePath + ".nfo");
+                    title = string.Join(" / ", parts.Select(p => Read(p, "title")).Where(t => t.Length > 0));
+                    aired = parts.Count > 0 ? Read(parts[0], "aired") : string.Empty;
                 }
             }
             catch { /* unreadable NFO: fall back to the filename */ }

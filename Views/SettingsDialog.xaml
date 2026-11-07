@@ -7,7 +7,8 @@
     CloseButtonText="Close"
     DefaultButton="Close"
     Closing="OnDialogClosing">
-    <ScrollViewer MaxHeight="520">
+    <!-- Right padding keeps the scrollbar off the text and boxes -->
+    <ScrollViewer MaxHeight="520" Padding="0,0,16,0">
         <StackPanel Spacing="20" Width="460">
 
             <!-- ============ General ============ -->
@@ -115,6 +116,94 @@
                                   Header="Add episode titles to file names"
                                   Toggled="OnEpisodeTitlesToggled" />
                     <TextBlock Text="When a TV show is scraped, &quot;Show - S01E01.mkv&quot; becomes &quot;Show - S01E01 - Pilot.mkv&quot;. Subtitles, the .nfo and the thumbnail are renamed with it. Files that already have a title are left alone, and you get an Undo after each scrape."
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- ============ NFO and pictures ============ -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="NFO and pictures"
+                           FontWeight="SemiBold"
+                           FontSize="14"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                <!-- Cast -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Cast" FontSize="13" />
+                    <ComboBox x:Name="CastCombo"
+                              MinWidth="220"
+                              SelectionChanged="OnCastChanged"
+                              AutomationProperties.Name="Cast">
+                        <ComboBoxItem Content="Everyone TMDb lists" Tag="0" />
+                        <ComboBoxItem Content="First 10" Tag="10" />
+                        <ComboBoxItem Content="First 15" Tag="15" />
+                        <ComboBoxItem Content="First 20" Tag="20" />
+                        <ComboBoxItem Content="First 30" Tag="30" />
+                        <ComboBoxItem Content="First 50" Tag="50" />
+                    </ComboBox>
+                    <TextBlock Text="How many actors a scrape writes to the NFO and gets photos for, in billing order."
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                </StackPanel>
+
+                <!-- First studio / crew only -->
+                <StackPanel Spacing="4">
+                    <ToggleSwitch x:Name="FirstStudioToggle"
+                                  Header="Only the first studio"
+                                  Toggled="OnFirstStudioToggled" />
+                    <ToggleSwitch x:Name="FirstCrewToggle"
+                                  Header="Only the first director, writer and creator"
+                                  Toggled="OnFirstCrewToggled" />
+                    <TextBlock Text="For players that show these on one line. A TV show's first studio is its network (such as HBO) when it has one."
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                </StackPanel>
+
+                <!-- Picture sizes -->
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Picture sizes" FontSize="13" />
+                    <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="12">
+                        <TextBlock Text="Poster" VerticalAlignment="Center" />
+                        <ComboBox Grid.Column="1" x:Name="PosterSizeCombo" Tag="poster" MinWidth="200"
+                                  SelectionChanged="OnImageSizeChanged" AutomationProperties.Name="Poster size">
+                            <ComboBoxItem Content="Original (largest)" Tag="original" />
+                            <ComboBoxItem Content="780 × 1170" Tag="w780" />
+                            <ComboBoxItem Content="500 × 750" Tag="w500" />
+                            <ComboBoxItem Content="342 × 513" Tag="w342" />
+                        </ComboBox>
+                        <TextBlock Grid.Row="1" Text="Fanart and landscape" VerticalAlignment="Center" />
+                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="FanartSizeCombo" Tag="fanart" MinWidth="200"
+                                  SelectionChanged="OnImageSizeChanged" AutomationProperties.Name="Fanart size">
+                            <ComboBoxItem Content="Original (largest)" Tag="original" />
+                            <ComboBoxItem Content="1280 × 720" Tag="w1280" />
+                            <ComboBoxItem Content="780 × 439" Tag="w780" />
+                        </ComboBox>
+                        <TextBlock Grid.Row="2" Text="Episode thumbnail" VerticalAlignment="Center" />
+                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="ThumbSizeCombo" Tag="thumb" MinWidth="200"
+                                  SelectionChanged="OnImageSizeChanged" AutomationProperties.Name="Episode thumbnail size">
+                            <ComboBoxItem Content="Original (largest)" Tag="original" />
+                            <ComboBoxItem Content="300 × 169" Tag="w300" />
+                        </ComboBox>
+                        <TextBlock Grid.Row="3" Text="Actor photo" VerticalAlignment="Center" />
+                        <ComboBox Grid.Row="3" Grid.Column="1" x:Name="ActorSizeCombo" Tag="actor" MinWidth="200"
+                                  SelectionChanged="OnImageSizeChanged" AutomationProperties.Name="Actor photo size">
+                            <ComboBoxItem Content="Original (largest)" Tag="original" />
+                            <ComboBoxItem Content="421 × 632" Tag="h632" />
+                            <ComboBoxItem Content="185 × 278" Tag="w185" />
+                        </ComboBox>
+                        <TextBlock Grid.Row="4" Text="Clear logo" VerticalAlignment="Center" />
+                        <ComboBox Grid.Row="4" Grid.Column="1" x:Name="LogoSizeCombo" Tag="logo" MinWidth="200"
+                                  SelectionChanged="OnImageSizeChanged" AutomationProperties.Name="Clear logo size">
+                            <ComboBoxItem Content="Original (largest)" Tag="original" />
+                            <ComboBoxItem Content="500 wide" Tag="w500" />
+                            <ComboBoxItem Content="300 wide" Tag="w300" />
+                        </ComboBox>
+                    </Grid>
+                    <TextBlock Text="Smaller pictures take less space. Original is the largest TMDb has. Only new downloads change: pictures already on disk stay as they are."
                                FontSize="11"
                                TextWrapping="Wrap"
                                Foreground="{ThemeResource TextFillColorTertiaryBrush}" />

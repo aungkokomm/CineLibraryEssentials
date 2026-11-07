@@ -47,14 +47,15 @@ public class ImageDownloadService
 
     /// <summary>
     /// Downloads every cast member's headshot in parallel (5 concurrent) at full
-    /// TMDb resolution. Idempotent: skips actors whose photo already exists on
+    /// TMDb resolution, or the TMDb size given. Idempotent: skips actors whose photo already exists on
     /// disk, so a re-scrape only fills in the gaps. Uses the Kodi/Plex/Jellyfin
     /// "Firstname_Lastname.jpg" filename convention so the standard NFO
     /// &lt;actor&gt;&lt;thumb&gt; refs resolve cleanly.
     /// </summary>
     public async Task<(int downloaded, int failed)> DownloadActorPhotosAsync(
         List<CastMember> cast,
-        string actorsFolderPath)
+        string actorsFolderPath,
+        string size = "original")
     {
         if (!Directory.Exists(actorsFolderPath))
             Directory.CreateDirectory(actorsFolderPath);
@@ -85,7 +86,7 @@ public class ImageDownloadService
                     return;
                 }
 
-                var imageUrl = $"https://image.tmdb.org/t/p/original{actor.ProfilePath}";
+                var imageUrl = $"https://image.tmdb.org/t/p/{size}{actor.ProfilePath}";
                 if (await DownloadImageAsync(imageUrl, filePath))
                     Interlocked.Increment(ref downloaded);
                 else

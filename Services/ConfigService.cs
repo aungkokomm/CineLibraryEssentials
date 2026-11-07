@@ -83,6 +83,48 @@ public class ConfigService
         SaveConfig();
     }
 
+    // ----- NFO and pictures (v1.4) -----
+    public int GetCastLimit() => _config.CastLimit;
+    public void SetCastLimit(int v) { _config.CastLimit = v; SaveConfig(); }
+    public bool GetFirstStudioOnly() => _config.FirstStudioOnly;
+    public void SetFirstStudioOnly(bool v) { _config.FirstStudioOnly = v; SaveConfig(); }
+    public bool GetFirstCrewOnly() => _config.FirstCrewOnly;
+    public void SetFirstCrewOnly(bool v) { _config.FirstCrewOnly = v; SaveConfig(); }
+
+    /// <summary>The TMDb size to download a kind of picture at: "poster", "fanart", "thumb", "actor" or "logo".</summary>
+    public string GetImageSize(string kind) => (kind switch
+    {
+        "poster" => _config.PosterSize,
+        "fanart" => _config.FanartSize,
+        "thumb" => _config.ThumbSize,
+        "actor" => _config.ActorSize,
+        "logo" => _config.LogoSize,
+        _ => null,
+    }) is { Length: > 0 } size ? size : "original";
+
+    public void SetImageSize(string kind, string size)
+    {
+        switch (kind)
+        {
+            case "poster": _config.PosterSize = size; break;
+            case "fanart": _config.FanartSize = size; break;
+            case "thumb": _config.ThumbSize = size; break;
+            case "actor": _config.ActorSize = size; break;
+            case "logo": _config.LogoSize = size; break;
+        }
+        SaveConfig();
+    }
+
+    // ----- Details / editor window placement (v1.4) -----
+    public WindowBounds? GetWindowPlacement(string window)
+        => _config.WindowPlacements.TryGetValue(window, out var b) ? b : null;
+
+    public void SetWindowPlacement(string window, WindowBounds bounds)
+    {
+        _config.WindowPlacements[window] = bounds;
+        SaveConfig();
+    }
+
     // ----- Dismissed warnings (v1.1) -----
     public bool IsWarningDismissed(string warningId)
         => _config.DismissedWarnings.Contains(warningId);

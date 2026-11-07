@@ -414,7 +414,8 @@ public sealed partial class MovieDetailsDialog : Window
     {
         _closedTcs = new TaskCompletionSource<bool>();
 
-        if (owner is not null)
+        // Where the user last left it, else centered on the owner
+        if (!Utilities.WindowPlacement.Restore(this, "details") && owner is not null)
         {
             try
             {
@@ -427,6 +428,7 @@ public sealed partial class MovieDetailsDialog : Window
             }
             catch { /* if positioning fails, just open at default */ }
         }
+        Utilities.WindowPlacement.Remember(this, "details");
 
         Activate();
         return _closedTcs.Task;

@@ -40,7 +40,41 @@ public sealed partial class SettingsDialog : ContentDialog
         // Words to always remove
         RemoveWordsBox.Text = string.Join(Environment.NewLine, _config.GetCustomRemoveWords());
 
+        // NFO and pictures
+        SelectComboByTag(CastCombo, _config.GetCastLimit().ToString());
+        FirstStudioToggle.IsOn = _config.GetFirstStudioOnly();
+        FirstCrewToggle.IsOn = _config.GetFirstCrewOnly();
+        foreach (var combo in new[] { PosterSizeCombo, FanartSizeCombo, ThumbSizeCombo, ActorSizeCombo, LogoSizeCombo })
+            SelectComboByTag(combo, _config.GetImageSize((string)combo.Tag));
+
         _isLoading = false;
+    }
+
+    private void OnCastChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoading) return;
+        if (CastCombo.SelectedItem is ComboBoxItem { Tag: string t } && int.TryParse(t, out var max))
+            _config.SetCastLimit(max);
+    }
+
+    private void OnFirstStudioToggled(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (_isLoading) return;
+        _config.SetFirstStudioOnly(FirstStudioToggle.IsOn);
+    }
+
+    private void OnFirstCrewToggled(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (_isLoading) return;
+        _config.SetFirstCrewOnly(FirstCrewToggle.IsOn);
+    }
+
+    /// <summary>One handler for the five picture-size boxes; each box's Tag names its kind.</summary>
+    private void OnImageSizeChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoading) return;
+        if (sender is ComboBox { Tag: string kind } combo && combo.SelectedItem is ComboBoxItem { Tag: string size })
+            _config.SetImageSize(kind, size);
     }
 
     /// <summary>True when the "Words to always remove" list was changed and saved,

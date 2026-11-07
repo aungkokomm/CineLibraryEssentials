@@ -204,12 +204,25 @@ public static class RegexPatterns
         @")(?=$|[\s\._\-\]\)])",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    /// <summary>LastEpisode is above Episode for a double episode like "S03E01E02".</summary>
     public record TvEpisodeParseResult(
         string ShowName,
         int Season,
         int Episode,
         string EpisodeTitle,
-        double Confidence);
+        double Confidence,
+        int LastEpisode);
+
+    // The extra numbers of a double episode, right after the marker: "E02" in
+    // "S03E01E02", "-E02", "-02". (?!\d) stops "S01E01-1080p" from reading as episode 108.
+    private static readonly Regex MoreEpisodesPattern = new(
+        @"\G(?:(?:[\-_]?E|-)(?<x>\d{1,3})(?!\d))+",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>"S03E01", or every number of a double episode: "S03E01-E02".</summary>
+    public static string EpisodeCode(int season, int episode, int lastEpisode)
+        => $"S{season:D2}" + string.Join("-",
+            Enumerable.Range(episode, Math.Max(1, lastEpisode - episode + 1)).Select(e => $"E{e:D2}"));
 
     /// <summary>
     /// Parses a TV episode filename into show name, season number, episode number,
@@ -270,6 +283,18 @@ public static class RegexPatterns
         //     won't match a dash with a space before it (that's how it preserves
         //     " - Currency"), so running it second let "-ION10" survive.
         var afterStart = best.Index + best.Length;
+        var lastEpisode = episode;
+        var more = MoreEpisodesPattern.Match(working, afterStart);
+        if (more.Success)
+        {
+            // Only a short run after the first episode is believable as a double episode
+            var last = more.Groups["x"].Captures.Select(c => int.Parse(c.Value)).Max();
+            if (last > episode && last - episode <= 5)
+            {
+                lastEpisode = last;
+                afterStart += more.Length;   // so "E02" doesn't become the title
+            }
+        }
         var afterPart = afterStart < working.Length ? working[afterStart..] : string.Empty;
         var anchor = TechAnchorPattern.Match(afterPart);
         if (anchor.Success) afterPart = afterPart[..anchor.Index];
@@ -288,7 +313,7 @@ public static class RegexPatterns
         if (episode is >= 1 and <= 200) confidence += 0.10;
         confidence = Math.Min(confidence, 1.0);
 
-        return new TvEpisodeParseResult(showName, season, episode, episodeTitle, confidence);
+        return new TvEpisodeParseResult(showName, season, episode, episodeTitle, confidence, lastEpisode);
     }
 
     // Common separators

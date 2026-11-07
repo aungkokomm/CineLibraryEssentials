@@ -89,9 +89,13 @@ The mode is shared between Step 1 and Step 3. When you load a different folder, 
 Folders are created right where your files already are (there is no separate output folder).
 
 - **Movies** → `Title (Year)/Title (Year).ext`
-- **TV episodes** → `Show Name/Season 01/Show Name - S01E01.ext`
+- **TV episodes** → `Show Name (Year)/Season 01/Show Name - S01E01.ext`
 
 TV episodes are renamed to the Kodi/Plex convention `Show - S01E01`, and all episodes of a season live together in one `Season XX` folder. If the original filename already contains the episode title, it's kept (`Show - S01E01 - Title`). Otherwise the real title comes from TMDb in Step 3 and is written into each episode's `.nfo`, which is where Kodi, Plex, Jellyfin and CineLibrary read it from. Want the title in the filename too? Turn on **Settings → Add episode titles to file names** (see [Episode titles in file names](#episode-titles-in-file-names)).
+
+The show's folder gets its year like a movie's, for example `1883 (2021)`, when the output template has the year. Episode file names rarely have it, so Step 2 asks TMDb (the first match for the show's name), or uses the show you picked with Search TMDb in Step 1. If the show already has a folder, with or without the year, new episodes go into that one.
+
+A file that holds two episodes keeps both numbers: `Show - S03E01-E02`. Kodi, Plex, Jellyfin and CineLibrary then count both episodes.
 
 ### How each is scraped (Step 3)
 
@@ -181,6 +185,8 @@ When the parser isn't sure (or you just want to verify), click the 🔍 button o
 
 The cleaned name updates to the canonical TMDb title + year, the row is marked **reviewed**, and confidence jumps to 100%. The original filename on disk hasn't changed yet - that only happens when you hit Rename Selected.
 
+On a TV episode row it searches TV shows. The show you pick applies to every episode of that show: they all take its name, and its year is used for the show's folder in Step 2. Each episode keeps its own `S01E01`.
+
 ### Top-row toggles explained
 
 Right of the source picker:
@@ -246,7 +252,7 @@ Tick / untick rows you want to skip (the **Select all** box toggles every row), 
 
 1. Creates a `Title (Year)/` folder (movies) or `Show/Season XX/` folders (TV) next to each file.
 2. Moves the video into it.
-3. Moves any matching subtitle files alongside - including language-tagged ones like `Movie.en.forced.srt`.
+3. Moves any matching subtitle files alongside - including language-tagged ones like `Movie.en.forced.srt`. A `Subs`, `Subtitles` or `Sub` folder moves too, when the movie was the only video in its folder.
 4. After success, advances to Step 3 automatically.
 
 **Folder merging:** if a destination folder already exists, files are merged into it instead of erroring. Existing files are never overwritten - and any subtitles from the source still move into the destination. The status line reports e.g. *"3 organized · 2 merged into existing folder(s)"*.
@@ -270,7 +276,7 @@ Bawarchi (1972)/
 
 ### Card view
 
-The default view is a **grid of cards** - each card shows the poster (or a placeholder), the title, the folder path, a status pill, and three buttons (Scrape / Open / Remove).
+The default view is a **grid of cards** - each card shows the whole poster (or a placeholder) with the title and year on a dark strip across its bottom, a status pill at the top right, a checkbox at the top left, and four buttons: Scrape, Open folder, View details and Remove. Hover the title for the folder path.
 
 Status pills are colour-coded:
 
@@ -303,6 +309,8 @@ Click **Fill gaps only** → the app sweeps **every** folder in the list and scr
 
 TV folders show one card per show. Under the title, a line like *"TV · 3 seasons · 24 episodes"* counts what's on disk (double episodes like `S01E01E02` count as two), and after a scrape it adds how many aired episodes are missing, e.g. *"· 2 missing"*. The status pill shows *Complete* or what's missing, the same as for movies.
 
+A double episode's `.nfo` gets both episodes, with their own titles and plots, the way Kodi writes it. Players then show both titles, and the second episode isn't reported missing. The editor lists them as two episodes.
+
 Scraping a TV card writes `tvshow.nfo` + show artwork at the root and a per-episode `.nfo` + thumbnail for every episode. Right-click → **Search TMDb** searches the **TV** database (not movies) for TV cards. If you add a `Season 01` folder (or `Dark Season 1 Complete` inside `Dark`), the card is made for the show folder above it, which is where the show's files belong.
 
 Scraping a show again keeps the TMDb show its `tvshow.nfo` is already matched to, so a show you once corrected with **Search TMDb** stays correct. To match it to a different show, use **Search TMDb**.
@@ -331,8 +339,8 @@ IMDb ratings change over time. **⋯ → Refresh IMDb ratings** updates them for
 
 - **+ Add Folder** - add a movie folder that wasn't part of Steps 1 or 2. The app accepts both single movie folders and "parent" folders that contain many movie folders.
 - **Drag-drop** - same as above.
-- **Double-tap a scraped card** - opens the **Movie Details** window (hero fanart, poster, plot, IMDb and TMDb rating chips, color-coded crew / studio / country / genres / IDs / file info, scrollable cast strip with photos, plus Play / Open Folder / Edit / Trailer buttons). ESC closes it. Resizable and maximizable. For a TV show it also lists the [episodes](#episodes-and-missing-episodes).
-- **Double-tap an unscraped card** - opens the resizable TMDb search dialog so you can pick the right match.
+- **Double-tap a card that has an NFO** - opens the **Movie Details** window (hero fanart, poster, plot, IMDb and TMDb rating chips, color-coded crew / studio / country / genres / IDs / file info, scrollable cast strip with photos, plus Play / Open Folder / Edit / Trailer buttons). ESC closes it. Resizable and maximizable, and it opens where and how big you last left it. For a TV show it also lists the [episodes](#episodes-and-missing-episodes).
+- **Double-tap a card without an NFO** - opens the resizable TMDb search dialog so you can pick the right match.
 - **Right-click a card** → View details / Search TMDb / Open Folder / Remove from List.
 - **List view toggle** (icon in toolbar) - for libraries with hundreds of movies, the dense list view is faster. Your preference is remembered.
 - **Each card shows an inline spinner** next to its status pill while it's being scraped - easy to see which one is in flight when you batch-scrape.
@@ -346,7 +354,7 @@ While you look, the app asks TMDb which **aired** episodes aren't in your librar
 
 ### Edit NFO
 
-Scraped the right title but want to fix something? Right-click a card → **Edit NFO...**, or click **Edit** in the details window. The editor is its own window: resize it, maximize it, keep it open next to the app. Sections on the left:
+Scraped the right title but want to fix something? Right-click a card → **Edit NFO...**, or click **Edit** in the details window. The editor is its own window: resize it, maximize it, keep it open next to the app. It opens where and how big you last left it. Sections on the left:
 
 | Section | What you can change |
 |---|---|
@@ -396,6 +404,15 @@ A **gear icon** lives in the title bar next to the About icon. Clicking it opens
 - **Main rating** - IMDb (when available) or TMDb: which rating players show first. Both are always saved.
 - **Add episode titles to file names** - off by default (see [Episode titles in file names](#episode-titles-in-file-names)).
 
+**NFO and pictures**
+
+What a scrape writes and downloads. By default it's everything, at the largest size.
+
+- **Cast** - everyone TMDb lists, or only the first 10, 15, 20, 30 or 50, in billing order. Fewer actors also means fewer photos in `.actors`.
+- **Only the first studio** - for players that show one studio. For a TV show it's the network (such as HBO) when it has one.
+- **Only the first director, writer and creator**
+- **Picture sizes** - poster, fanart and landscape, episode thumbnail, actor photo and clear logo, from the original (largest) down to TMDb's smaller sizes, such as a 500 × 750 poster or 1280 × 720 fanart. Pictures picked in **Edit NFO** use them too. Only new downloads change: pictures already on disk stay as they are.
+
 **Updates**
 
 - **Check for updates on startup** - silent once-per-24h check against GitHub. When a newer version is published, a toast appears with a **Download** button that fetches the installer directly inside the app (with a live progress percentage) and launches it for you.
@@ -411,7 +428,7 @@ What's remembered between sessions:
 - TMDb API key (embedded by default)
 - Everything from the Settings page above
 - Recent source folders (last 10)
-- Window size + position
+- Window size + position (the main window, the details window and the editor)
 - Which warnings you've dismissed
 - Step 3 view preference (Grid / List)
 - Step 1 sort column + direction

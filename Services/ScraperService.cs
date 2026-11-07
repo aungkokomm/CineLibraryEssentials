@@ -10,6 +10,7 @@ public class ScraperService
     private readonly MediaProbeService _mediaProbe;
     private readonly ImdbRatingService _imdb = new();
     private readonly bool _addEpisodeTitles;
+    private readonly ConfigService _config = new();   // Settings → NFO and pictures, read at each scrape
 
     public ScraperService(string tmdbApiKey, string language = "en", bool preferImdbRating = true,
         bool addEpisodeTitles = false)
@@ -115,6 +116,7 @@ public class ScraperService
         // IMDb rating + votes (best effort: skipped quietly if unavailable)
         if (await _imdb.GetRatingAsync(details.ImdbId) is { } imdbRating)
             (details.ImdbRating, details.ImdbVotes) = (imdbRating.Rating, imdbRating.Votes);
+        TrimForSettings(details);
 
         // Find a video file in the folder to base poster/fanart filenames on
         var videoFile = Directory.GetFiles(movieFolderPath, "*.*")
@@ -130,29 +132,30 @@ public class ScraperService
                 details.Edition = detected;
         }
 
-        // Poster — pull TMDb's "original" upload (typically 1500–2000px tall).
+        // Poster — TMDb's "original" upload (typically 1500–2000px tall) unless
+        // Settings → NFO and pictures picks a smaller size.
         // The previous w500 default produced blurry results on any modern display.
         if (!string.IsNullOrEmpty(details.PosterPath) && !string.IsNullOrEmpty(videoFile)
             && !(keepImages && HasImage(movieFolderPath, "-poster.jpg")))
         {
             progress?.Report("Downloading poster...");
-            var posterUrl = _tmdbClient.GetImageUrl(details.PosterPath, "original");
+            var posterUrl = _tmdbClient.GetImageUrl(details.PosterPath, _config.GetImageSize("poster"));
             await _imageService.DownloadPosterAsync(posterUrl, videoFile);
         }
 
-        // Fanart — also "original" (typically 1920×1080+) for sharp 1080p/4K TVs.
+        // Fanart — also "original" (typically 1920×1080+) for sharp 1080p/4K TVs, unless set smaller.
         if (!string.IsNullOrEmpty(details.BackdropPath) && !string.IsNullOrEmpty(videoFile)
             && !(keepImages && HasImage(movieFolderPath, "-fanart.jpg")))
         {
             progress?.Report("Downloading fanart...");
-            var fanartUrl = _tmdbClient.GetImageUrl(details.BackdropPath, "original");
+            var fanartUrl = _tmdbClient.GetImageUrl(details.BackdropPath, _config.GetImageSize("fanart"));
             await _imageService.DownloadFanartAsync(fanartUrl, videoFile);
         }
 
         // Actor photos
         progress?.Report("Downloading actor photos...");
         var actorsFolder = Path.Combine(movieFolderPath, ".actors");
-        await _imageService.DownloadActorPhotosAsync(details.Cast, actorsFolder);
+        await _imageService.DownloadActorPhotosAsync(details.Cast, actorsFolder, _config.GetImageSize("actor"));
 
         // Probe the actual file for <fileinfo>/<streamdetails> — duration, video codec,
         // audio tracks with language, subtitle tracks. This is what lets the companion
@@ -179,6 +182,34 @@ public class ScraperService
 
     private static bool HasImage(string folder, string suffix)
         => Directory.EnumerateFiles(folder, "*" + suffix).Any();
+
+    /// <summary>Settings → NFO and pictures: fewer actors, only the first studio, director and writer.</summary>
+    private void TrimForSettings(MovieMetadata m)
+    {
+        if (_config.GetCastLimit() is > 0 and var max) m.Cast = m.Cast.Take(max).ToList();
+        if (_config.GetFirstStudioOnly()) m.ProductionCompanies = m.ProductionCompanies.Take(1).ToList();
+        if (_config.GetFirstCrewOnly())
+        {
+            m.Directors = m.Directors.Take(1).ToList();
+            m.Writers = m.Writers.Take(1).ToList();
+        }
+    }
+
+    private void TrimForSettings(TvShowMetadata s)
+    {
+        if (_config.GetCastLimit() is > 0 and var max) s.Cast = s.Cast.Take(max).ToList();
+        if (_config.GetFirstStudioOnly())
+        {
+            // The network (HBO, Netflix) is what most people call a show's studio
+            if (s.Networks.Count > 0)
+            {
+                s.Networks = s.Networks.Take(1).ToList();
+                s.ProductionCompanies = new();
+            }
+            else s.ProductionCompanies = s.ProductionCompanies.Take(1).ToList();
+        }
+        if (_config.GetFirstCrewOnly()) s.Creators = s.Creators.Take(1).ToList();
+    }
 
     // ═════════════════════════════════════════════════════════════════════
     //  TV SHOW SCRAPING
@@ -276,6 +307,7 @@ public class ScraperService
         // IMDb rating + votes for the show (best effort: skipped quietly if unavailable)
         if (await _imdb.GetRatingAsync(details.ImdbId) is { } imdbRating)
             (details.ImdbRating, details.ImdbVotes) = (imdbRating.Rating, imdbRating.Votes);
+        TrimForSettings(details);
 
         // 3) Show-level images at the FOLDER root (works for either layout —
         //    flat single-season folders get poster/fanart there too).
@@ -284,7 +316,7 @@ public class ScraperService
 
         progress?.Report($"Downloading actor photos ({details.Cast.Count})...");
         var actorsFolder = Path.Combine(showFolderPath, ".actors");
-        await _imageService.DownloadActorPhotosAsync(details.Cast, actorsFolder);
+        await _imageService.DownloadActorPhotosAsync(details.Cast, actorsFolder, _config.GetImageSize("actor"));
 
         // 4) Group episodes by season number, fetch each season's metadata
         //    from TMDb in one call, then scrape every episode in that season.
@@ -327,12 +359,18 @@ public class ScraperService
                     }
                 }
 
+                // A double episode's .nfo holds every episode the file has, so players
+                // show both titles and the second one isn't reported missing
+                var parts = Enumerable.Range(ep.Episode, ep.LastEpisode - ep.Episode + 1)
+                    .Select(n => byNumber.GetValueOrDefault(n))
+                    .OfType<TvEpisodeMetadata>()
+                    .ToList();
                 var streams = _mediaProbe.Probe(videoFile);
-                _nfoService.SaveEpisodeNfo(tmdbEp, details, videoFile, streams);
+                _nfoService.SaveEpisodeNfo(parts, details, videoFile, streams);
 
                 if (!string.IsNullOrEmpty(tmdbEp.StillPath))
                 {
-                    var thumbUrl = _tmdbClient.GetImageUrl(tmdbEp.StillPath, "original");
+                    var thumbUrl = _tmdbClient.GetImageUrl(tmdbEp.StillPath, _config.GetImageSize("thumb"));
                     var thumbPath = Path.Combine(
                         Path.GetDirectoryName(videoFile)!,
                         Path.GetFileNameWithoutExtension(videoFile) + "-thumb.jpg");
@@ -381,14 +419,14 @@ public class ScraperService
     {
         if (!string.IsNullOrEmpty(details.PosterPath))
         {
-            var posterUrl = _tmdbClient.GetImageUrl(details.PosterPath, "original");
+            var posterUrl = _tmdbClient.GetImageUrl(details.PosterPath, _config.GetImageSize("poster"));
             var posterPath = Path.Combine(showFolderPath, "poster.jpg");
             if (!File.Exists(posterPath))
                 await _imageService.DownloadAnyImageAsync(posterUrl, posterPath);
         }
         if (!string.IsNullOrEmpty(details.BackdropPath))
         {
-            var fanartUrl = _tmdbClient.GetImageUrl(details.BackdropPath, "original");
+            var fanartUrl = _tmdbClient.GetImageUrl(details.BackdropPath, _config.GetImageSize("fanart"));
             var fanartPath = Path.Combine(showFolderPath, "fanart.jpg");
             if (!File.Exists(fanartPath))
                 await _imageService.DownloadAnyImageAsync(fanartUrl, fanartPath);

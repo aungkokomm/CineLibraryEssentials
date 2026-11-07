@@ -101,7 +101,9 @@ public sealed partial class NfoEditorWindow : Window
         }
         OpenEditors[folder] = window;
         window.Closed += (_, _) => OpenEditors.Remove(folder);
-        window.CenterOn(App.MainWindow);
+        if (!WindowPlacement.Restore(window, "editor"))
+            window.CenterOn(App.MainWindow);
+        WindowPlacement.Remember(window, "editor");
         window.Activate();
         return (window, null);
     }
@@ -398,7 +400,12 @@ public sealed partial class NfoEditorWindow : Window
                 var target = ArtTarget(slot);
                 backup.Add(target);
                 if (slot.PendingFile != null) await ImageFiles.SaveAsAsync(slot.PendingFile, target);
-                else await ImageFiles.DownloadAsync(ImageFiles.Tmdb(slot.PendingTmdb!.FilePath, "original"), target);
+                else
+                {
+                    // At the size Settings → NFO and pictures picks for that kind of picture
+                    var size = _config.GetImageSize(slot.Source switch { "posters" => "poster", "logos" => "logo", _ => "fanart" });
+                    await ImageFiles.DownloadAsync(ImageFiles.Tmdb(slot.PendingTmdb!.FilePath, size), target);
+                }
             }
 
             foreach (var actor in _cast.Where(a => a.PendingPhoto != null))
@@ -423,9 +430,9 @@ public sealed partial class NfoEditorWindow : Window
                 if (ep.FieldsChanged && ep.NfoPath != null)
                 {
                     backup.Add(ep.NfoPath);
-                    var epDoc = NfoFile.Load(ep.NfoPath);
-                    NfoEditor.ApplyEpisode(epDoc.Root!, ep.Before, ep.Fields);
-                    NfoFile.Save(epDoc, ep.NfoPath);
+                    var parts = NfoFile.LoadEpisodes(ep.NfoPath);   // two for a double episode
+                    NfoEditor.ApplyEpisode(parts[ep.Part], ep.Before, ep.Fields);
+                    NfoFile.SaveEpisodes(parts, ep.NfoPath);
                 }
                 if (ep.PendingThumb != null)
                 {
@@ -997,35 +1004,50 @@ public sealed partial class NfoEditorWindow : Window
             foreach (var e in NfoReaderService.ReadEpisodes(_folder))
             {
                 var nfo = Path.ChangeExtension(e.VideoFile, ".nfo");
-                string? nfoPath = null;
-                var before = new NfoEditor.EpisodeFields(string.Empty, string.Empty, string.Empty);
+                var parts = new List<XElement>();
                 if (File.Exists(nfo))
                 {
-                    try
-                    {
-                        before = NfoEditor.ReadEpisode(XDocument.Load(nfo).Root!);
-                        nfoPath = nfo;
-                    }
+                    try { parts = NfoFile.LoadEpisodes(nfo); }
                     catch { /* unreadable: shown as "no NFO yet" */ }
                 }
                 var basePath = Path.Combine(Path.GetDirectoryName(e.VideoFile)!, Path.GetFileNameWithoutExtension(e.VideoFile));
-                var item = new EpisodeItem
+                var code = RegexPatterns.EpisodeCode(e.Season, e.Episode, e.LastEpisode);
+
+                void Add(string rowCode, string? nfoPath, int part, NfoEditor.EpisodeFields before)
                 {
-                    Code = e.LastEpisode > e.Episode ? $"S{e.Season:D2}E{e.Episode:D2}-E{e.LastEpisode:D2}" : $"S{e.Season:D2}E{e.Episode:D2}",
-                    NfoPath = nfoPath,
-                    Before = before,
-                    ThumbTarget = basePath + "-thumb.jpg",
-                    Title = nfoPath != null ? before.Title : e.Title,
-                    Aired = before.Aired,
-                    Plot = before.Plot,
-                    Thumb = e.ThumbPath != null ? Fresh(e.ThumbPath, 480) : null,
-                };
-                item.PropertyChanged += (_, a) =>
+                    var item = new EpisodeItem
+                    {
+                        Code = rowCode,
+                        NfoPath = nfoPath,
+                        Part = part,
+                        Before = before,
+                        ThumbTarget = basePath + "-thumb.jpg",
+                        Title = nfoPath != null ? before.Title : e.Title,
+                        Aired = before.Aired,
+                        Plot = before.Plot,
+                        Thumb = e.ThumbPath != null ? Fresh(e.ThumbPath, 480) : null,
+                    };
+                    item.PropertyChanged += (_, a) =>
+                    {
+                        if (a.PropertyName is nameof(EpisodeItem.Title) or nameof(EpisodeItem.Aired) or nameof(EpisodeItem.Plot))
+                            UpdateDirty();
+                    };
+                    _episodes.Add(item);
+                }
+
+                if (parts.Count == 0)
+                    Add(code, null, 0, new NfoEditor.EpisodeFields(string.Empty, string.Empty, string.Empty));
+                else if (parts.Count == 1)
+                    Add(code, nfo, 0, NfoEditor.ReadEpisode(parts[0]));
+                else
                 {
-                    if (a.PropertyName is nameof(EpisodeItem.Title) or nameof(EpisodeItem.Aired) or nameof(EpisodeItem.Plot))
-                        UpdateDirty();
-                };
-                _episodes.Add(item);
+                    // A double episode's NFO holds one part per episode: a row each
+                    for (int i = 0; i < parts.Count; i++)
+                    {
+                        var number = int.TryParse(parts[i].Element("episode")?.Value, out var n) ? n : e.Episode + i;
+                        Add(RegexPatterns.EpisodeCode(e.Season, number, number), nfo, i, NfoEditor.ReadEpisode(parts[i]));
+                    }
+                }
             }
         }
         EpisodeList.ItemsSource = _episodes.ToList();
@@ -1140,6 +1162,8 @@ public partial class EpisodeItem : ObservableObject
 {
     public string Code { get; init; } = string.Empty;
     public string? NfoPath { get; init; }
+    /// <summary>Which &lt;episodedetails&gt; in the NFO: 1 is a double episode's second half.</summary>
+    public int Part { get; init; }
     public NfoEditor.EpisodeFields Before { get; init; } = new(string.Empty, string.Empty, string.Empty);
     public string ThumbTarget { get; init; } = string.Empty;
     public string? PendingThumb { get; set; }

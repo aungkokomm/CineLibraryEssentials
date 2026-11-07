@@ -17,11 +17,26 @@ public class RenameService
     /// Used by both Step 1 (RenameService) and Step 2 (FileToFolderViewModel)
     /// so the format stays consistent across the wizard.
     /// </summary>
-    public static string BuildTvFileName(string showName, int season, int episode, string episodeTitle)
+    public static string BuildTvFileName(string showName, int season, int episode, string episodeTitle, int lastEpisode = 0)
     {
-        var basePart = $"{showName.Trim()} - S{season:D2}E{episode:D2}";
+        // A double episode keeps every number ("S03E01-E02"), or its second half reads as missing
+        var basePart = $"{showName.Trim()} - {RegexPatterns.EpisodeCode(season, episode, Math.Max(episode, lastEpisode))}";
         if (string.IsNullOrWhiteSpace(episodeTitle)) return basePart;
         return $"{basePart} - {episodeTitle.Trim()}";
+    }
+
+    /// <summary>
+    /// The show's folder in <paramref name="baseDir"/>: "Show (Year)" by the template
+    /// when the year is known, like a movie. A folder the show already has, with or
+    /// without the year, is used as it is, so new episodes never start a second one.
+    /// </summary>
+    public static string ShowFolderPath(string baseDir, string showName, int year, string template)
+    {
+        var plain = Path.Combine(baseDir, PathSanitizer.SanitizeFolderName(showName));
+        if (year <= 0 || !template.Contains("{Year}", StringComparison.OrdinalIgnoreCase))
+            return plain;
+        var withYear = Path.Combine(baseDir, PathSanitizer.SanitizeFolderName(ApplyTemplate(showName, year, template)));
+        return !Directory.Exists(withYear) && Directory.Exists(plain) ? plain : withYear;
     }
 
     /// <summary>
@@ -77,7 +92,7 @@ public class RenameService
             if (tv != null && !string.IsNullOrEmpty(tv.ShowName))
             {
                 var tvCleanedName = PathSanitizer.SanitizeFileName(
-                    BuildTvFileName(tv.ShowName, tv.Season, tv.Episode, tv.EpisodeTitle)) + extension;
+                    BuildTvFileName(tv.ShowName, tv.Season, tv.Episode, tv.EpisodeTitle, tv.LastEpisode)) + extension;
 
                 previews.Add(new FilePreview
                 {
@@ -92,6 +107,7 @@ public class RenameService
                     ShowName = tv.ShowName,
                     Season = tv.Season,
                     Episode = tv.Episode,
+                    LastEpisode = tv.LastEpisode,
                     EpisodeTitle = tv.EpisodeTitle,
                 });
                 continue;
@@ -400,7 +416,7 @@ public class RenameService
                     OriginalFilePath = sourcePath,
                     OriginalFileName = preview.OriginalName,
                     CleanedTitle = preview.ShowName,
-                    Year = 0,
+                    Year = preview.ShowYear,   // from a Step 1 match; Step 2 asks TMDb otherwise
                     Confidence = preview.Confidence,
                     DestinationFolder = destFolder,
                     FinalFileName = preview.CleanedName,

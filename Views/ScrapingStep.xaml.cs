@@ -196,6 +196,12 @@ public sealed partial class ScrapingStep : UserControl
             _viewModel?.OpenFolderCommand.Execute(item);
     }
 
+    private async void OnDetailsRowClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is MovieFolderItem item)
+            await ShowMovieDetailsAsync(item);
+    }
+
     private void OnRemoveRowClick(object sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.Tag is MovieFolderItem item)
@@ -206,17 +212,17 @@ public sealed partial class ScrapingStep : UserControl
     }
 
     // -----------------------------------------------------------------
-    //  Double-tap a card to open TMDb search
+    //  Double-tap a card: its details, or TMDb search when not scraped yet
     // -----------------------------------------------------------------
 
     private async void OnCardDoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
     {
         if (sender is not Border b || b.Tag is not MovieFolderItem item) return;
 
-        // Context-aware: already-scraped folders open the details dialog so the
-        // user can verify what was scraped. Unscraped/failed folders open the
-        // TMDb search so they can pick a match.
-        if (item.IsScraped)
+        // Context-aware: folders with an NFO open the details dialog so the
+        // user can verify what was scraped, even when TMDb had no fanart or cast
+        // photos for it. Folders without one open the TMDb search to pick a match.
+        if (item.HasNfo)
             await ShowMovieDetailsAsync(item);
         else
             await OpenTmdbDialogForAsync(item);

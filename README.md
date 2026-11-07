@@ -112,7 +112,7 @@ A **Mode** selector (Auto · Movies · TV Shows) lets you tell the app what you'
 Pick a folder (or **drag-and-drop** one onto the window).
 
 - **Auto-detect** - extracts title + year for movies, or show + season + episode for TV, and strips technical tags (`1080p`, `x265`, `BluRay`, `WEB-HDRip`, `Atmos`, release-group prefixes, etc.)
-- **TV episodes** → `Show - S01E01` (plus the episode title if the original filename has one); **Movies** → `Title (Year)`
+- **TV episodes** → `Show - S01E01` (plus the episode title if the original filename has one, and both numbers for a double episode: `S03E01-E02`); **Movies** → `Title (Year)`
 - **Edition detection** - Director's Cut, Extended, IMAX, 4K Remaster, Theatrical, Unrated, Criterion … shown as a chip and written to the NFO
 - **Diff highlight** - original filename shows kept tokens in grey, removed tokens in **red strikethrough**
 - **Confidence chip**, editable rows, bulk Find & Replace / Title Case / Reset, search + filters
@@ -128,7 +128,8 @@ Pick a folder (or **drag-and-drop** one onto the window).
 Files carry over from Step 1, or add a folder directly. Each loose file gets its own folder, created right where the file already is. Files that are already in their own folder are skipped.
 
 - **Movies** → `Title (Year)/Title (Year).ext`
-- **TV** → `Show/Season XX/Show - S01E01.ext`
+- **TV** → `Show (Year)/Season XX/Show - S01E01.ext` (the year comes from TMDb)
+- **Subs folders** - a `Subs` folder moves along with its movie
 - **Folder merging** - if a destination already exists, files merge in instead of erroring (nothing overwritten)
 - Click **Run File to Folder** - moves everything (subtitles included), then auto-advances to Step 3
 
@@ -137,9 +138,10 @@ Files carry over from Step 1, or add a folder directly. Each loose file gets its
 Folders from Step 2 are auto-listed. You can also **+ Add Folder** for any existing library folder.
 
 - **Movies** → downloads `Title (Year).nfo`, original-resolution poster + fanart, and a `.actors/` folder with the full cast's photos
+- **Your choice of what's written** - in Settings, limit the cast (10 to 50), keep only the first studio, director and writer, and pick smaller picture sizes
 - **TV shows** → downloads `tvshow.nfo` + show poster/fanart/cast into the show folder, then a per-episode `.nfo` (with the real episode title) + episode thumbnail for every episode
 - **IMDb + TMDb ratings** - every NFO gets both, with vote counts. Pick which one players show first in Settings, and update them any time with **⋯ → Refresh IMDb ratings** (only the ratings change, nothing is re-scraped)
-- **Double-tap a scraped card** → a rich **Movie Details** window (hero fanart, poster, plot, both ratings, color-coded crew/studio/country/genres/IDs/file-info, scrollable cast)
+- **Double-tap a scraped card** (or its ⓘ button) → a rich **Movie Details** window (hero fanart, poster, plot, both ratings, color-coded crew/studio/country/genres/IDs/file-info, scrollable cast)
 - **TV shows** - cards read `TV · 3 seasons · 24 episodes`, and the details window lists every episode with its thumbnail and air date, plus the aired episodes you're **missing**
 - **Edit NFO** - right-click a card for a full, resizable editor: every detail field, genres and tags as chips with suggestions from your library, a cast editor, TV episodes, fetch any field from TMDb in another language, and artwork picked from everything TMDb has (poster, fanart, clear logo, landscape). Only what you change is written, every save can be restored, and your edits are protected from Fill gaps and Scrape Selected
 - **Bulk edit** - set a collection, certification, genres, tags or protection for all checked cards at once

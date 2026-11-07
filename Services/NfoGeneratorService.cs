@@ -303,6 +303,14 @@ public class NfoGeneratorService
         TvShowMetadata show,
         string videoFileName,
         StreamDetails? streamDetails = null)
+        => new XDocument(new XDeclaration("1.0", "utf-8", "yes"),
+            BuildEpisodeElement(episode, show, videoFileName, streamDetails)).ToString();
+
+    private static XElement BuildEpisodeElement(
+        TvEpisodeMetadata episode,
+        TvShowMetadata show,
+        string videoFileName,
+        StreamDetails? streamDetails)
     {
         var root = new XElement("episodedetails");
 
@@ -348,7 +356,7 @@ public class NfoGeneratorService
 
         root.Add(new XElement("dateadded", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")));
 
-        return new XDocument(new XDeclaration("1.0", "utf-8", "yes"), root).ToString();
+        return root;
     }
 
     public void SaveTvShowNfo(TvShowMetadata show, string showFolderPath)
@@ -364,18 +372,22 @@ public class NfoGeneratorService
         }
     }
 
+    /// <summary>
+    /// The episode's .nfo next to its video. A double episode (S03E01-E02) gets one
+    /// &lt;episodedetails&gt; per episode, side by side, the way Kodi writes it.
+    /// </summary>
     public void SaveEpisodeNfo(
-        TvEpisodeMetadata episode,
+        IReadOnlyList<TvEpisodeMetadata> episodes,
         TvShowMetadata show,
         string episodeVideoPath,
         StreamDetails? streamDetails = null)
     {
         try
         {
-            var content = GenerateEpisodeNfoXml(
-                episode, show,
-                Path.GetFileName(episodeVideoPath),
-                streamDetails);
+            var videoName = Path.GetFileName(episodeVideoPath);
+            var content = episodes.Count == 1
+                ? GenerateEpisodeNfoXml(episodes[0], show, videoName, streamDetails)
+                : NfoFile.EpisodesXml(episodes.Select(e => BuildEpisodeElement(e, show, videoName, streamDetails)));
             var nfoPath = Path.ChangeExtension(episodeVideoPath, ".nfo");
             File.WriteAllText(nfoPath, content);
         }
