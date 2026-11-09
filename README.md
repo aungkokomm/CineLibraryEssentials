@@ -44,11 +44,11 @@ Movies/
     └── ...
 ```
 
-**TV shows** → `Show/Season XX/`
+**TV shows** → `Show (Year)/Season XX/`
 
 ```
 TV/
-└── Breaking Bad/
+└── Breaking Bad (2008)/
     ├── tvshow.nfo
     ├── poster.jpg
     ├── fanart.jpg
@@ -66,19 +66,54 @@ This is the **Plex / Kodi / Jellyfin / MediaElch** standard layout - readable by
 
 ---
 <p align="center">
-  <img width="1600" alt="Step 1 - Clean Names" src="https://github.com/user-attachments/assets/e5cdd96c-c8f6-42bc-a279-a48f3c24811d" /><br/>
-  <em><b>Step 1 · Clean Names</b> - messy filenames cleaned in place, with a red-strikethrough diff of what was removed and a confidence chip per row.</em>
+  <img width="960" alt="Step 1, Clean Names: a downloads folder of movies and TV episodes, each messy filename with the removed parts in red strikethrough, the clean new name beside it, and edition chips such as Director's Cut and IMAX" src="docs/images/essentials-step1.png" /><br/>
+  <em><b>Step 1 · Clean Names</b> - messy filenames cleaned in place. A red strikethrough shows what was removed, editions like Director's Cut and IMAX get a chip, and a double episode keeps both numbers.</em>
 </p>
 
 <p align="center">
-  <img width="1600" alt="Step 2 - Organize" src="https://github.com/user-attachments/assets/7f262903-9bba-4182-8acf-08f6fd257b66" /><br/>
-  <em><b>Step 2 · Organize</b> - each cleaned file is wrapped into its own <code>Title (Year)/</code> folder, with a live "Will Move To" preview before you run it.</em>
+  <img width="960" alt="Step 2, Organize: each file with the folder it will move to, movies into Title (Year) folders and TV episodes into Show (Year)\Season XX folders" src="docs/images/essentials-step2.png" /><br/>
+  <em><b>Step 2 · Organize</b> - each movie gets its own <code>Title (Year)</code> folder and each episode goes into <code>Show (Year)\Season XX</code>, with a "Will Move To" preview before you run it.</em>
 </p>
 
 <p align="center">
-  <img width="1600" alt="Step 3 - Scrape" src="https://github.com/user-attachments/assets/a7b59a10-ea91-4adf-819a-8e80d51ec23e" /><br/>
-  <em><b>Step 3 · Scrape</b> - posters, fanart, cast photos and a full Kodi NFO downloaded for every folder; double-tap a card for the rich details view.</em>
+  <img width="960" alt="Step 3, Scrape: a grid of movie cards, each with its whole poster, the title under it and a Complete pill" src="docs/images/essentials-step3.jpg" /><br/>
+  <em><b>Step 3 · Scrape</b> - posters, fanart, cast photos and a full Kodi NFO for every folder. Each card shows its whole poster and whether anything is missing.</em>
 </p>
+
+<p align="center">
+  <img width="960" alt="The details window for Moana (2026): the fanart across the top, the poster, the tagline, IMDb and TMDb ratings, Play, Open Folder, Edit and Trailer buttons, the plot, and the crew, studio, country, genres and IDs" src="docs/images/essentials-details.jpg" /><br/>
+  <em><b>Details</b> - double-click a scraped card for its fanart, both ratings, the plot, the crew and the cast.</em>
+</p>
+
+<p align="center">
+  <img width="960" alt="The NFO editor for Moana (2026) on its Details page: title, original and sort title, year, premiered date, runtime, certification, tagline and plot, with Protect from re-scrapes, Restore previous version, Revert and Save at the top" src="docs/images/essentials-editor.png" /><br/>
+  <em><b>Edit NFO</b> - right-click a card to edit every field of its .nfo. Only what you change is written, and every save can be restored.</em>
+</p>
+
+<p align="center">
+  <img width="960" alt="The NFO editor's Cast and crew page: the director and writers as chips, and the cast as rows with each actor's photo, name and role, with buttons to move or remove them" src="docs/images/essentials-editor-cast.jpg" /><br/>
+  <em><b>Cast and crew</b> - drag actors to change the billing order, change a photo, or add someone TMDb missed.</em>
+</p>
+
+<details>
+<summary><b>More of the editor (click to expand)</b></summary>
+
+<p align="center">
+  <img width="960" alt="The NFO editor's Genres and tags page: genres, tags, studios and countries as chips, each with a box to type a new one" src="docs/images/essentials-editor-genres.png" /><br/>
+  <em><b>Genres and tags</b> - genres, tags, studios and countries as chips, with suggestions from your library.</em>
+</p>
+
+<p align="center">
+  <img width="960" alt="The NFO editor's Ratings and IDs page: IMDb and TMDb ratings with Refresh IMDb rating, a ten-star user rating, play count, a note, and the IMDb and TMDb ids" src="docs/images/essentials-editor-ratings.png" /><br/>
+  <em><b>Ratings and IDs</b> - both ratings, your own rating, a play count and a note of your own.</em>
+</p>
+
+<p align="center">
+  <img width="960" alt="The NFO editor's Artwork page: the poster, fanart and clear logo, each with From TMDb and From file buttons" src="docs/images/essentials-editor-artwork.jpg" /><br/>
+  <em><b>Artwork</b> - pick a poster, fanart or clear logo from everything TMDb has, or from a file.</em>
+</p>
+
+</details>
 
 ## Workflow
 
