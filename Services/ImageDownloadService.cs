@@ -39,11 +39,12 @@ public class ImageDownloadService
         if (string.IsNullOrEmpty(imageUrl))
             return false;
 
-        var fileName = $"{Path.GetFileNameWithoutExtension(outputPath)}-fanart.jpg";
-        var fullPath = Path.Combine(Path.GetDirectoryName(outputPath) ?? "", fileName);
-
-        return await DownloadImageAsync(imageUrl, fullPath);
+        return await DownloadImageAsync(imageUrl, FanartPathFor(outputPath));
     }
+
+    /// <summary>A movie's fanart next to its video: "Movie (Year)-fanart.jpg".</summary>
+    public static string FanartPathFor(string videoPath)
+        => Path.Combine(Path.GetDirectoryName(videoPath) ?? "", $"{Path.GetFileNameWithoutExtension(videoPath)}-fanart.jpg");
 
     /// <summary>
     /// Downloads every cast member's headshot in parallel (5 concurrent) at full

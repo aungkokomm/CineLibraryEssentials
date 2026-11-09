@@ -179,6 +179,7 @@
                         <ComboBox Grid.Row="1" Grid.Column="1" x:Name="FanartSizeCombo" Tag="fanart" MinWidth="200"
                                   SelectionChanged="OnImageSizeChanged" AutomationProperties.Name="Fanart size">
                             <ComboBoxItem Content="Original (largest)" Tag="original" />
+                            <ComboBoxItem Content="1920 × 1080" Tag="max1920" />
                             <ComboBoxItem Content="1280 × 720" Tag="w1280" />
                             <ComboBoxItem Content="780 × 439" Tag="w780" />
                         </ComboBox>
@@ -186,6 +187,7 @@
                         <ComboBox Grid.Row="2" Grid.Column="1" x:Name="ThumbSizeCombo" Tag="thumb" MinWidth="200"
                                   SelectionChanged="OnImageSizeChanged" AutomationProperties.Name="Episode thumbnail size">
                             <ComboBoxItem Content="Original (largest)" Tag="original" />
+                            <ComboBoxItem Content="640 × 360" Tag="max640" />
                             <ComboBoxItem Content="300 × 169" Tag="w300" />
                         </ComboBox>
                         <TextBlock Grid.Row="3" Text="Actor photo" VerticalAlignment="Center" />

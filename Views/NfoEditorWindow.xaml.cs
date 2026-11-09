@@ -38,6 +38,10 @@ public sealed partial class NfoEditorWindow : Window
     private static readonly string[] AgeRatings =
         { "G", "PG", "PG-13", "R", "NC-17", "NR", "TV-Y", "TV-Y7", "TV-G", "TV-PG", "TV-14", "TV-MA" };
 
+    // TMDb's show statuses, plus Kodi's "Continuing"; any other can be typed
+    private static readonly string[] ShowStatuses =
+        { "Returning Series", "Continuing", "Ended", "Canceled", "In Production", "Planned", "Pilot" };
+
     private static readonly string[] Editions =
     {
         "Director's Cut", "Extended", "Extended Edition", "Theatrical", "Unrated", "IMAX", "Remastered",
@@ -58,6 +62,7 @@ public sealed partial class NfoEditorWindow : Window
     private bool _beforeLocked;
     private bool _isTv;
     private string _ageRating = string.Empty;
+    private string _status = string.Empty;
     private NfoReaderService.MovieDetail? _detail;
     private LibraryVocabulary _vocab = LibraryVocabulary.Empty;
     private ImdbRatingService.ImdbRating? _pendingImdb;
@@ -129,6 +134,7 @@ public sealed partial class NfoEditorWindow : Window
         AppWindow.Closing += OnAppWindowClosing;
 
         foreach (var r in AgeRatings) AgeRatingBox.Items.Add(r);
+        foreach (var s in ShowStatuses) StatusBox.Items.Add(s);
         foreach (var b in new[] { FetchTitleButton, FetchTaglineButton, FetchPlotButton, FetchOutlineButton })
             SetupFetchFlyout(b);
         foreach (var box in new[] { GenresBox, TagsBox, StudiosBox, CountriesBox, DirectorsBox, WritersBox })
@@ -189,6 +195,7 @@ public sealed partial class NfoEditorWindow : Window
             PremieredBox.Text = _before.Premiered;
             RuntimeBox.Value = _before.Runtime > 0 ? _before.Runtime : double.NaN;
             SetAgeRating(_before.AgeRating);
+            SetStatus(_before.Status);
             TaglineBox.Text = _before.Tagline;
             PlotBox.Text = _before.Plot;
             OutlineBox.Text = _before.Outline;
@@ -206,6 +213,8 @@ public sealed partial class NfoEditorWindow : Window
             // Ratings and IDs
             UserRatingControl.Value = _before.UserRating > 0 ? _before.UserRating : -1;
             UpdateUserRatingText();
+            PlayCountBox.Value = _before.PlayCount;
+            NoteBox.Text = _before.Note;
             ImdbIdBox.Text = _before.ImdbId;
             TmdbIdBox.Text = _before.TmdbId;
             TrailerBox.Text = _before.Trailer;
@@ -213,6 +222,7 @@ public sealed partial class NfoEditorWindow : Window
 
             // Shows have creators instead of a director, and no collection or edition
             MovieOnlyDetails.Visibility = _isTv ? Visibility.Collapsed : Visibility.Visible;
+            TvStatusRow.Visibility = _isTv ? Visibility.Visible : Visibility.Collapsed;
             DirectorsBox.Visibility = _isTv ? Visibility.Collapsed : Visibility.Visible;
             WritersBox.Header = _isTv ? "Creators" : "Writers";
             StudiosBox.Header = _isTv ? "Studios and networks" : "Studios";
@@ -288,6 +298,9 @@ public sealed partial class NfoEditorWindow : Window
         Trailer = TrailerBox.Text.Trim(),
         ImdbId = ImdbIdBox.Text.Trim(),
         TmdbId = TmdbIdBox.Text.Trim(),
+        PlayCount = ToInt(PlayCountBox.Value),
+        Note = Norm(NoteBox.Text),
+        Status = _isTv ? _status.Trim() : _before.Status,
     };
 
     private int DirtyCount()
@@ -329,6 +342,26 @@ public sealed partial class NfoEditorWindow : Window
     private void OnAgeRatingSubmitted(ComboBox sender, ComboBoxTextSubmittedEventArgs args)
     {
         _ageRating = args.Text.Trim();
+        UpdateDirty();
+    }
+
+    private void SetStatus(string value)
+    {
+        _status = value;
+        if (value.Length > 0 && !StatusBox.Items.Contains(value)) StatusBox.Items.Add(value);
+        StatusBox.SelectedItem = value.Length > 0 ? value : null;
+        if (value.Length == 0) StatusBox.Text = string.Empty;
+    }
+
+    private void OnStatusSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (StatusBox.SelectedItem is string s) _status = s;
+        UpdateDirty();
+    }
+
+    private void OnStatusSubmitted(ComboBox sender, ComboBoxTextSubmittedEventArgs args)
+    {
+        _status = args.Text.Trim();
         UpdateDirty();
     }
 
@@ -403,8 +436,10 @@ public sealed partial class NfoEditorWindow : Window
                 else
                 {
                     // At the size Settings → NFO and pictures picks for that kind of picture
-                    var size = _config.GetImageSize(slot.Source switch { "posters" => "poster", "logos" => "logo", _ => "fanart" });
+                    var (size, shrinkTo) = ImageFiles.Resolve(
+                        _config.GetImageSize(slot.Source switch { "posters" => "poster", "logos" => "logo", _ => "fanart" }));
                     await ImageFiles.DownloadAsync(ImageFiles.Tmdb(slot.PendingTmdb!.FilePath, size), target);
+                    await ImageFiles.ShrinkToWidthAsync(target, shrinkTo);
                 }
             }
 

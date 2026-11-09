@@ -150,6 +150,11 @@
                             <ComboBox Grid.Column="3" x:Name="AgeRatingBox" Header="Certification" IsEditable="True"
                                       HorizontalAlignment="Stretch" SelectionChanged="OnAgeRatingSelectionChanged" TextSubmitted="OnAgeRatingSubmitted" />
                         </Grid>
+                        <!-- TV only: TMDb's status is sometimes missing or out of date -->
+                        <Grid x:Name="TvStatusRow" ColumnDefinitions="*,*,*,*" ColumnSpacing="16">
+                            <ComboBox x:Name="StatusBox" Header="Status" IsEditable="True" HorizontalAlignment="Stretch"
+                                      SelectionChanged="OnStatusSelectionChanged" TextSubmitted="OnStatusSubmitted" />
+                        </Grid>
 
                         <TextBlock Style="{StaticResource SectionHeader}" Text="Story" />
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
@@ -293,6 +298,18 @@
                             <TextBlock x:Name="UserRatingText" VerticalAlignment="Center"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
+
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="Play count" />
+                        <NumberBox x:Name="PlayCountBox" Minimum="0" Maximum="9999" Width="160" HorizontalAlignment="Left"
+                                   SpinButtonPlacementMode="Inline" ValueChanged="OnNumberChanged"
+                                   AutomationProperties.Name="Play count" />
+
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="Note" />
+                        <TextBox x:Name="NoteBox" AcceptsReturn="True" TextWrapping="Wrap" Height="90"
+                                 PlaceholderText="Your own note about this title" TextChanged="OnAnyChange"
+                                 AutomationProperties.Name="Note" />
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="Saved in the .nfo the way tinyMediaManager writes notes. CineLibrary shows it when you haven't written a note there." />
 
                         <TextBlock Style="{StaticResource SectionHeader}" Text="IDs and links" />
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">

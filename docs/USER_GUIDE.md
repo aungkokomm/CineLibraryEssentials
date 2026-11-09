@@ -358,10 +358,10 @@ Scraped the right title but want to fix something? Right-click a card → **Edit
 
 | Section | What you can change |
 |---|---|
-| **Details** | Title, original title, sort title, year, premiered date, runtime, certification, tagline, plot (overview), outline, and for movies the collection and edition |
+| **Details** | Title, original title, sort title, year, premiered date, runtime, certification, tagline, plot (overview), outline, for movies the collection and edition, and for TV shows the status (Returning Series, Ended, Canceled...) |
 | **Genres and tags** | Genres, tags (your own labels like *4K* or *Watched*), studios, countries |
 | **Cast and crew** | Director, writers (creators for TV), and the cast: add, remove, rename, change roles and photos, and drag rows (or use the arrows) to change the billing order |
-| **Ratings and IDs** | See the IMDb and TMDb ratings, refresh the IMDb one, give your own rating (0 to 10 stars), and edit the IMDb id, TMDb id and trailer link (each with an Open button) |
+| **Ratings and IDs** | See the IMDb and TMDb ratings, refresh the IMDb one, give your own rating (0 to 10 stars), set the play count, write your own note, and edit the IMDb id, TMDb id and trailer link (each with an Open button). The note is saved as `<user_note>`, the way tinyMediaManager writes it, and CineLibrary shows it when you haven't written a note there |
 | **Artwork** | Poster, fanart, clear logo, landscape and banner. Pick **From TMDb** to browse every picture TMDb has for the title (filter by language or *Without text*), or **From file...** |
 | **Episodes** (TV) | Every episode's title, air date, plot and thumbnail |
 | **NFO source** | The file itself, read-only, with **Copy** and **Open folder** |
@@ -411,7 +411,7 @@ What a scrape writes and downloads. By default it's everything, at the largest s
 - **Cast** - everyone TMDb lists, or only the first 10, 15, 20, 30 or 50, in billing order. Fewer actors also means fewer photos in `.actors`.
 - **Only the first studio** - for players that show one studio. For a TV show it's the network (such as HBO) when it has one.
 - **Only the first director, writer and creator**
-- **Picture sizes** - poster, fanart and landscape, episode thumbnail, actor photo and clear logo, from the original (largest) down to TMDb's smaller sizes, such as a 500 × 750 poster or 1280 × 720 fanart. Pictures picked in **Edit NFO** use them too. Only new downloads change: pictures already on disk stay as they are.
+- **Picture sizes** - poster, fanart and landscape, episode thumbnail, actor photo and clear logo, from the original (largest) down to TMDb's smaller sizes, such as a 500 × 750 poster or 1280 × 720 fanart. 1920 × 1080 fanart and 640 × 360 episode thumbnails aren't sizes TMDb has, so they're made from the original on your PC. Pictures picked in **Edit NFO** use them too. Only new downloads change: pictures already on disk stay as they are.
 
 **Updates**
 

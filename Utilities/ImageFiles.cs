@@ -60,4 +60,50 @@ public static class ImageFiles
 
     /// <summary>A TMDb picture URL at the given size ("w342", "original"...).</summary>
     public static string Tmdb(string filePath, string size) => $"https://image.tmdb.org/t/p/{size}{filePath}";
+
+    /// <summary>
+    /// The TMDb size to download for a Settings choice, and the width to shrink the
+    /// picture to afterwards (0 = keep). TMDb has no 1920 or 640 wide sizes, so
+    /// "max1920" and "max640" come from the original.
+    /// </summary>
+    public static (string TmdbSize, int ShrinkTo) Resolve(string setting)
+        => setting.StartsWith("max", StringComparison.Ordinal) && int.TryParse(setting[3..], out var width)
+            ? ("original", width)
+            : (setting, 0);
+
+    /// <summary>
+    /// Scales a JPG down to <paramref name="maxWidth"/> pixels wide, keeping its shape,
+    /// when it's wider. If anything goes wrong the full-size picture stays.
+    /// </summary>
+    public static async Task ShrinkToWidthAsync(string path, int maxWidth)
+    {
+        if (maxWidth <= 0 || !File.Exists(path)) return;
+        var tmp = path + ".tmp";
+        try
+        {
+            var file = await StorageFile.GetFileFromPathAsync(path);
+            using (var input = await file.OpenReadAsync())
+            {
+                var decoder = await BitmapDecoder.CreateAsync(input);
+                if (decoder.PixelWidth <= maxWidth) return;
+                var height = (uint)Math.Max(1, Math.Round(decoder.PixelHeight * (double)maxWidth / decoder.PixelWidth));
+                using var pixels = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Ignore);
+                using var fs = File.Create(tmp);
+                using var output = fs.AsRandomAccessStream();
+                var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, output,
+                    new BitmapPropertySet { ["ImageQuality"] = new BitmapTypedValue(0.92f, Windows.Foundation.PropertyType.Single) });
+                encoder.SetSoftwareBitmap(pixels);
+                encoder.BitmapTransform.ScaledWidth = (uint)maxWidth;
+                encoder.BitmapTransform.ScaledHeight = height;
+                encoder.BitmapTransform.InterpolationMode = BitmapInterpolationMode.Fant;
+                await encoder.FlushAsync();
+            }
+            File.Move(tmp, path, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Shrinking {path} failed: {ex.Message}");
+            try { File.Delete(tmp); } catch { }
+        }
+    }
 }

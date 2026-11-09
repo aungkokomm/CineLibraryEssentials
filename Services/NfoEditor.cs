@@ -40,6 +40,11 @@ public static class NfoEditor
         public string Trailer { get; init; } = string.Empty;
         public string ImdbId { get; init; } = string.Empty;
         public string TmdbId { get; init; } = string.Empty;
+        public int PlayCount { get; init; }
+        /// <summary>The user's own note, as tinyMediaManager writes it (&lt;user_note&gt;).</summary>
+        public string Note { get; init; } = string.Empty;
+        /// <summary>A show's status ("Returning Series", "Ended"...).</summary>
+        public string Status { get; init; } = string.Empty;
     }
 
     public static Fields Read(XElement root) => new()
@@ -70,6 +75,9 @@ public static class NfoEditor
         Trailer = Text(root, "trailer"),
         ImdbId = UniqueId(root, "imdb"),
         TmdbId = UniqueId(root, "tmdb"),
+        PlayCount = Int(root, "playcount"),
+        Note = Text(root, "user_note"),
+        Status = Text(root, "status"),
     };
 
     /// <summary>
@@ -127,6 +135,9 @@ public static class NfoEditor
         Single("userrating", Number(before.UserRating), Number(after.UserRating));
         Single("edition", before.Edition, after.Edition);
         Single("trailer", before.Trailer, after.Trailer);
+        Single("playcount", Number(before.PlayCount), Number(after.PlayCount));
+        Single("user_note", before.Note, after.Note);
+        Single("status", before.Status, after.Status);
 
         if (before.ImdbId != after.ImdbId)
         {
@@ -183,6 +194,8 @@ public static class NfoEditor
         if (a.UserRating != b.UserRating) n++;
         S(a.Collection, b.Collection); S(a.Edition, b.Edition); S(a.Trailer, b.Trailer);
         S(a.ImdbId, b.ImdbId); S(a.TmdbId, b.TmdbId);
+        if (a.PlayCount != b.PlayCount) n++;
+        S(a.Note, b.Note); S(a.Status, b.Status);
         return n;
     }
 

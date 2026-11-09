@@ -148,8 +148,9 @@ public class ScraperService
             && !(keepImages && HasImage(movieFolderPath, "-fanart.jpg")))
         {
             progress?.Report("Downloading fanart...");
-            var fanartUrl = _tmdbClient.GetImageUrl(details.BackdropPath, _config.GetImageSize("fanart"));
+            var (fanartUrl, shrinkTo) = ImageUrl(details.BackdropPath, "fanart");
             await _imageService.DownloadFanartAsync(fanartUrl, videoFile);
+            await Utilities.ImageFiles.ShrinkToWidthAsync(ImageDownloadService.FanartPathFor(videoFile), shrinkTo);
         }
 
         // Actor photos
@@ -370,12 +371,13 @@ public class ScraperService
 
                 if (!string.IsNullOrEmpty(tmdbEp.StillPath))
                 {
-                    var thumbUrl = _tmdbClient.GetImageUrl(tmdbEp.StillPath, _config.GetImageSize("thumb"));
+                    var (thumbUrl, shrinkTo) = ImageUrl(tmdbEp.StillPath, "thumb");
                     var thumbPath = Path.Combine(
                         Path.GetDirectoryName(videoFile)!,
                         Path.GetFileNameWithoutExtension(videoFile) + "-thumb.jpg");
-                    if (!File.Exists(thumbPath))
-                        await _imageService.DownloadAnyImageAsync(thumbUrl, thumbPath);
+                    if (!File.Exists(thumbPath)
+                        && await _imageService.DownloadAnyImageAsync(thumbUrl, thumbPath))
+                        await Utilities.ImageFiles.ShrinkToWidthAsync(thumbPath, shrinkTo);
                 }
 
                 episodesScraped++;
@@ -426,11 +428,22 @@ public class ScraperService
         }
         if (!string.IsNullOrEmpty(details.BackdropPath))
         {
-            var fanartUrl = _tmdbClient.GetImageUrl(details.BackdropPath, _config.GetImageSize("fanart"));
+            var (fanartUrl, shrinkTo) = ImageUrl(details.BackdropPath, "fanart");
             var fanartPath = Path.Combine(showFolderPath, "fanart.jpg");
-            if (!File.Exists(fanartPath))
-                await _imageService.DownloadAnyImageAsync(fanartUrl, fanartPath);
+            if (!File.Exists(fanartPath)
+                && await _imageService.DownloadAnyImageAsync(fanartUrl, fanartPath))
+                await Utilities.ImageFiles.ShrinkToWidthAsync(fanartPath, shrinkTo);
         }
+    }
+
+    /// <summary>
+    /// A picture's TMDb URL at the size Settings → NFO and pictures picks, and the
+    /// width to shrink it to after downloading (0 = keep; for 1920 and 640 wide).
+    /// </summary>
+    private (string Url, int ShrinkTo) ImageUrl(string? tmdbPath, string kind)
+    {
+        var (size, shrinkTo) = Utilities.ImageFiles.Resolve(_config.GetImageSize(kind));
+        return (_tmdbClient.GetImageUrl(tmdbPath, size), shrinkTo);
     }
 
     private static int ParseSeasonNumber(string folderName)

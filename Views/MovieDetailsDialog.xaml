@@ -195,9 +195,11 @@
                     <!-- ============ Cast ============ -->
                     <StackPanel x:Name="CastSection" Spacing="12" Visibility="Collapsed">
                         <TextBlock Text="CAST" FontSize="11" FontWeight="SemiBold" Foreground="#F59E0B" CharacterSpacing="80" />
+                        <!-- Bottom padding keeps the scrollbar under the roles, not over them -->
                         <ScrollViewer HorizontalScrollMode="Auto"
                                       HorizontalScrollBarVisibility="Auto"
-                                      VerticalScrollMode="Disabled">
+                                      VerticalScrollMode="Disabled"
+                                      Padding="0,0,0,16">
                             <ItemsControl x:Name="CastList">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>

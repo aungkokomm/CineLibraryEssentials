@@ -147,4 +147,34 @@ public class NfoEditorTests : IDisposable
         Assert.Equal("Edited plot", reread.Plot);
         Assert.Equal(f.Studios, reread.Studios);
     }
+
+    // CLE #4 (jo-el414): play count, tinyMediaManager's <user_note>, and a show's status
+    [Fact]
+    public void WritesPlayCountNoteAndStatus()
+    {
+        var root = XElement.Parse("""
+            <tvshow><title>The Mandalorian</title><playcount>0</playcount>
+              <user_note>The end of the show is a movie.</user_note><status>Returning Series</status></tvshow>
+            """);
+        var before = NfoEditor.Read(root);
+        Assert.Equal((0, "The end of the show is a movie.", "Returning Series"), (before.PlayCount, before.Note, before.Status));
+
+        var after = before with { PlayCount = 3, Note = "Watch the movie after season 3.", Status = "Ended" };
+        Assert.Equal(3, NfoEditor.CountChanges(before, after));
+        Assert.True(NfoEditor.Apply(root, before, after, lockData: false));
+
+        Assert.Equal("3", root.Element("playcount")!.Value);
+        Assert.Equal("Watch the movie after season 3.", root.Element("user_note")!.Value);
+        Assert.Equal("Ended", root.Element("status")!.Value);
+    }
+
+    [Fact]
+    public void ClearingNoteAndPlayCountRemovesThem()
+    {
+        var root = XElement.Parse("<movie><title>X</title><playcount>2</playcount><user_note>Seen twice</user_note></movie>");
+        var before = NfoEditor.Read(root);
+        NfoEditor.Apply(root, before, before with { PlayCount = 0, Note = string.Empty }, lockData: false);
+        Assert.Null(root.Element("playcount"));
+        Assert.Null(root.Element("user_note"));
+    }
 }
