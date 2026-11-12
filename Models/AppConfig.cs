@@ -81,6 +81,9 @@ public class AppConfig
     public string ThumbSize { get; set; } = "original";
     public string ActorSize { get; set; } = "original";
     public string LogoSize { get; set; } = "original";
+
+    /// <summary>Step 3's card order: "Name", "Collection", "Year" or "Needs work first".</summary>
+    public string Step3Sort { get; set; } = "Name";
 }
 
 /// <summary>A window's last size and position (the restored ones when it was maximized).</summary>

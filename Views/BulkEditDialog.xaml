@@ -26,8 +26,8 @@
 
             <StackPanel Spacing="6">
                 <CheckBox x:Name="AgeRatingCheck" Content="Set the certification" />
-                <ComboBox x:Name="AgeRatingBox" IsEditable="True" MinWidth="200"
-                          IsEnabled="{Binding IsChecked, ElementName=AgeRatingCheck}" />
+                <AutoSuggestBox x:Name="AgeRatingBox" Width="200" HorizontalAlignment="Left"
+                                IsEnabled="{Binding IsChecked, ElementName=AgeRatingCheck}" />
             </StackPanel>
 
             <Grid ColumnDefinitions="*,*" ColumnSpacing="14">

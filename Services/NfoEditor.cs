@@ -41,6 +41,11 @@ public static class NfoEditor
         public string ImdbId { get; init; } = string.Empty;
         public string TmdbId { get; init; } = string.Empty;
         public int PlayCount { get; init; }
+        /// <summary>
+        /// &lt;watched&gt;true&lt;/watched&gt; as tinyMediaManager writes it, or any plays:
+        /// Kodi counts a title with a play count as watched.
+        /// </summary>
+        public bool Watched { get; init; }
         /// <summary>The user's own note, as tinyMediaManager writes it (&lt;user_note&gt;).</summary>
         public string Note { get; init; } = string.Empty;
         /// <summary>A show's status ("Returning Series", "Ended"...).</summary>
@@ -76,9 +81,15 @@ public static class NfoEditor
         ImdbId = UniqueId(root, "imdb"),
         TmdbId = UniqueId(root, "tmdb"),
         PlayCount = Int(root, "playcount"),
+        Watched = IsWatched(root),
         Note = Text(root, "user_note"),
         Status = Text(root, "status"),
     };
+
+    /// <summary>Watched as players see it: &lt;watched&gt;true&lt;/watched&gt; or a play count above 0.</summary>
+    public static bool IsWatched(XElement root)
+        => string.Equals(Text(root, "watched"), "true", StringComparison.OrdinalIgnoreCase)
+           || Int(root, "playcount") > 0;
 
     /// <summary>
     /// Writes the fields that differ between <paramref name="before"/> and
@@ -136,6 +147,11 @@ public static class NfoEditor
         Single("edition", before.Edition, after.Edition);
         Single("trailer", before.Trailer, after.Trailer);
         Single("playcount", Number(before.PlayCount), Number(after.PlayCount));
+        if (before.Watched != after.Watched)
+        {
+            SetText(root, "watched", after.Watched ? "true" : "false");
+            changed = true;
+        }
         Single("user_note", before.Note, after.Note);
         Single("status", before.Status, after.Status);
 
@@ -195,6 +211,7 @@ public static class NfoEditor
         S(a.Collection, b.Collection); S(a.Edition, b.Edition); S(a.Trailer, b.Trailer);
         S(a.ImdbId, b.ImdbId); S(a.TmdbId, b.TmdbId);
         if (a.PlayCount != b.PlayCount) n++;
+        if (a.Watched != b.Watched) n++;
         S(a.Note, b.Note); S(a.Status, b.Status);
         return n;
     }
@@ -303,7 +320,7 @@ public static class NfoEditor
                ?.Value.Trim() ?? string.Empty;
 
     // Collection is <set><name>X</name><overview/></set>; very old NFOs use <set>X</set>.
-    private static string CollectionName(XElement root)
+    public static string CollectionName(XElement root)
     {
         var set = root.Element("set");
         if (set == null) return string.Empty;

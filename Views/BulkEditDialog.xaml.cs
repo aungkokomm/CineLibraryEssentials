@@ -1,3 +1,4 @@
+using CineLibraryEssentials.Controls;
 using CineLibraryEssentials.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -25,7 +26,7 @@ public sealed partial class BulkEditDialog : ContentDialog
         _folders = folders.ToList();
         IntroText.Text = $"Applies to the {_folders.Count} checked item{(_folders.Count == 1 ? "" : "s")}. " +
                          "Only what you tick or fill in below changes; everything else stays as it is.";
-        foreach (var r in AgeRatings) AgeRatingBox.Items.Add(r);
+        PickList.Attach(AgeRatingBox, AgeRatings);
         _ = LoadSuggestionsAsync(libraryFolders.ToList());
     }
 
@@ -44,7 +45,7 @@ public sealed partial class BulkEditDialog : ContentDialog
 
     private void OnApplyClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
     {
-        var ageRating = (AgeRatingBox.SelectedItem as string) ?? AgeRatingBox.Text ?? string.Empty;
+        var ageRating = AgeRatingBox.Text ?? string.Empty;
         var change = new NfoEditor.BulkChange
         {
             Collection = CollectionCheck.IsChecked == true ? CollectionBox.Text.Trim() : null,

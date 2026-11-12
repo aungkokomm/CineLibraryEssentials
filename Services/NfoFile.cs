@@ -34,9 +34,12 @@ public static class NfoFile
     /// Every &lt;episodedetails&gt; in an episode NFO: one, or one per episode for a
     /// double episode, which Kodi writes as several root elements in one file.
     /// </summary>
-    public static List<XElement> LoadEpisodes(string path)
+    public static List<XElement> LoadEpisodes(string path) => ParseEpisodes(File.ReadAllText(path));
+
+    /// <summary>The root elements of NFO text: one, or several for a double episode.</summary>
+    public static List<XElement> ParseEpisodes(string xml)
     {
-        var body = Declaration.Replace(File.ReadAllText(path), string.Empty);
+        var body = Declaration.Replace(xml, string.Empty);
         return XElement.Parse("<parts>" + body + "</parts>").Elements().ToList();
     }
 
@@ -57,4 +60,47 @@ public static class NfoFile
     public static string EpisodesXml(IEnumerable<XElement> parts)
         => "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>" + Environment.NewLine
            + string.Join(Environment.NewLine, parts.Select(p => p.ToString()));
+
+    private static readonly string[] UserFields = { "userrating", "playcount", "lastplayed", "watched", "user_note" };
+
+    /// <summary>
+    /// A rescrape builds the .nfo afresh from TMDb, so the user's own fields
+    /// (rating, play count, last played, watched, note) are taken over from the
+    /// old file at <paramref name="oldPath"/>. Episodes are matched by number, for
+    /// a double episode's file. Returns <paramref name="newXml"/> as it is when
+    /// there's nothing to keep.
+    /// </summary>
+    public static string KeepUserFields(string newXml, string? oldPath)
+    {
+        if (oldPath == null || !File.Exists(oldPath)) return newXml;
+        List<XElement> oldRoots, newRoots;
+        try
+        {
+            oldRoots = LoadEpisodes(oldPath);
+            newRoots = ParseEpisodes(newXml);
+        }
+        catch
+        {
+            return newXml;   // an unreadable old file has nothing to keep
+        }
+
+        bool kept = false;
+        foreach (var root in newRoots)
+        {
+            var old = oldRoots.FirstOrDefault(o => o.Name == root.Name
+                                                   && (string?)o.Element("episode") == (string?)root.Element("episode"));
+            if (old == null) continue;
+            foreach (var name in UserFields)
+            {
+                var value = old.Element(name)?.Value.Trim();
+                if (string.IsNullOrEmpty(value) || value == "0") continue;
+                var target = root.Element(name);
+                if (target == null) root.Add(new XElement(name, value));
+                else target.Value = value;
+                kept = true;
+            }
+        }
+        if (!kept) return newXml;
+        return newRoots.Count == 1 ? newRoots[0].ToString() : EpisodesXml(newRoots);
+    }
 }

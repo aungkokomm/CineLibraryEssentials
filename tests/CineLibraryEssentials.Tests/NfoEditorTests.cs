@@ -177,4 +177,29 @@ public class NfoEditorTests : IDisposable
         Assert.Null(root.Element("playcount"));
         Assert.Null(root.Element("user_note"));
     }
+
+    // CLE #4 (jo-el414): Watched, as tinyMediaManager writes it; a play count counts too, as in Kodi
+    [Theory]
+    [InlineData("<movie><watched>true</watched></movie>", true)]
+    [InlineData("<movie><watched>false</watched><playcount>1</playcount></movie>", true)]
+    [InlineData("<movie><playcount>0</playcount></movie>", false)]
+    [InlineData("<movie><watched>False</watched></movie>", false)]
+    public void ReadsWatched(string xml, bool watched)
+        => Assert.Equal(watched, NfoEditor.Read(XElement.Parse(xml)).Watched);
+
+    [Fact]
+    public void WritesWatchedOnlyWhenItChanges()
+    {
+        var root = XElement.Parse("<movie><title>X</title><playcount>1</playcount></movie>");
+        var before = NfoEditor.Read(root);
+        Assert.False(NfoEditor.Apply(root, before, before, lockData: false));
+        Assert.Null(root.Element("watched"));   // a play count already says watched
+
+        var unwatched = before with { Watched = false, PlayCount = 0 };
+        Assert.Equal(2, NfoEditor.CountChanges(before, unwatched));
+        Assert.True(NfoEditor.Apply(root, before, unwatched, lockData: false));
+        Assert.Equal("false", root.Element("watched")!.Value);
+        Assert.Null(root.Element("playcount"));
+        Assert.False(NfoEditor.Read(root).Watched);
+    }
 }

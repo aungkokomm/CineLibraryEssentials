@@ -200,6 +200,18 @@ public class ConfigService
     public string GetWizardMode() =>
         string.IsNullOrEmpty(_config.WizardMode) ? "Auto" : _config.WizardMode;
 
+    public string GetStep3Sort() => _config.Step3Sort switch
+    {
+        "Collection" or "Year" or "Needs work first" => _config.Step3Sort,
+        _ => "Name",
+    };
+
+    public void SetStep3Sort(string sort)
+    {
+        _config.Step3Sort = sort;
+        SaveConfig();
+    }
+
     public void SetWizardMode(string mode)
     {
         _config.WizardMode = mode switch

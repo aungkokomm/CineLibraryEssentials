@@ -147,13 +147,12 @@
                                      PlaceholderText="2010-07-15" TextChanged="OnAnyChange" />
                             <NumberBox Grid.Column="2" x:Name="RuntimeBox" Header="Runtime (minutes)"
                                        Minimum="0" Maximum="2000" SpinButtonPlacementMode="Hidden" ValueChanged="OnNumberChanged" />
-                            <ComboBox Grid.Column="3" x:Name="AgeRatingBox" Header="Certification" IsEditable="True"
-                                      HorizontalAlignment="Stretch" SelectionChanged="OnAgeRatingSelectionChanged" TextSubmitted="OnAgeRatingSubmitted" />
+                            <!-- Pick lists you can type into (Controls/PickList), filled in code -->
+                            <AutoSuggestBox Grid.Column="3" x:Name="AgeRatingBox" Header="Certification" PlaceholderText="None" />
                         </Grid>
                         <!-- TV only: TMDb's status is sometimes missing or out of date -->
                         <Grid x:Name="TvStatusRow" ColumnDefinitions="*,*,*,*" ColumnSpacing="16">
-                            <ComboBox x:Name="StatusBox" Header="Status" IsEditable="True" HorizontalAlignment="Stretch"
-                                      SelectionChanged="OnStatusSelectionChanged" TextSubmitted="OnStatusSubmitted" />
+                            <AutoSuggestBox x:Name="StatusBox" Header="Status" PlaceholderText="Not set" />
                         </Grid>
 
                         <TextBlock Style="{StaticResource SectionHeader}" Text="Story" />
@@ -176,7 +175,7 @@
                         </Grid>
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                             <TextBox x:Name="OutlineBox" Header="Outline (short summary)" AcceptsReturn="True" TextWrapping="Wrap"
-                                     Height="80" TextChanged="OnAnyChange" />
+                                     Height="130" TextChanged="OnAnyChange" />
                             <Button Grid.Column="1" x:Name="FetchOutlineButton" Tag="outline" Style="{StaticResource FetchButton}"
                                     AutomationProperties.Name="Fetch the outline from TMDb"
                                     ToolTipService.ToolTip="Fetch from TMDb, in a language you pick">
@@ -300,9 +299,15 @@
                         </StackPanel>
 
                         <TextBlock Style="{StaticResource SectionHeader}" Text="Play count" />
-                        <NumberBox x:Name="PlayCountBox" Minimum="0" Maximum="9999" Width="160" HorizontalAlignment="Left"
-                                   SpinButtonPlacementMode="Inline" ValueChanged="OnNumberChanged"
-                                   AutomationProperties.Name="Play count" />
+                        <StackPanel Orientation="Horizontal" Spacing="24">
+                            <NumberBox x:Name="PlayCountBox" Minimum="0" Maximum="9999" Width="160"
+                                       SpinButtonPlacementMode="Inline" ValueChanged="OnNumberChanged"
+                                       AutomationProperties.Name="Play count" />
+                            <CheckBox x:Name="WatchedCheck" Content="Watched" Click="OnWatchedClick"
+                                      VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock x:Name="WatchedHint" Style="{StaticResource Hint}"
+                                   Text="Players count a title with plays as watched, and so does CineLibrary. Ticking Watched gives it 1 play if it has none; unticking it sets the play count to 0." />
 
                         <TextBlock Style="{StaticResource SectionHeader}" Text="Note" />
                         <TextBox x:Name="NoteBox" AcceptsReturn="True" TextWrapping="Wrap" Height="90"

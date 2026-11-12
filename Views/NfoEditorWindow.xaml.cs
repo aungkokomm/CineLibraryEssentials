@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Xml.Linq;
+using CineLibraryEssentials.Controls;
 using CineLibraryEssentials.Services;
 using CineLibraryEssentials.Utilities;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -61,8 +62,6 @@ public sealed partial class NfoEditorWindow : Window
     private NfoEditor.Fields _before = new();
     private bool _beforeLocked;
     private bool _isTv;
-    private string _ageRating = string.Empty;
-    private string _status = string.Empty;
     private NfoReaderService.MovieDetail? _detail;
     private LibraryVocabulary _vocab = LibraryVocabulary.Empty;
     private ImdbRatingService.ImdbRating? _pendingImdb;
@@ -133,8 +132,8 @@ public sealed partial class NfoEditorWindow : Window
         }
         AppWindow.Closing += OnAppWindowClosing;
 
-        foreach (var r in AgeRatings) AgeRatingBox.Items.Add(r);
-        foreach (var s in ShowStatuses) StatusBox.Items.Add(s);
+        PickList.Attach(AgeRatingBox, AgeRatings, UpdateDirty);
+        PickList.Attach(StatusBox, ShowStatuses, UpdateDirty);
         foreach (var b in new[] { FetchTitleButton, FetchTaglineButton, FetchPlotButton, FetchOutlineButton })
             SetupFetchFlyout(b);
         foreach (var box in new[] { GenresBox, TagsBox, StudiosBox, CountriesBox, DirectorsBox, WritersBox })
@@ -194,8 +193,8 @@ public sealed partial class NfoEditorWindow : Window
             YearBox.Value = _before.Year > 0 ? _before.Year : double.NaN;
             PremieredBox.Text = _before.Premiered;
             RuntimeBox.Value = _before.Runtime > 0 ? _before.Runtime : double.NaN;
-            SetAgeRating(_before.AgeRating);
-            SetStatus(_before.Status);
+            AgeRatingBox.Text = _before.AgeRating;
+            StatusBox.Text = _before.Status;
             TaglineBox.Text = _before.Tagline;
             PlotBox.Text = _before.Plot;
             OutlineBox.Text = _before.Outline;
@@ -214,6 +213,7 @@ public sealed partial class NfoEditorWindow : Window
             UserRatingControl.Value = _before.UserRating > 0 ? _before.UserRating : -1;
             UpdateUserRatingText();
             PlayCountBox.Value = _before.PlayCount;
+            WatchedCheck.IsChecked = _before.Watched;
             NoteBox.Text = _before.Note;
             ImdbIdBox.Text = _before.ImdbId;
             TmdbIdBox.Text = _before.TmdbId;
@@ -223,6 +223,8 @@ public sealed partial class NfoEditorWindow : Window
             // Shows have creators instead of a director, and no collection or edition
             MovieOnlyDetails.Visibility = _isTv ? Visibility.Collapsed : Visibility.Visible;
             TvStatusRow.Visibility = _isTv ? Visibility.Visible : Visibility.Collapsed;
+            // A show is watched episode by episode, so Watched is for movies
+            WatchedCheck.Visibility = WatchedHint.Visibility = _isTv ? Visibility.Collapsed : Visibility.Visible;
             DirectorsBox.Visibility = _isTv ? Visibility.Collapsed : Visibility.Visible;
             WritersBox.Header = _isTv ? "Creators" : "Writers";
             StudiosBox.Header = _isTv ? "Studios and networks" : "Studios";
@@ -260,14 +262,6 @@ public sealed partial class NfoEditorWindow : Window
         WritersBox.Suggestions = _vocab.People;
     }
 
-    private void SetAgeRating(string value)
-    {
-        _ageRating = value;
-        if (value.Length > 0 && !AgeRatingBox.Items.Contains(value)) AgeRatingBox.Items.Add(value);
-        AgeRatingBox.SelectedItem = value.Length > 0 ? value : null;
-        if (value.Length == 0) AgeRatingBox.Text = string.Empty;
-    }
-
     // =====================================================================
     //  Changes
     // =====================================================================
@@ -291,7 +285,7 @@ public sealed partial class NfoEditorWindow : Window
         Directors = _isTv ? _before.Directors : Same(DirectorsBox.Items, _before.Directors),
         Writers = Same(WritersBox.Items, _before.Writers),
         Cast = _cast.Select(a => a.ToActor()).ToList(),
-        AgeRating = _ageRating.Trim(),
+        AgeRating = AgeRatingBox.Text.Trim(),
         UserRating = UserRatingControl.Value > 0 ? (int)Math.Round(UserRatingControl.Value) : 0,
         Collection = _isTv ? _before.Collection : CollectionBox.Text.Trim(),
         Edition = _isTv ? _before.Edition : EditionBox.Text.Trim(),
@@ -299,8 +293,9 @@ public sealed partial class NfoEditorWindow : Window
         ImdbId = ImdbIdBox.Text.Trim(),
         TmdbId = TmdbIdBox.Text.Trim(),
         PlayCount = ToInt(PlayCountBox.Value),
+        Watched = _isTv ? _before.Watched : WatchedCheck.IsChecked == true,
         Note = Norm(NoteBox.Text),
-        Status = _isTv ? _status.Trim() : _before.Status,
+        Status = _isTv ? StatusBox.Text.Trim() : _before.Status,
     };
 
     private int DirtyCount()
@@ -331,37 +326,20 @@ public sealed partial class NfoEditorWindow : Window
         _lockTouched = true;
         UpdateDirty();
     }
-    private void OnNumberChanged(NumberBox sender, NumberBoxValueChangedEventArgs args) => UpdateDirty();
-
-    private void OnAgeRatingSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void OnNumberChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
-        if (AgeRatingBox.SelectedItem is string s) _ageRating = s;
+        // Watched follows the play count, as players see it
+        if (sender == PlayCountBox && !_loading && !_isTv)
+            WatchedCheck.IsChecked = ToInt(PlayCountBox.Value) > 0;
         UpdateDirty();
     }
 
-    private void OnAgeRatingSubmitted(ComboBox sender, ComboBoxTextSubmittedEventArgs args)
+    private void OnWatchedClick(object sender, RoutedEventArgs e)
     {
-        _ageRating = args.Text.Trim();
-        UpdateDirty();
-    }
-
-    private void SetStatus(string value)
-    {
-        _status = value;
-        if (value.Length > 0 && !StatusBox.Items.Contains(value)) StatusBox.Items.Add(value);
-        StatusBox.SelectedItem = value.Length > 0 ? value : null;
-        if (value.Length == 0) StatusBox.Text = string.Empty;
-    }
-
-    private void OnStatusSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (StatusBox.SelectedItem is string s) _status = s;
-        UpdateDirty();
-    }
-
-    private void OnStatusSubmitted(ComboBox sender, ComboBoxTextSubmittedEventArgs args)
-    {
-        _status = args.Text.Trim();
+        // Players go by the play count, so keep it in step with the tick
+        var plays = ToInt(PlayCountBox.Value);
+        if (WatchedCheck.IsChecked == true && plays == 0) PlayCountBox.Value = 1;
+        else if (WatchedCheck.IsChecked != true && plays > 0) PlayCountBox.Value = 0;
         UpdateDirty();
     }
 

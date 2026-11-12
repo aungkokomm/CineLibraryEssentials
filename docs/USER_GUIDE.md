@@ -289,6 +289,17 @@ Status pills are colour-coded:
 
 If a folder was already scraped (it has both an `.nfo` and a `-poster.jpg`), the app **detects this on load** and pre-unchecks it, so a bulk *Scrape Selected* only redoes it if you check it.
 
+The **Sort** box next to Mode puts the cards in order:
+
+| Sort | Order |
+|---|---|
+| **Name** (default) | A to Z |
+| **Collection** | A collection's films together, oldest first, filed under the collection's name among the other titles |
+| **Year** | Newest first |
+| **Needs work first** | Folders missing an NFO, poster, fanart or cast photos at the top |
+
+Your choice is remembered. Cards keep their place while you scrape, so nothing jumps around under the mouse; they're put in order again when you add folders or pick a sort.
+
 ### Per-movie scrape
 
 Click **Scrape** on any card → the same TMDb search dialog as Step 1 opens, pre-filled with the title and year. Pick a result → app downloads everything. The card flips to green and the poster appears.
@@ -297,7 +308,7 @@ Click **Scrape** on any card → the same TMDb search dialog as Step 1 opens, pr
 
 Click **Scrape Selected (auto)** at the top → every checked card is processed sequentially using the **first TMDb match** for each one (movie or TV show, depending on the card). Fast for batch processing, less precise than per-card. Use it after you've eyeballed the list and trust the auto-match.
 
-Checked cards that are already **Complete** are scraped again, for example to get the full cast of a TV show or to add episode titles to file names. An already-scraped movie or show keeps the TMDb match in its NFO and its poster and fanart (only missing pictures are added), and protected edits stay as they are. To scrape only what's missing, use **Fill gaps only**.
+Checked cards that are already **Complete** are scraped again, for example to get the full cast of a TV show or to add episode titles to file names. An already-scraped movie or show keeps the TMDb match in its NFO and its poster and fanart (only missing pictures are added), and protected edits stay as they are. Whatever is scraped again keeps your own rating, play count, Watched, last played date and note from its old `.nfo`. To scrape only what's missing, use **Fill gaps only**.
 
 The **Select all** box ticks every card (or clears them all), and a progress bar at the bottom shows *"Scraping 3 of 12: Title"* while a batch runs.
 
@@ -361,7 +372,7 @@ Scraped the right title but want to fix something? Right-click a card → **Edit
 | **Details** | Title, original title, sort title, year, premiered date, runtime, certification, tagline, plot (overview), outline, for movies the collection and edition, and for TV shows the status (Returning Series, Ended, Canceled...) |
 | **Genres and tags** | Genres, tags (your own labels like *4K* or *Watched*), studios, countries |
 | **Cast and crew** | Director, writers (creators for TV), and the cast: add, remove, rename, change roles and photos, and drag rows (or use the arrows) to change the billing order |
-| **Ratings and IDs** | See the IMDb and TMDb ratings, refresh the IMDb one, give your own rating (0 to 10 stars), set the play count, write your own note, and edit the IMDb id, TMDb id and trailer link (each with an Open button). The note is saved as `<user_note>`, the way tinyMediaManager writes it, and CineLibrary shows it when you haven't written a note there |
+| **Ratings and IDs** | See the IMDb and TMDb ratings, refresh the IMDb one, give your own rating (0 to 10 stars), set the play count, tick **Watched** (movies: players count a title with plays as watched, so ticking it gives a title with none 1 play, and unticking it sets 0; CineLibrary marks it watched too), write your own note, and edit the IMDb id, TMDb id and trailer link (each with an Open button). The note is saved as `<user_note>`, the way tinyMediaManager writes it, and CineLibrary shows it when you haven't written a note there |
 | **Artwork** | Poster, fanart, clear logo, landscape and banner. Pick **From TMDb** to browse every picture TMDb has for the title (filter by language or *Without text*), or **From file...** |
 | **Episodes** (TV) | Every episode's title, air date, plot and thumbnail |
 | **NFO source** | The file itself, read-only, with **Copy** and **Open folder** |

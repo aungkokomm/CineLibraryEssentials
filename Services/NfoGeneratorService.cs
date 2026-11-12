@@ -155,6 +155,7 @@ public class NfoGeneratorService
             var nfoContent = GenerateNfoXml(metadata, movieFolderPath, streamDetails);
             var nfoFileName = $"{Path.GetFileNameWithoutExtension(Path.GetFileName(movieFolderPath))}.nfo";
             var nfoPath = Path.Combine(movieFolderPath, nfoFileName);
+            nfoContent = NfoFile.KeepUserFields(nfoContent, NfoLocator.FindMainNfo(movieFolderPath));
             File.WriteAllText(nfoPath, nfoContent);
         }
         catch (Exception ex)
@@ -363,8 +364,8 @@ public class NfoGeneratorService
     {
         try
         {
-            var content = GenerateTvShowNfoXml(show);
-            File.WriteAllText(Path.Combine(showFolderPath, "tvshow.nfo"), content);
+            var path = Path.Combine(showFolderPath, "tvshow.nfo");
+            File.WriteAllText(path, NfoFile.KeepUserFields(GenerateTvShowNfoXml(show), path));
         }
         catch (Exception ex)
         {
@@ -389,7 +390,7 @@ public class NfoGeneratorService
                 ? GenerateEpisodeNfoXml(episodes[0], show, videoName, streamDetails)
                 : NfoFile.EpisodesXml(episodes.Select(e => BuildEpisodeElement(e, show, videoName, streamDetails)));
             var nfoPath = Path.ChangeExtension(episodeVideoPath, ".nfo");
-            File.WriteAllText(nfoPath, content);
+            File.WriteAllText(nfoPath, NfoFile.KeepUserFields(content, nfoPath));
         }
         catch (Exception ex)
         {

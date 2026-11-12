@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Xml.Linq;
 using CineLibraryEssentials.Models;
 using CineLibraryEssentials.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -71,11 +72,8 @@ public partial class ScrapingViewModel : ObservableObject
             _         => true,
         };
 
-    private void AddItem(MovieFolderItem item)
-    {
-        _allFolders.Add(item);
-        if (ShouldShow(item)) MovieFolders.Add(item);
-    }
+    /// <summary>Adds to the master list; call ApplyModeFilter after a batch to show them in order.</summary>
+    private void AddItem(MovieFolderItem item) => _allFolders.Add(item);
 
     private void RemoveItemInternal(MovieFolderItem item)
     {
@@ -89,11 +87,61 @@ public partial class ScrapingViewModel : ObservableObject
         MovieFolders.Clear();
     }
 
+    /// <summary>Shows the cards the Mode lets through, in the chosen Sort order.</summary>
     private void ApplyModeFilter()
     {
+        // Clear() doesn't say which items left, so let go of them here
+        foreach (var item in MovieFolders) item.PropertyChanged -= OnMovieItemPropertyChanged;
         MovieFolders.Clear();
-        foreach (var item in _allFolders)
+        foreach (var item in Sorted(_allFolders))
             if (ShouldShow(item)) MovieFolders.Add(item);
+    }
+
+    /// <summary>Step 3's Sort choices; Name is the default.</summary>
+    [ObservableProperty]
+    private string sortOrder = "Name";
+
+    partial void OnSortOrderChanged(string value)
+    {
+        _configService.SetStep3Sort(value);
+        ApplyModeFilter();
+    }
+
+    private IEnumerable<MovieFolderItem> Sorted(IEnumerable<MovieFolderItem> items)
+    {
+        var byName = StringComparer.CurrentCultureIgnoreCase;
+        switch (SortOrder)
+        {
+            case "Year":   // newest first
+                return items.OrderByDescending(i => i.Year).ThenBy(i => i.MovieTitle, byName);
+            case "Needs work first":
+                return items.OrderBy(i => i.IsComplete).ThenBy(i => i.MovieTitle, byName).ThenBy(i => i.Year);
+            case "Collection":
+                // A collection's films together, oldest first, filed under the
+                // collection's name among the other titles
+                return items
+                    .Select(i => (Item: i, Set: i.IsTvShow ? string.Empty : CollectionOf(i.FolderPath)))
+                    .OrderBy(x => x.Set.Length > 0 ? x.Set : x.Item.MovieTitle, byName)
+                    .ThenBy(x => x.Set.Length > 0 ? x.Item.Year : 0)
+                    .ThenBy(x => x.Item.MovieTitle, byName)
+                    .Select(x => x.Item);
+            default:
+                return items.OrderBy(i => i.MovieTitle, byName).ThenBy(i => i.Year);
+        }
+    }
+
+    /// <summary>The collection (&lt;set&gt;) in a movie folder's NFO, read fresh so edits count.</summary>
+    private static string CollectionOf(string folder)
+    {
+        try
+        {
+            var nfo = NfoLocator.FindMainNfo(folder);
+            return nfo == null ? string.Empty : NfoEditor.CollectionName(XDocument.Load(nfo).Root!);
+        }
+        catch
+        {
+            return string.Empty;   // unreadable NFO: sort it by its title
+        }
     }
 
     public ScrapingViewModel(WizardViewModel parentViewModel)
@@ -118,6 +166,7 @@ public partial class ScrapingViewModel : ObservableObject
         // Initialize WizardMode from the shared config (Step 1's dropdown writes
         // here too) so the filter applies as soon as Step 3 loads.
         wizardMode = _configService.GetWizardMode();
+        sortOrder = _configService.GetStep3Sort();
     }
 
     private void OnMovieItemPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -159,6 +208,7 @@ public partial class ScrapingViewModel : ObservableObject
 
             AddItem(CreateMovieItem(folderPath));
         }
+        ApplyModeFilter();
 
         if (_repairedShowCount > 0)
             StatusMessage = RepairedNote();
@@ -213,6 +263,7 @@ public partial class ScrapingViewModel : ObservableObject
                 return;
             }
             AddItem(CreateMovieItem(showRoot));
+            ApplyModeFilter();
             StatusMessage = _repairedShowCount > 0
                 ? RepairedNote()
                 : $"Added the show \"{Path.GetFileName(showRoot)}\" (you picked one of its season folders).";
@@ -226,17 +277,11 @@ public partial class ScrapingViewModel : ObservableObject
                 continue;
 
             var item = CreateMovieItem(movieFolder);
-            _allFolders.Add(item);
-            if (ShouldShow(item))
-            {
-                MovieFolders.Add(item);
-                added++;
-            }
-            else
-            {
-                hidden++;
-            }
+            AddItem(item);
+            if (ShouldShow(item)) added++;
+            else hidden++;
         }
+        ApplyModeFilter();
 
         // Tell the user when items were added but hidden by the current Mode filter,
         // so "Add Folder" never looks silently broken.
