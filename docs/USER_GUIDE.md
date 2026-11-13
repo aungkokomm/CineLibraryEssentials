@@ -20,11 +20,15 @@
   - [Top-row toggles explained](#top-row-toggles-explained)
   - [Hitting the Rename button](#hitting-the-rename-button)
   - [Undo](#undo)
+  - [Clean, organize and scrape](#clean-organize-and-scrape)
 - [Step 2 · Organize](#step-2--organize)
 - [Step 3 · Scrape](#step-3--scrape)
+  - [Search and keys](#search-and-keys)
+  - [Scan in CineLibrary](#scan-in-cinelibrary)
   - [Episode titles in file names](#episode-titles-in-file-names)
   - [Ratings: IMDb and TMDb](#ratings-imdb-and-tmdb)
   - [Episodes and missing episodes](#episodes-and-missing-episodes)
+  - [Films missing from a collection](#films-missing-from-a-collection)
   - [Edit NFO](#edit-nfo)
   - [Bulk edit](#bulk-edit)
 - [Settings page](#settings-page)
@@ -223,6 +227,10 @@ Undo reverses every rename in the batch (files first, folders last) so you're ba
 
 > **Tip:** even though we have undo, you should still review carefully before committing. If you close the toast or wait too long, you'll have to fix any mistakes manually.
 
+### Clean, organize and scrape
+
+All three steps in one go: **Clean, organize and scrape** (next to **Rename Selected**) takes the checked rows, gives each its clean name and its own folder as Step 2 does, then scrapes them with the first TMDb match as **Scrape Selected (auto)** does. Rows with a ⚠ are left out and unticked, for you to check. Step 2's **Undo** works for 30 seconds as usual, and if anything goes wrong it stops on the step that shows it. Best when you trust the names in the list; for tricky ones, pick the match with **🔍** first.
+
 ---
 
 ## Step 2 · Organize
@@ -254,6 +262,8 @@ Tick / untick rows you want to skip (the **Select all** box toggles every row), 
 2. Moves the video into it.
 3. Moves any matching subtitle files alongside - including language-tagged ones like `Movie.en.forced.srt`. A `Subs`, `Subtitles` or `Sub` folder moves too, when the movie was the only video in its folder.
 4. After success, advances to Step 3 automatically.
+
+**Undo:** for 30 seconds after the move, a message offers **Undo**. It puts every file and `Subs` folder back where it was and removes the new folders. A folder that has other files by then (Step 3's NFO and pictures, say) is kept, and a file you've moved or renamed since stays where it is. You're taken back to Step 2 to try again.
 
 **Folder merging:** if a destination folder already exists, files are merged into it instead of erroring. Existing files are never overwritten - and any subtitles from the source still move into the destination. The status line reports e.g. *"3 organized · 2 merged into existing folder(s)"*.
 
@@ -300,6 +310,30 @@ The **Sort** box next to Mode puts the cards in order:
 
 Your choice is remembered. Cards keep their place while you scrape, so nothing jumps around under the mouse; they're put in order again when you add folders or pick a sort.
 
+A card matched to the same TMDb title as another card gets an orange **Duplicate** tag; hover it to see where the other one is. A message lists them once when they turn up.
+
+### Search and keys
+
+Type in **Search** (or press **Ctrl+F**) to show only the cards whose title, year or collection has that text, such as *indiana*, *2023* or *marvel*. **Esc** clears it.
+
+Click a card's poster, then:
+
+| Key | What it does |
+|---|---|
+| `Enter` | Opens the details window (or the TMDb search, for a card that isn't scraped yet), like a double-click |
+| `F2` | Opens **Edit NFO** |
+| `Space` | Ticks or unticks the card |
+| `Delete` | Takes the card off the list (the files stay as they are) |
+| Arrows | Move to the card beside, above or below |
+
+In the list view, `Enter`, `F2`, `Space` and `Delete` work on the row the same way.
+
+### Scan in CineLibrary
+
+After a batch, a message offers **Scan in CineLibrary**, and it's in **⋯** any time (the checked cards, or all of them when none are checked). CineLibrary reads just those folders and shows them right away, without a Rescan; it opens first when it isn't running. It needs CineLibrary 5.4.1 or newer, and only folders inside the ones you added to CineLibrary are read (it says which aren't).
+
+Essentials finds CineLibrary where its installer put it. If you run CineLibrary from a folder you copied, Essentials asks once where `CineLibrary.exe` is. Nothing is registered in Windows: Essentials leaves a small list of folders in CineLibrary's own `CineLibrary-Data` folder, which CineLibrary reads and deletes.
+
 ### Per-movie scrape
 
 Click **Scrape** on any card → the same TMDb search dialog as Step 1 opens, pre-filled with the title and year. Pick a result → app downloads everything. The card flips to green and the poster appears.
@@ -310,7 +344,7 @@ Click **Scrape Selected (auto)** at the top → every checked card is processed 
 
 Checked cards that are already **Complete** are scraped again, for example to get the full cast of a TV show or to add episode titles to file names. An already-scraped movie or show keeps the TMDb match in its NFO and its poster and fanart (only missing pictures are added), and protected edits stay as they are. Whatever is scraped again keeps your own rating, play count, Watched, last played date and note from its old `.nfo`. To scrape only what's missing, use **Fill gaps only**.
 
-The **Select all** box ticks every card (or clears them all), and a progress bar at the bottom shows *"Scraping 3 of 12: Title"* while a batch runs.
+The **Select all** box ticks every card (or clears them all), and a progress bar at the bottom shows *"Scraping 3 of 12: Title"* while a batch runs. When some fail (no internet for a moment, say), the bottom says how many, with **Retry failed** to scrape just those again. If you're in another app when a batch ends, a Windows notification says how it went; click it to come back.
 
 ### Fill gaps only (verify a library)
 
@@ -348,7 +382,7 @@ IMDb ratings change over time. **⋯ → Refresh IMDb ratings** updates them for
 
 ### Other things you can do
 
-- **+ Add Folder** - add a movie folder that wasn't part of Steps 1 or 2. The app accepts both single movie folders and "parent" folders that contain many movie folders.
+- **+ Add Folder** - add a movie folder that wasn't part of Steps 1 or 2. The app accepts both single movie folders and "parent" folders that contain many movie folders. Click **▾** beside it for the last 10 folders you added, as in Step 1.
 - **Drag-drop** - same as above.
 - **Double-tap a card that has an NFO** - opens the **Movie Details** window (hero fanart, poster, plot, IMDb and TMDb rating chips, color-coded crew / studio / country / genres / IDs / file info, scrollable cast strip with photos, plus Play / Open Folder / Edit / Trailer buttons). ESC closes it. Resizable and maximizable, and it opens where and how big you last left it. For a TV show it also lists the [episodes](#episodes-and-missing-episodes).
 - **Double-tap a card without an NFO** - opens the resizable TMDb search dialog so you can pick the right match.
@@ -362,6 +396,10 @@ IMDb ratings change over time. **⋯ → Refresh IMDb ratings** updates them for
 The details window of a TV show has an **Episodes** section, grouped by season (specials last). Each episode shows its thumbnail, title and air date, read from the files Step 3 wrote. Double-click an episode to play it.
 
 While you look, the app asks TMDb which **aired** episodes aren't in your library and adds them to the list with an orange **Missing** tag. A season you don't have at all shows as one line ("All 10 aired episodes"). Episodes that haven't aired yet and specials are never reported as missing. This needs an internet connection; without one the list simply shows what's on disk.
+
+### Films missing from a collection
+
+For a movie in a TMDb collection, such as the *Indiana Jones Collection*, the details window lists the collection's films, oldest first: a check mark for the ones in Step 3's list, an orange **Missing** tag for released ones that aren't, and a grey **Not out yet** tag for the rest. The line beside the name sums it up, e.g. *"3 of 5 in this list · 2 missing"*. It compares with the cards in Step 3, so add your whole movie library there to see what you really have. This needs an internet connection.
 
 ### Edit NFO
 
@@ -381,6 +419,7 @@ Some handy details:
 
 - **Chips** for lists: type a genre, studio or name and press `Enter`; click × (or press `Backspace` in the empty box) to remove one. While you type, it suggests values already used in your library, so "Sci-Fi" and "Science Fiction" don't both creep in.
 - **Fetch from TMDb** (the download-arrow button next to title, tagline, plot and outline) fills in just that field from TMDb, in a language you pick. Handy for getting the plot in English when you scrape in another language, or the other way round.
+- **Previous / Next** (the arrows at the top, or `Alt+Left` / `Alt+Right`) save your changes and open the card before or after this one in Step 3, in the order shown there (sorted and searched), on the same section. Good for a run of titles, like a whole collection.
 - **Nothing is written until you Save** (`Ctrl+S`). The header counts your unsaved changes; **Revert** throws them away, and closing the window asks first.
 - **Only what you change is written.** Everything else in the NFO, like file info and tags added by other tools, stays exactly as it was.
 - **Restore previous version** puts back the files exactly as they were before your last save: the NFO and any picture, actor photo or episode file that save replaced. Backups are kept in the app's own folder, not next to your movies.

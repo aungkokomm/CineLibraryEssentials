@@ -27,7 +27,13 @@ public class FileToFolderService
                 // CreateDirectory is idempotent — if the destination folder is already
                 // there (which is what enables folder merging), this is a no-op.
                 if (!Directory.Exists(operation.DestinationFolder))
+                {
+                    // Remember every folder this makes (a show and its Season folder), for Undo
+                    for (var dir = operation.DestinationFolder; !string.IsNullOrEmpty(dir) && !Directory.Exists(dir);
+                         dir = Path.GetDirectoryName(dir))
+                        result.CreatedFolders.Add(dir);
                     Directory.CreateDirectory(operation.DestinationFolder);
+                }
 
                 var destinationFile = Path.Combine(operation.DestinationFolder, operation.FinalFileName);
 
@@ -62,18 +68,20 @@ public class FileToFolderService
                     await MoveCompanionFilesAsync(
                         operation.OriginalFilePath,
                         operation.DestinationFolder,
-                        operation.FinalFileName);
+                        operation.FinalFileName,
+                        result.Moves);
                     merged++;
                     continue;
                 }
 
                 File.Move(operation.OriginalFilePath, destinationFile, overwrite: false);
+                result.Moves.Add(new FileMove(operation.OriginalFilePath, destinationFile, IsFolder: false));
                 organized++;
 
-                await MoveCompanionFilesAsync(operation.OriginalFilePath, operation.DestinationFolder, operation.FinalFileName);
+                await MoveCompanionFilesAsync(operation.OriginalFilePath, operation.DestinationFolder, operation.FinalFileName, result.Moves);
                 if (!operation.IsTvEpisode
                     && videosIn.GetValueOrDefault(Path.GetDirectoryName(operation.OriginalFilePath) ?? string.Empty) == 1)
-                    MoveSubtitleFolders(Path.GetDirectoryName(operation.OriginalFilePath)!, operation.DestinationFolder);
+                    MoveSubtitleFolders(Path.GetDirectoryName(operation.OriginalFilePath)!, operation.DestinationFolder, result.Moves);
 
                 // Optionally scrub embedded container metadata after the move.
                 // Done HERE (not just in Step 1's RenameInPlaceAsync) so that users
@@ -117,7 +125,7 @@ public class FileToFolderService
     }
 
     /// <summary>Moves a "Subs" folder (and the like) into the movie's new folder, unless one is already there.</summary>
-    private static void MoveSubtitleFolders(string sourceFolder, string destinationFolder)
+    private static void MoveSubtitleFolders(string sourceFolder, string destinationFolder, List<FileMove> moves)
     {
         foreach (var name in SubtitleFolders)
         {
@@ -127,6 +135,7 @@ public class FileToFolderService
             try
             {
                 Directory.Move(source, dest);
+                moves.Add(new FileMove(source, dest, IsFolder: true));
             }
             catch (Exception ex)
             {
@@ -135,7 +144,8 @@ public class FileToFolderService
         }
     }
 
-    private async Task MoveCompanionFilesAsync(string originalVideoPath, string destinationFolder, string renamedVideoFile)
+    private async Task MoveCompanionFilesAsync(string originalVideoPath, string destinationFolder, string renamedVideoFile,
+                                               List<FileMove> moves)
     {
         // CompanionFileHelper finds every subtitle / companion file in the source
         // folder (including language-suffixed ones like .en.srt, .en.forced.srt)
@@ -157,6 +167,7 @@ public class FileToFolderService
             try
             {
                 File.Move(move.SourcePath, destPath, overwrite: false);
+                moves.Add(new FileMove(move.SourcePath, destPath, IsFolder: false));
             }
             catch (Exception ex)
             {
@@ -165,6 +176,54 @@ public class FileToFolderService
         }
 
         await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Undo for Step 2: moves everything back where it was, newest first, then
+    /// removes the folders Step 2 made once they're empty. A folder that has
+    /// other files by now (Step 3's NFO and pictures) is kept. Anything moved or
+    /// renamed since then is left where it is and counted as not moved back.
+    /// </summary>
+    public static (int MovedBack, int NotMovedBack, int FoldersKept) Undo(ProcessingResult result)
+    {
+        int back = 0, notBack = 0, kept = 0;
+        foreach (var m in Enumerable.Reverse(result.Moves))
+        {
+            try
+            {
+                var there = m.IsFolder ? Directory.Exists(m.To) : File.Exists(m.To);
+                var free = !File.Exists(m.From) && !Directory.Exists(m.From);
+                if (!there || !free)
+                {
+                    notBack++;
+                    continue;
+                }
+                Directory.CreateDirectory(Path.GetDirectoryName(m.From)!);
+                if (m.IsFolder) Directory.Move(m.To, m.From);
+                else File.Move(m.To, m.From);
+                back++;
+            }
+            catch
+            {
+                notBack++;
+            }
+        }
+
+        // Deepest first, so a show folder goes after its Season folder
+        foreach (var dir in result.CreatedFolders.Distinct(StringComparer.OrdinalIgnoreCase).OrderByDescending(d => d.Length))
+        {
+            try
+            {
+                if (!Directory.Exists(dir)) continue;
+                if (Directory.EnumerateFileSystemEntries(dir).Any()) kept++;
+                else Directory.Delete(dir);
+            }
+            catch
+            {
+                kept++;
+            }
+        }
+        return (back, notBack, kept);
     }
 
     public List<FolderPreview> GeneratePreview(List<FileOperation> operations)

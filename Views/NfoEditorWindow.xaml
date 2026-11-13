@@ -12,6 +12,8 @@
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Modifiers="Control" Key="S" Invoked="OnSaveAccelerator" />
             <KeyboardAccelerator Key="Escape" Invoked="OnEscapeAccelerator" />
+            <KeyboardAccelerator Modifiers="Menu" Key="Left" Invoked="OnPreviousAccelerator" />
+            <KeyboardAccelerator Modifiers="Menu" Key="Right" Invoked="OnNextAccelerator" />
         </Grid.KeyboardAccelerators>
         <Grid.Resources>
             <Style x:Key="SectionHeader" TargetType="TextBlock">
@@ -58,6 +60,17 @@
                 </StackPanel>
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <!-- Previous / Next: save and go on to the card before or after this one in Step 3 -->
+                <StackPanel x:Name="StepButtons" Orientation="Horizontal" Spacing="2" Margin="0,0,10,0">
+                    <Button x:Name="PreviousButton" Click="OnPreviousClick" Padding="10,6"
+                            AutomationProperties.Name="Previous title">
+                        <FontIcon Glyph="&#xE76B;" FontSize="13" />
+                    </Button>
+                    <Button x:Name="NextButton" Click="OnNextClick" Padding="10,6"
+                            AutomationProperties.Name="Next title">
+                        <FontIcon Glyph="&#xE76C;" FontSize="13" />
+                    </Button>
+                </StackPanel>
                 <CheckBox x:Name="LockCheckBox"
                           Content="Protect from re-scrapes"
                           Click="OnLockClick"

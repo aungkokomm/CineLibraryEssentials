@@ -19,7 +19,18 @@ public partial class ScrapingViewModel : ObservableObject
     private ObservableCollection<MovieFolderItem> movieFolders = new();
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowRetry))]
     private bool isWorking = false;
+
+    /// <summary>How many cards failed in the last batch (the footer offers Retry).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowRetry))]
+    private int failedCount;
+
+    public bool ShowRetry => FailedCount > 0 && !IsWorking;
+
+    // The cards that failed in the last batch
+    private List<MovieFolderItem> _failed = new();
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
@@ -79,6 +90,26 @@ public partial class ScrapingViewModel : ObservableObject
     {
         _allFolders.Remove(item);
         MovieFolders.Remove(item);
+        _ = CheckDuplicatesAsync();   // its twin may be alone now
+    }
+
+    /// <summary>Takes away the cards whose folder is gone or no longer has a video (after Step 2's Undo).</summary>
+    public void RemoveGoneFolders()
+    {
+        static bool HasVideo(string folder)
+        {
+            try
+            {
+                return Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories)
+                    .Any(Utilities.FileFormatValidator.IsVideoFile);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        foreach (var item in _allFolders.Where(i => !Directory.Exists(i.FolderPath) || !HasVideo(i.FolderPath)).ToList())
+            RemoveItemInternal(item);
     }
 
     private void ClearItems()
@@ -87,14 +118,89 @@ public partial class ScrapingViewModel : ObservableObject
         MovieFolders.Clear();
     }
 
-    /// <summary>Shows the cards the Mode lets through, in the chosen Sort order.</summary>
+    /// <summary>Shows the cards the Mode and the search let through, in the chosen Sort order.</summary>
     private void ApplyModeFilter()
     {
         // Clear() doesn't say which items left, so let go of them here
         foreach (var item in MovieFolders) item.PropertyChanged -= OnMovieItemPropertyChanged;
         MovieFolders.Clear();
         foreach (var item in Sorted(_allFolders))
-            if (ShouldShow(item)) MovieFolders.Add(item);
+            if (ShouldShow(item) && MatchesSearch(item)) MovieFolders.Add(item);
+    }
+
+    /// <summary>Every card, shown or not (the empty state tells "nothing matches" from "nothing added").</summary>
+    public int TotalCount => _allFolders.Count;
+
+    /// <summary>Step 3's search box: only the cards whose title, year or collection has this text.</summary>
+    [ObservableProperty]
+    private string searchText = string.Empty;
+
+    partial void OnSearchTextChanged(string value) => ApplyModeFilter();
+
+    private bool MatchesSearch(MovieFolderItem item)
+    {
+        var text = SearchText.Trim();
+        if (text.Length == 0) return true;
+        return item.DisplayName.Contains(text, StringComparison.CurrentCultureIgnoreCase)
+               || (!item.IsTvShow && FactsOf(item).Collection.Contains(text, StringComparison.CurrentCultureIgnoreCase));
+    }
+
+    // ---- What Step 3 reads from each folder's NFO, kept until the folder changes ----
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (string Collection, string TmdbId)> _facts
+        = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>A card's collection and TMDb id from its NFO (empty when it has none). Safe off the UI thread.</summary>
+    private (string Collection, string TmdbId) FactsOf(MovieFolderItem item) => _facts.GetOrAdd(item.FolderPath, ReadFacts);
+
+    private static (string Collection, string TmdbId) ReadFacts(string folder)
+    {
+        try
+        {
+            var nfo = NfoLocator.FindMainNfo(folder);
+            if (nfo == null) return (string.Empty, string.Empty);
+            var f = NfoEditor.Read(XDocument.Load(nfo).Root!);
+            return (f.Collection, f.TmdbId);
+        }
+        catch
+        {
+            return (string.Empty, string.Empty);   // unreadable NFO: it has neither
+        }
+    }
+
+    /// <summary>The TMDb ids of the movies in the list, for the details window's collection check.</summary>
+    public HashSet<string> MovieTmdbIds()
+        => _allFolders.Where(i => !i.IsTvShow).Select(i => FactsOf(i).TmdbId).Where(id => id.Length > 0).ToHashSet();
+
+    // ---- Duplicates: two cards matched to the same TMDb title ----
+    private int _duplicateCheck;
+    private readonly HashSet<string> _reportedDuplicates = new();
+
+    /// <summary>Raised with the titles that just turned out to be in the list twice.</summary>
+    public event Action<List<string>>? DuplicatesFound;
+
+    /// <summary>
+    /// Tags the cards matched to the same TMDb title as another card. The NFOs are
+    /// read off the UI thread (which also gets them ready for search and sort).
+    /// </summary>
+    public async Task CheckDuplicatesAsync()
+    {
+        var check = ++_duplicateCheck;
+        var items = _allFolders.ToList();
+        var keyed = await Task.Run(() => items
+            .Select(i => (Item: i, Key: FactsOf(i).TmdbId is { Length: > 0 } id ? (i.IsTvShow ? "tv:" : "movie:") + id : string.Empty))
+            .ToList());
+        if (check != _duplicateCheck) return;   // a newer check is on its way
+
+        var groups = keyed.Where(k => k.Key.Length > 0).GroupBy(k => k.Key).Where(g => g.Count() > 1).ToList();
+        var twins = new Dictionary<MovieFolderItem, string>();
+        foreach (var g in groups)
+            foreach (var (item, _) in g)
+                twins[item] = string.Join("\n", g.Where(o => o.Item != item).Select(o => o.Item.FolderPath));
+        foreach (var item in items)
+            item.DuplicateOf = twins.GetValueOrDefault(item) ?? string.Empty;
+
+        var fresh = groups.Where(g => _reportedDuplicates.Add(g.Key)).Select(g => g.First().Item.DisplayName).ToList();
+        if (fresh.Count > 0) DuplicatesFound?.Invoke(fresh);
     }
 
     /// <summary>Step 3's Sort choices; Name is the default.</summary>
@@ -120,27 +226,13 @@ public partial class ScrapingViewModel : ObservableObject
                 // A collection's films together, oldest first, filed under the
                 // collection's name among the other titles
                 return items
-                    .Select(i => (Item: i, Set: i.IsTvShow ? string.Empty : CollectionOf(i.FolderPath)))
+                    .Select(i => (Item: i, Set: i.IsTvShow ? string.Empty : FactsOf(i).Collection))
                     .OrderBy(x => x.Set.Length > 0 ? x.Set : x.Item.MovieTitle, byName)
                     .ThenBy(x => x.Set.Length > 0 ? x.Item.Year : 0)
                     .ThenBy(x => x.Item.MovieTitle, byName)
                     .Select(x => x.Item);
             default:
                 return items.OrderBy(i => i.MovieTitle, byName).ThenBy(i => i.Year);
-        }
-    }
-
-    /// <summary>The collection (&lt;set&gt;) in a movie folder's NFO, read fresh so edits count.</summary>
-    private static string CollectionOf(string folder)
-    {
-        try
-        {
-            var nfo = NfoLocator.FindMainNfo(folder);
-            return nfo == null ? string.Empty : NfoEditor.CollectionName(XDocument.Load(nfo).Root!);
-        }
-        catch
-        {
-            return string.Empty;   // unreadable NFO: sort it by its title
         }
     }
 
@@ -209,6 +301,7 @@ public partial class ScrapingViewModel : ObservableObject
             AddItem(CreateMovieItem(folderPath));
         }
         ApplyModeFilter();
+        _ = CheckDuplicatesAsync();
 
         if (_repairedShowCount > 0)
             StatusMessage = RepairedNote();
@@ -264,6 +357,8 @@ public partial class ScrapingViewModel : ObservableObject
             }
             AddItem(CreateMovieItem(showRoot));
             ApplyModeFilter();
+            _ = CheckDuplicatesAsync();
+            _configService.AddRecentScrapeFolder(showRoot);
             StatusMessage = _repairedShowCount > 0
                 ? RepairedNote()
                 : $"Added the show \"{Path.GetFileName(showRoot)}\" (you picked one of its season folders).";
@@ -282,6 +377,9 @@ public partial class ScrapingViewModel : ObservableObject
             else hidden++;
         }
         ApplyModeFilter();
+        _ = CheckDuplicatesAsync();
+        // Remembered for Add Folder's ▾ list, once it gave something to scrape
+        if (added + hidden > 0) _configService.AddRecentScrapeFolder(rootPath);
 
         // Tell the user when items were added but hidden by the current Mode filter,
         // so "Add Folder" never looks silently broken.
@@ -589,7 +687,9 @@ public partial class ScrapingViewModel : ObservableObject
     /// </summary>
     public void RefreshAssetFlags(MovieFolderItem item)
     {
-        if (item == null || !Directory.Exists(item.FolderPath)) return;
+        if (item == null) return;
+        _facts.TryRemove(item.FolderPath, out _);   // its NFO may have changed
+        if (!Directory.Exists(item.FolderPath)) return;
         try
         {
             string? poster;
@@ -678,6 +778,7 @@ public partial class ScrapingViewModel : ObservableObject
         if (success)
         {
             RefreshAssetFlags(item);
+            _ = CheckDuplicatesAsync();   // the match may now be the same as another card's
         }
         else
         {
@@ -709,6 +810,7 @@ public partial class ScrapingViewModel : ObservableObject
     /// </summary>
     private async Task RunBatchAsync(List<MovieFolderItem> items, string verb)
     {
+        FailedCount = 0;
         IsWorking = true;
         IsProgressIndeterminate = false;
         ProgressMax = Math.Max(items.Count, 1);
@@ -727,13 +829,59 @@ public partial class ScrapingViewModel : ObservableObject
         }
         finally
         {
+            _failed = items.Where(i => i.Status == "Failed").ToList();
+            FailedCount = _failed.Count;
+            var scraped = items.Where(i => i.Status != "Failed").ToList();
+            if (scraped.Count > 0) BatchFinished?.Invoke(scraped);
+            // A long batch runs while you do something else: Windows says when it's over
+            if (items.Count > 1)
+                NotificationService.ShowIfAway("Step 3 is done",
+                    $"{items.Count - _failed.Count} of {items.Count} scraped"
+                    + (_failed.Count > 0 ? $", {_failed.Count} failed. Retry failed is at the bottom of Step 3." : "."));
             IsWorking = false;
             ProgressText = string.Empty;
             // One Undo for the whole batch
             var renames = _batchRenames!;
             _batchRenames = null;
             ReportEpisodeRenames(renames);
+            _ = CheckDuplicatesAsync();
         }
+    }
+
+    /// <summary>
+    /// Step 1's "Clean, organize and scrape": scrapes the cards of the folders
+    /// Step 2 just moved files into, with the first TMDb match.
+    /// </summary>
+    public async Task ScrapeOrganizedAsync()
+    {
+        if (IsWorking) return;
+        var folders = _parentViewModel.AllFileOperations
+            .Select(op => op.DestinationFolder)
+            .Where(Directory.Exists)
+            .Select(NormalizeToShowRoot)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var items = _allFolders.Where(i => folders.Contains(i.FolderPath)).ToList();
+        if (items.Count == 0) return;
+        await RunBatchAsync(items, "Scraping");
+        StatusMessage = $"Done. {items.Count(i => i.Status != "Failed")} of {items.Count} cleaned, organized and scraped.";
+    }
+
+    /// <summary>Raised after a batch with the cards it scraped (for "Scan in CineLibrary").</summary>
+    public event Action<List<MovieFolderItem>>? BatchFinished;
+
+    /// <summary>Scrapes the cards that failed in the last batch once more.</summary>
+    [RelayCommand]
+    public async Task RetryFailedAsync()
+    {
+        if (IsWorking) return;
+        var again = _failed.Where(i => _allFolders.Contains(i) && i.Status == "Failed").ToList();
+        if (again.Count == 0)
+        {
+            FailedCount = 0;
+            return;
+        }
+        await RunBatchAsync(again, "Trying again");
+        StatusMessage = $"Done. {again.Count(i => i.Status != "Failed")} of {again.Count} worked this time.";
     }
 
     /// <summary>

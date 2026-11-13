@@ -84,6 +84,12 @@ public class AppConfig
 
     /// <summary>Step 3's card order: "Name", "Collection", "Year" or "Needs work first".</summary>
     public string Step3Sort { get; set; } = "Name";
+
+    /// <summary>Folders added in Step 3 (most recent first, max 10), like Step 1's recent folders.</summary>
+    public List<string> RecentScrapeFolders { get; set; } = new();
+
+    /// <summary>CineLibrary.exe, when you showed Essentials where it is (else its installer's folder is used).</summary>
+    public string CineLibraryExe { get; set; } = string.Empty;
 }
 
 /// <summary>A window's last size and position (the restored ones when it was maximized).</summary>

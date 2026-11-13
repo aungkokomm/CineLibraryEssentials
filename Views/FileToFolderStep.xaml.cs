@@ -18,6 +18,9 @@ public sealed partial class FileToFolderStep : UserControl
     /// <summary>Raised after a successful "Run File to Folder" so the wizard can advance.</summary>
     public event EventHandler? OperationCompleted;
 
+    /// <summary>Raised after Undo put Step 2's moves back, so Step 3 can drop the cards that went with them.</summary>
+    public event EventHandler? Undone;
+
     /// <summary>Raised when the footer "← Back" is clicked.</summary>
     public event EventHandler? BackRequested;
 
@@ -222,28 +225,58 @@ public sealed partial class FileToFolderStep : UserControl
     //  Run
     // -----------------------------------------------------------------
 
-    private async void OnRunClick(object sender, RoutedEventArgs e)
+    private async void OnRunClick(object sender, RoutedEventArgs e) => await RunAsync();
+
+    /// <summary>
+    /// Run File to Folder: moves the ticked rows, offers Undo, and on success moves
+    /// on to Step 3. True when everything moved (also used by Step 1's "Clean,
+    /// organize and scrape").
+    /// </summary>
+    public async Task<bool> RunAsync()
     {
-        if (_viewModel == null) return;
+        if (_viewModel == null) return false;
 
         var anyChecked = _viewModel.OperationsPreview.Any(op => op.IsSelected);
         if (!anyChecked)
         {
             ToastService.Warning("No files selected. Tick at least one row to continue.");
-            return;
+            return false;
         }
 
         var result = await _viewModel.RunAsync();
         if (result.Success && result.Errors.Count == 0)
         {
-            ToastService.Success($"Organized {_viewModel.OperationsPreview.Count(op => op.IsSelected)} file(s).");
+            var organized = $"Organized {_viewModel.OperationsPreview.Count(op => op.IsSelected)} file(s).";
+            if (result.Moves.Count > 0) OfferUndo(result, organized);
+            else ToastService.Success(organized);
             OperationCompleted?.Invoke(this, EventArgs.Empty);
+            return true;
         }
-        else
-        {
-            var top = string.Join("\n", result.Errors.Take(5));
-            var more = result.Errors.Count > 5 ? $"\n... and {result.Errors.Count - 5} more." : "";
-            ToastService.Error($"{result.Errors.Count} error(s):\n{top}{more}");
-        }
+
+        var top = string.Join("\n", result.Errors.Take(5));
+        var more = result.Errors.Count > 5 ? $"\n... and {result.Errors.Count - 5} more." : "";
+        ToastService.Error($"{result.Errors.Count} error(s):\n{top}{more}");
+        if (result.Moves.Count > 0) OfferUndo(result, "The other files were moved.");
+        return false;
+    }
+
+    /// <summary>For 30 seconds, Undo puts everything Step 2 just moved back where it was.</summary>
+    private void OfferUndo(ProcessingResult result, string message)
+    {
+        ToastService.ShowAction(
+            message: message,
+            title: "Organize",
+            actionText: "Undo",
+            onAction: () =>
+            {
+                var (back, notBack, kept) = FileToFolderService.Undo(result);
+                var text = $"Moved {back} item{(back == 1 ? "" : "s")} back where {(back == 1 ? "it was" : "they were")}."
+                    + (notBack > 0 ? $" {notBack} couldn't be moved back: they were moved or renamed since." : "")
+                    + (kept > 0 ? $" Kept {kept} new folder{(kept == 1 ? "" : "s")} that now hold other files." : "");
+                if (notBack > 0) ToastService.Warning(text);
+                else ToastService.Success(text);
+                Undone?.Invoke(this, EventArgs.Empty);
+            },
+            severity: InfoBarSeverity.Success);
     }
 }

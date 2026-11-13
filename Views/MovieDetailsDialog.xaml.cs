@@ -177,6 +177,10 @@ public sealed partial class MovieDetailsDialog : Window
             CastSection.Visibility = Visibility.Visible;
         }
 
+        // ---- Collection (movies): which of its films are missing ----
+        if (!_detail.IsTvShow)
+            _ = CheckCollectionAsync(_detail);
+
         // ---- Episodes (TV) ----
         if (_detail.IsTvShow)
         {
@@ -197,6 +201,7 @@ public sealed partial class MovieDetailsDialog : Window
     {
         ChipsRow.Children.Clear();
         SeasonsPanel.Children.Clear();
+        CollectionFilms.Children.Clear();
         MissingSummaryText.Text = string.Empty;
         HeroImage.Source = null;
         PosterImage.Source = null;
@@ -204,13 +209,130 @@ public sealed partial class MovieDetailsDialog : Window
                  {
                      PosterPlaceholder, OriginalTitleText, TaglineText, PlotSection, DirectorField,
                      WriterField, StudioField, CountryField, GenresField, IdsField, StreamField,
-                     TrailerButton, CastSection, EpisodesSection,
+                     TrailerButton, CastSection, EpisodesSection, CollectionSection,
                  })
             element.Visibility = Visibility.Collapsed;
     }
 
     /// <summary>Every folder in Step 3's list, for the editor's suggestions while typing.</summary>
     public IReadOnlyList<string> LibraryFolders { get; set; } = Array.Empty<string>();
+
+    /// <summary>The TMDb ids of the movies in Step 3's list, for the collection check.</summary>
+    public Func<HashSet<string>>? OwnedMovieIds { get; set; }
+
+    // TMDb's answer per movie for this session (null: the movie isn't in a collection)
+    private static readonly Dictionary<int, (string Name, List<TmdbApiClient.CollectionPart> Parts)?> CollectionCache = new();
+
+    /// <summary>
+    /// Lists the films of the movie's TMDb collection, marking the ones in Step 3's
+    /// list, the missing ones and the ones not out yet. Shown only for a movie in a
+    /// collection; skipped quietly without an API key or a TMDb id.
+    /// </summary>
+    private async Task CheckCollectionAsync(NfoReaderService.MovieDetail detail)
+    {
+        var config = new ConfigService();
+        var apiKey = config.GetApiKey();
+        if (string.IsNullOrEmpty(apiKey) || !int.TryParse(detail.TmdbId, out var movieId)) return;
+
+        // A movie the NFO says is in a collection shows the section while TMDb answers
+        if (detail.CollectionName.Length > 0)
+        {
+            CollectionHeader.Text = detail.CollectionName.ToUpperInvariant();
+            CollectionSummaryText.Text = "Checking TMDb for the collection's films...";
+            CollectionSection.Visibility = Visibility.Visible;
+        }
+
+        (string Name, List<TmdbApiClient.CollectionPart> Parts)? collection;
+        try
+        {
+            if (!CollectionCache.TryGetValue(movieId, out collection))
+            {
+                collection = await new TmdbApiClient(apiKey, config.GetScrapeLanguage()).GetMovieCollectionAsync(movieId);
+                CollectionCache[movieId] = collection;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Collection check failed: {ex.Message}");
+            if (!_isClosed && _detail == detail && detail.CollectionName.Length > 0)
+                CollectionSummaryText.Text = "Couldn't reach TMDb to check the collection.";
+            return;
+        }
+        if (_isClosed || _detail != detail) return;   // closed, or another title is showing now
+        if (collection is not { } c || c.Parts.Count < 2)
+        {
+            CollectionSection.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var inList = OwnedMovieIds?.Invoke() ?? new HashSet<string>();
+        inList.Add(detail.TmdbId);
+        var films = MissingFilms.Compare(c.Parts, inList, DateTime.Today);
+        var have = films.Count(f => f.State == MissingFilms.State.InList);
+        var missing = films.Count(f => f.State == MissingFilms.State.Missing);
+
+        CollectionHeader.Text = (c.Name.Length > 0 ? c.Name : detail.CollectionName).ToUpperInvariant();
+        CollectionSummaryText.Text = $"{have} of {films.Count} in this list"
+            + (missing > 0 ? $" · {missing} missing" : string.Empty);
+        CollectionFilms.Children.Clear();
+        foreach (var f in films) CollectionFilms.Children.Add(CollectionRow(f));
+        CollectionSection.Visibility = Visibility.Visible;
+    }
+
+    private static FrameworkElement CollectionRow(MissingFilms.Film f)
+    {
+        var grid = new Grid { ColumnSpacing = 10 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(22) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        if (f.State == MissingFilms.State.InList)
+            grid.Children.Add(new FontIcon
+            {
+                Glyph = "\uE73E",   // check mark
+                FontSize = 14,
+                Foreground = (Brush)Application.Current.Resources["SystemFillColorSuccessBrush"],
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+
+        var title = new TextBlock
+        {
+            Text = f.Year > 0 ? $"{f.Title} ({f.Year})" : f.Title,
+            FontSize = 13,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            Foreground = (Brush)Application.Current.Resources[
+                f.State == MissingFilms.State.InList ? "TextFillColorPrimaryBrush" : "TextFillColorSecondaryBrush"],
+        };
+        Grid.SetColumn(title, 1);
+        grid.Children.Add(title);
+
+        if (f.State != MissingFilms.State.InList)
+        {
+            var pill = new Border
+            {
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(8, 2, 8, 2),
+                VerticalAlignment = VerticalAlignment.Center,
+                // Orange like a missing episode; grey for a film that isn't out yet
+                Background = f.State == MissingFilms.State.Missing
+                    ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 202, 80, 16))
+                    : (Brush)Application.Current.Resources["ControlFillColorTertiaryBrush"],
+                Child = new TextBlock
+                {
+                    Text = f.State == MissingFilms.State.Missing ? "Missing" : "Not out yet",
+                    FontSize = 10,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Foreground = f.State == MissingFilms.State.Missing
+                        ? new SolidColorBrush(Microsoft.UI.Colors.White)
+                        : (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+                },
+            };
+            Grid.SetColumn(pill, 2);
+            grid.Children.Add(pill);
+        }
+        return grid;
+    }
 
     private async void OnEditClick(object sender, RoutedEventArgs e)
     {

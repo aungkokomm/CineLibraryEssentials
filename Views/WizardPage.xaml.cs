@@ -33,6 +33,15 @@ public sealed partial class WizardPage : Page
 
         // After "Run File to Folder" completes, advance to Step 3 automatically
         FileToFolderStepView.OperationCompleted += (_, _) => GoToStep(2);
+        // Undo after Step 2: the moved folders' cards go, and Step 2 is where to try again
+        FileToFolderStepView.Undone += (_, _) =>
+        {
+            _scrapingViewModel.RemoveGoneFolders();
+            GoToStep(1);
+        };
+
+        // Step 1's "Clean, organize and scrape"
+        RenameStepView.AllThreeRequested += async (_, _) => await AllThreeAsync();
 
         // Each step's footer "← Back" button routes here.
         RenameStepView.BackRequested += (_, _) => GoBack();
@@ -77,6 +86,21 @@ public sealed partial class WizardPage : Page
 
         _viewModel.SelectedSourceFolder = _renameViewModel.SourceFolderPath;
         _viewModel.SetRenamePreview(selected);
+    }
+
+    /// <summary>
+    /// Step 1's "Clean, organize and scrape": the checked rows (Step 1 already left
+    /// out the ones with a ⚠) go to Step 2 as they would by its pill, are moved into
+    /// their folders (with Undo), and the new Step 3 cards are scraped with the first
+    /// TMDb match. It stops on the step that shows what went wrong.
+    /// </summary>
+    private async Task AllThreeAsync()
+    {
+        TryHandOffRenameStepData();
+        GoToStep(1);   // Step 2 builds its list from Step 1's rows
+        if (!await FileToFolderStepView.RunAsync()) return;   // the errors show in Step 2
+        // A successful run moved on to Step 3, which listed the new folders
+        await _scrapingViewModel.ScrapeOrganizedAsync();
     }
 
     private void GoBack()

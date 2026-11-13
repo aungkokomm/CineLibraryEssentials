@@ -320,7 +320,7 @@ public static class NfoEditor
                ?.Value.Trim() ?? string.Empty;
 
     // Collection is <set><name>X</name><overview/></set>; very old NFOs use <set>X</set>.
-    public static string CollectionName(XElement root)
+    private static string CollectionName(XElement root)
     {
         var set = root.Element("set");
         if (set == null) return string.Empty;

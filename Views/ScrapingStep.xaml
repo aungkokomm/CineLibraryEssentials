@@ -6,19 +6,27 @@
     AllowDrop="True"
     DragOver="OnDragOver"
     DragLeave="OnDragLeave"
-    Drop="OnDrop">
+    Drop="OnDrop"
+    KeyboardAcceleratorPlacementMode="Hidden">
+    <UserControl.KeyboardAccelerators>
+        <KeyboardAccelerator Modifiers="Control" Key="F" Invoked="OnFindAccelerator" />
+    </UserControl.KeyboardAccelerators>
     <Grid>
         <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
 
             <!-- Toolbar -->
-            <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="6">
-                <Button Click="OnAddFolderClick"
-                        ToolTipService.ToolTip="Add a movie folder (recursively scans for videos)">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="6">
+                <SplitButton Click="OnAddFolderClick"
+                             AutomationProperties.Name="Add Folder"
+                             ToolTipService.ToolTip="Add a movie or TV folder (scans every folder inside it). Click ▾ for recent folders.">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <FontIcon Glyph="&#xE710;" FontSize="13" />
                         <TextBlock Text="Add Folder" FontSize="13" />
                     </StackPanel>
-                </Button>
+                    <SplitButton.Flyout>
+                        <MenuFlyout x:Name="RecentFoldersFlyout" Placement="Bottom" Opening="OnRecentFoldersOpening" />
+                    </SplitButton.Flyout>
+                </SplitButton>
                 <Button Grid.Column="1"
                         Click="OnClearAllClick"
                         ToolTipService.ToolTip="Clear the list (does not touch any files)">
@@ -65,7 +73,17 @@
                     <x:String>Year</x:String>
                     <x:String>Needs work first</x:String>
                 </ComboBox>
-                <TextBlock Grid.Column="6"
+                <AutoSuggestBox Grid.Column="6"
+                                x:Name="SearchBox"
+                                Width="200"
+                                VerticalAlignment="Center"
+                                PlaceholderText="Search (Ctrl+F)"
+                                QueryIcon="Find"
+                                TextChanged="OnSearchTextChanged"
+                                KeyDown="OnSearchKeyDown"
+                                AutomationProperties.Name="Search the cards"
+                                ToolTipService.ToolTip="Shows only the cards whose title, year or collection has this text. Esc clears it." />
+                <TextBlock Grid.Column="7"
                            x:Name="StatusText"
                            Text="{Binding StatusMessage}"
                            VerticalAlignment="Center"
@@ -73,7 +91,7 @@
                            Margin="8,0,0,0"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                            TextTrimming="CharacterEllipsis" />
-                <StackPanel Grid.Column="7" Orientation="Horizontal" Spacing="6">
+                <StackPanel Grid.Column="8" Orientation="Horizontal" Spacing="6">
                     <Button Content="Fill gaps only"
                             Click="OnScrapeGapsClick"
                             ToolTipService.ToolTip="Verify library - auto-scrape every folder that's missing the NFO, poster, fanart, or actor photos. Skips folders that are already complete." />
@@ -90,6 +108,11 @@
                                                 Click="OnRefreshImdbClick"
                                                 ToolTipService.ToolTip="Update the IMDb rating and vote count in the checked items' NFO files (all items when none are checked). Nothing else is re-scraped.">
                                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE734;" /></MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem Text="Scan in CineLibrary"
+                                                Click="OnScanInCineLibraryClick"
+                                                ToolTipService.ToolTip="Tell CineLibrary to read the checked items again (all items when none are checked), so the new details show there right away. Starts CineLibrary when it isn't open.">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE895;" /></MenuFlyoutItem.Icon>
                                 </MenuFlyoutItem>
                                 <MenuFlyoutItem Text="Bulk edit checked items..."
                                                 Click="OnBulkEditClick"
@@ -114,7 +137,7 @@
                               HorizontalScrollMode="Disabled"
                               VerticalScrollBarVisibility="Auto"
                               Padding="6">
-                    <ItemsRepeater ItemsSource="{Binding MovieFolders}">
+                    <ItemsRepeater x:Name="CardRepeater" ItemsSource="{Binding MovieFolders}">
                         <ItemsRepeater.Layout>
                             <UniformGridLayout MinItemWidth="160"
                                                MinItemHeight="278"
@@ -124,6 +147,15 @@
                         </ItemsRepeater.Layout>
                         <ItemsRepeater.ItemTemplate>
                             <DataTemplate>
+                                <!-- Focusable, for the keys: Enter, F2, Space, Delete and the arrows -->
+                                <ContentControl IsTabStop="True"
+                                                UseSystemFocusVisuals="True"
+                                                HorizontalContentAlignment="Stretch"
+                                                VerticalContentAlignment="Stretch"
+                                                Tag="{Binding}"
+                                                KeyDown="OnCardKeyDown"
+                                                PointerPressed="OnCardPointerPressed"
+                                                AutomationProperties.Name="{Binding DisplayName}">
                                 <Border Height="278"
                                         BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                                         BorderThickness="1"
@@ -191,12 +223,15 @@
                                                       MinWidth="0" MinHeight="0"
                                                       Padding="0" />
                                         </Border>
-                                        <!-- Status pill top-right, with inline spinner while scraping -->
+                                        <!-- Status pill top-right, with inline spinner while scraping,
+                                             and a Duplicate tag under it -->
+                                        <StackPanel HorizontalAlignment="Right"
+                                                    VerticalAlignment="Top"
+                                                    Margin="0,6,5,0"
+                                                    Spacing="3">
                                         <StackPanel Orientation="Horizontal"
                                                     Spacing="4"
-                                                    HorizontalAlignment="Right"
-                                                    VerticalAlignment="Top"
-                                                    Margin="0,6,5,0">
+                                                    HorizontalAlignment="Right">
                                             <ProgressRing Width="12" Height="12"
                                                           IsActive="{Binding IsScraping}"
                                                           Visibility="{Binding IsScraping, Converter={StaticResource BoolToVisibilityConverter}}" />
@@ -212,6 +247,13 @@
                                                            TextTrimming="CharacterEllipsis"
                                                            ToolTipService.ToolTip="{Binding Status}" />
                                             </Border>
+                                        </StackPanel>
+                                        <Border CornerRadius="8" Padding="6,1" HorizontalAlignment="Right"
+                                                Background="#D97706"
+                                                ToolTipService.ToolTip="{Binding DuplicateTip}"
+                                                Visibility="{Binding DuplicateOf, Converter={StaticResource StringNonEmptyToVisibilityConverter}}">
+                                            <TextBlock Text="Duplicate" Foreground="White" FontWeight="SemiBold" FontSize="9" />
+                                        </Border>
                                         </StackPanel>
 
                                         <!-- Title + year, then the TV line ("TV · 3 seasons · 24 episodes"),
@@ -271,6 +313,7 @@
                                     </StackPanel>
                                 </Grid>
                             </Border>
+                                </ContentControl>
                         </DataTemplate>
                         </ItemsRepeater.ItemTemplate>
                     </ItemsRepeater>
@@ -279,6 +322,7 @@
                 <!-- List view (toggle) -->
                 <ListView x:Name="MovieList"
                           SelectionMode="None"
+                          KeyDown="OnListKeyDown"
                           ItemsSource="{Binding MovieFolders}"
                           Visibility="Collapsed">
                     <ListView.ItemContainerStyle>
@@ -344,6 +388,11 @@
                                                    Foreground="White"
                                                    FontWeight="SemiBold" FontSize="10" />
                                     </Border>
+                                    <Border CornerRadius="10" Padding="8,2" Background="#D97706"
+                                            ToolTipService.ToolTip="{Binding DuplicateTip}"
+                                            Visibility="{Binding DuplicateOf, Converter={StaticResource StringNonEmptyToVisibilityConverter}}">
+                                        <TextBlock Text="Duplicate" Foreground="White" FontWeight="SemiBold" FontSize="10" />
+                                    </Border>
                                 </StackPanel>
                                 <StackPanel Grid.Column="3"
                                             Orientation="Horizontal"
@@ -385,11 +434,13 @@
                             Visibility="Collapsed">
                     <FontIcon Glyph="&#xE721;" FontSize="56"
                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                    <TextBlock Text="No movies in the list yet"
+                    <TextBlock x:Name="EmptyTitle"
+                               Text="No movies in the list yet"
                                FontSize="16"
                                FontWeight="SemiBold"
                                HorizontalAlignment="Center" />
-                    <TextBlock Text="Add a movie folder, drop one onto the window, or come back from Step 2."
+                    <TextBlock x:Name="EmptyHint"
+                               Text="Add a movie folder, drop one onto the window, or come back from Step 2."
                                FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                HorizontalAlignment="Center"
@@ -417,6 +468,19 @@
                                FontSize="11"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="10"
+                            Margin="16,0"
+                            VerticalAlignment="Center"
+                            Visibility="{Binding ShowRetry, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <FontIcon Glyph="&#xE7BA;" FontSize="14" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                    <TextBlock VerticalAlignment="Center">
+                        <Run Text="{Binding FailedCount}" /><Run Text=" failed in the last batch" />
+                    </TextBlock>
+                    <Button Content="Retry failed" Click="OnRetryFailedClick"
+                            ToolTipService.ToolTip="Scrape the ones that failed once more" />
                 </StackPanel>
                 <Button Grid.Column="2"
                         x:Name="SaveButton"

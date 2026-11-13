@@ -32,11 +32,19 @@
     <Compile Include="..\..\Services\LibraryVocabulary.cs" Link="Linked\LibraryVocabulary.cs" />
     <Compile Include="..\..\Services\BulkNfoEdit.cs" Link="Linked\BulkNfoEdit.cs" />
     <Compile Include="..\..\Services\DiagnosticsService.cs" Link="Linked\DiagnosticsService.cs" />
+    <Compile Include="..\..\Services\MissingFilms.cs" Link="Linked\MissingFilms.cs" />
+    <Compile Include="..\..\Services\FileToFolderService.cs" Link="Linked\FileToFolderService.cs" />
+    <Compile Include="..\..\Services\MetadataCleanerService.cs" Link="Linked\MetadataCleanerService.cs" />
+    <Compile Include="..\..\Utilities\CompanionFileHelper.cs" Link="Linked\CompanionFileHelper.cs" />
+    <Compile Include="..\..\Models\FileOperation.cs" Link="Linked\FileOperation.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <!-- What Step 2's FileToFolderService and its models use -->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="TagLibSharp" Version="2.3.0" />
   </ItemGroup>
 </Project>

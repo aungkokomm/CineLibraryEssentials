@@ -20,6 +20,45 @@ public sealed partial class RenameStep : UserControl
     /// <summary>Raised when the footer "← Back" is clicked. The wizard handles it.</summary>
     public event EventHandler? BackRequested;
 
+    /// <summary>"Clean, organize and scrape" was confirmed: the wizard runs the three steps.</summary>
+    public event EventHandler? AllThreeRequested;
+
+    private async void OnAllThreeClick(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel == null) return;
+        var ticked = _viewModel.AllPreviews.Where(p => p.IsSelected).ToList();
+        var warned = ticked.Count(p => p.HasWarning);
+        var ready = ticked.Count - warned;
+        if (ready == 0)
+        {
+            ToastService.Info(ticked.Count == 0
+                ? "Tick the files to clean, organize and scrape first."
+                : "Every checked row has a ⚠. Check those first: fix the name, or untick the row.");
+            return;
+        }
+        if (_viewModel.DuplicateCount > 0)
+        {
+            ToastService.Warning("Two rows would get the same name. Fix the duplicates first.");
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = $"Clean, organize and scrape {ready} file{(ready == 1 ? "" : "s")}?",
+            Content = "Each one gets its clean name and its own folder (Step 2), then is scraped with the first "
+                      + "TMDb match (Step 3). You can undo the move for 30 seconds afterwards."
+                      + (warned > 0 ? $"\n\n{warned} row{(warned == 1 ? "" : "s")} with a ⚠ {(warned == 1 ? "is" : "are")} left out and unticked, for you to check." : ""),
+            PrimaryButtonText = "Start",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+        foreach (var p in ticked.Where(p => p.HasWarning)) p.IsSelected = false;
+        AllThreeRequested?.Invoke(this, EventArgs.Empty);
+    }
+
     public RenameStep()
     {
         InitializeComponent();

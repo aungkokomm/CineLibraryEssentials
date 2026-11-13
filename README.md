@@ -157,6 +157,7 @@ Pick a folder (or **drag-and-drop** one onto the window).
 - **Show only warnings** - one click next to the file count shows just the rows with a ⚠, and one click goes back
 - **Keyboard** - `Ctrl+A` selects or clears all, `F2` edits the focused row's new name, `Enter` finishes, `Delete` removes the row from the list (the file is untouched)
 - Picked a `Season 01` folder? It offers to load the whole show folder instead, so Steps 2 and 3 see every season
+- **Clean, organize and scrape** - all three steps in one go for the checked rows; rows with a ⚠ are left for you
 
 ### Step 2 · Organize
 
@@ -166,7 +167,7 @@ Files carry over from Step 1, or add a folder directly. Each loose file gets its
 - **TV** → `Show (Year)/Season XX/Show - S01E01.ext` (the year comes from TMDb)
 - **Subs folders** - a `Subs` folder moves along with its movie
 - **Folder merging** - if a destination already exists, files merge in instead of erroring (nothing overwritten)
-- Click **Run File to Folder** - moves everything (subtitles included), then auto-advances to Step 3
+- Click **Run File to Folder** - moves everything (subtitles included), then auto-advances to Step 3. Changed your mind? **Undo** puts it all back
 
 ### Step 3 · Scrape
 
@@ -176,12 +177,15 @@ Folders from Step 2 are auto-listed. You can also **+ Add Folder** for any exist
 - **Your choice of what's written** - in Settings, limit the cast (10 to 50), keep only the first studio, director and writer, and pick smaller picture sizes
 - **TV shows** → downloads `tvshow.nfo` + show poster/fanart/cast into the show folder, then a per-episode `.nfo` (with the real episode title) + episode thumbnail for every episode
 - **IMDb + TMDb ratings** - every NFO gets both, with vote counts. Pick which one players show first in Settings, and update them any time with **⋯ → Refresh IMDb ratings** (only the ratings change, nothing is re-scraped)
-- **Sort** the cards by name, collection, year, or what still needs work
+- **Sort** the cards by name, collection, year, or what still needs work, and **search** them (`Ctrl+F`) by title, year or collection
+- **Keyboard** - `Enter` opens a card, `F2` edits it, `Space` ticks it, `Delete` takes it off the list, arrows move between cards
+- **Duplicates** - two folders matched to the same film get an orange tag
 - **Double-tap a scraped card** (or its ⓘ button) → a rich **Movie Details** window (hero fanart, poster, plot, both ratings, color-coded crew/studio/country/genres/IDs/file-info, scrollable cast)
-- **TV shows** - cards read `TV · 3 seasons · 24 episodes`, and the details window lists every episode with its thumbnail and air date, plus the aired episodes you're **missing**
-- **Edit NFO** - right-click a card for a full, resizable editor: every detail field, genres and tags as chips with suggestions from your library, a cast editor, TV episodes, fetch any field from TMDb in another language, and artwork picked from everything TMDb has (poster, fanart, clear logo, landscape). Only what you change is written, every save can be restored, and your edits are protected from Fill gaps and Scrape Selected. Your own rating, play count, Watched and note are kept when a title is scraped again
+- **TV shows** - cards read `TV · 3 seasons · 24 episodes`, and the details window lists every episode with its thumbnail and air date, plus the aired episodes you're **missing**; a movie's window lists its collection's films and which are **missing**
+- **Edit NFO** - right-click a card for a full, resizable editor: every detail field, genres and tags as chips with suggestions from your library, a cast editor, TV episodes, fetch any field from TMDb in another language, and artwork picked from everything TMDb has (poster, fanart, clear logo, landscape). Only what you change is written, every save can be restored, and your edits are protected from Fill gaps and Scrape Selected. Your own rating, play count, Watched and note are kept when a title is scraped again. **Previous / Next** save and go on to the next card, for editing a run of titles
 - **Bulk edit** - set a collection, certification, genres, tags or protection for all checked cards at once
-- **Scrape Selected (auto)** - batch-scrape everything checked, with a progress bar
+- **Scrape Selected (auto)** - batch-scrape everything checked, with a progress bar and **Retry failed** for any that didn't work, and a Windows notification when it ends while you're in another app
+- **Scan in CineLibrary** - CineLibrary reads what you just scraped and shows it right away (CineLibrary 5.4.1 or newer)
 - **Fill gaps only** - *Verify-library* sweep: scrapes only folders missing the NFO, poster, fanart, or actor photos; skips complete ones
 - **16 languages** - set the scrape language in Settings (English, Burmese, Hindi, Tamil, Telugu, Thai, Chinese, Japanese, Korean, and more)
 

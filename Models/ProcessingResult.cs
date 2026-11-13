@@ -2,41 +2,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace CineLibraryEssentials.Models;
 
-public class ProcessingResult
-{
-    public bool Success { get; set; }
-    public string Message { get; set; } = string.Empty;
-    public List<string> Errors { get; set; } = new();
-}
-
-public partial class FileOperation : ObservableObject
-{
-    public string OriginalFilePath { get; set; } = string.Empty;
-    public string OriginalFileName { get; set; } = string.Empty;
-    public string CleanedTitle { get; set; } = string.Empty;
-    public int Year { get; set; }
-    public double Confidence { get; set; }
-
-    [ObservableProperty]
-    private string destinationFolder = string.Empty;
-
-    public string FinalFileName { get; set; } = string.Empty;
-
-    /// <summary>Detected edition tag (e.g. "Director's Cut", "IMAX"), empty if none.</summary>
-    public string Edition { get; set; } = string.Empty;
-
-    // ---- TV episode metadata (populated only for TV episodes) ----
-    public string ShowName { get; set; } = string.Empty;
-    public int Season { get; set; }
-    public int Episode { get; set; }
-    public string EpisodeTitle { get; set; } = string.Empty;
-    public bool IsTvEpisode => Season > 0 && Episode > 0 && !string.IsNullOrEmpty(ShowName);
-
-    /// <summary>Whether this operation will be executed when "Run File to Folder" is clicked.</summary>
-    [ObservableProperty]
-    private bool isSelected = true;
-}
-
 /// <summary>One token of the original filename, marked as kept or removed by the cleaner.</summary>
 public class DiffSegment
 {
@@ -182,12 +147,6 @@ public partial class FilePreview : ObservableObject
     }
 }
 
-public class FolderPreview
-{
-    public string FolderName { get; set; } = string.Empty;
-    public List<string> FilesInFolder { get; set; } = new();
-}
-
 public class ScrapingProgressItem
 {
     public string MovieName { get; set; } = string.Empty;
@@ -250,6 +209,16 @@ public partial class MovieFolderItem : ObservableObject
     public bool IsComplete => HasNfo && HasPoster && HasFanart && HasActorPhotos;
 
     public string DisplayName => Year > 0 ? $"{MovieTitle} ({Year})" : MovieTitle;
+
+    /// <summary>
+    /// The other folders in the list matched to the same TMDb title, one per line;
+    /// empty when there are none.
+    /// </summary>
+    [ObservableProperty] private string duplicateOf = string.Empty;
+
+    public string DuplicateTip => $"Matched to the same TMDb title as:\n{DuplicateOf}";
+
+    partial void OnDuplicateOfChanged(string value) => OnPropertyChanged(nameof(DuplicateTip));
 
     partial void OnMovieTitleChanged(string value) => OnPropertyChanged(nameof(DisplayName));
     partial void OnYearChanged(int value) => OnPropertyChanged(nameof(DisplayName));

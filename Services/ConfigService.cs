@@ -60,6 +60,12 @@ public class ConfigService
     public void AddRecentSourceFolder(string path) => AddRecent(_config.RecentSourceFolders, path);
     public void AddRecentOutputFolder(string path) => AddRecent(_config.RecentOutputFolders, path);
 
+    public IReadOnlyList<string> GetRecentScrapeFolders() => _config.RecentScrapeFolders;
+    public void AddRecentScrapeFolder(string path) => AddRecent(_config.RecentScrapeFolders, path);
+
+    public string GetCineLibraryExe() => _config.CineLibraryExe ?? string.Empty;
+    public void SetCineLibraryExe(string path) { _config.CineLibraryExe = path; SaveConfig(); }
+
     private void AddRecent(List<string> list, string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return;

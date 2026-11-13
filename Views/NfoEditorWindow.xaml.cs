@@ -49,7 +49,7 @@ public sealed partial class NfoEditorWindow : Window
         "4K Remaster", "Criterion", "Special Edition", "Ultimate Edition", "Final Cut", "Open Matte",
     };
 
-    private readonly string _folder;
+    private string _folder;   // changes with Previous / Next
     private readonly List<string> _libraryFolders;
     private readonly ConfigService _config = new();
     private readonly ObservableCollection<ActorItem> _cast = new();
@@ -73,6 +73,12 @@ public sealed partial class NfoEditorWindow : Window
 
     /// <summary>True once anything was saved or restored while the window was open.</summary>
     public bool Saved { get; private set; }
+
+    /// <summary>
+    /// The folders Previous / Next go through, in Step 3's order (as sorted and
+    /// searched there). Null hides the buttons.
+    /// </summary>
+    public static Func<IReadOnlyList<string>>? Sequence { get; set; }
 
     /// <summary>
     /// Raised with the folder after a save or restore, so Step 3's card and an
@@ -104,7 +110,7 @@ public sealed partial class NfoEditorWindow : Window
             return (null, $"The NFO couldn't be read: {ex.Message}");
         }
         OpenEditors[folder] = window;
-        window.Closed += (_, _) => OpenEditors.Remove(folder);
+        window.Closed += (_, _) => OpenEditors.Remove(window._folder);
         if (!WindowPlacement.Restore(window, "editor"))
             window.CenterOn(App.MainWindow);
         WindowPlacement.Remember(window, "editor");
@@ -242,6 +248,7 @@ public sealed partial class NfoEditorWindow : Window
             SourceText.Text = File.ReadAllText(_nfoPath);
             CopySourceText.Text = "Copy";
             UpdateRestoreButton();
+            UpdateStepButtons();
         }
         finally
         {
@@ -515,6 +522,96 @@ public sealed partial class NfoEditorWindow : Window
         {
             ShowStatus($"Couldn't restore: {ex.Message}", InfoBarSeverity.Error);
         }
+    }
+
+    // =====================================================================
+    //  Previous / Next (Alt+Left / Alt+Right)
+    // =====================================================================
+
+    private async void OnPreviousClick(object sender, RoutedEventArgs e) => await StepAsync(-1);
+    private async void OnNextClick(object sender, RoutedEventArgs e) => await StepAsync(+1);
+
+    private async void OnPreviousAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        await StepAsync(-1);
+    }
+
+    private async void OnNextAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        await StepAsync(+1);
+    }
+
+    /// <summary>The folder before (-1) or after (+1) this one in Step 3's list, or null.</summary>
+    private string? Neighbour(int step)
+    {
+        var list = Sequence?.Invoke();
+        if (list == null) return null;
+        var i = list.ToList().FindIndex(f => string.Equals(f, _folder, StringComparison.OrdinalIgnoreCase));
+        return i < 0 || i + step < 0 || i + step >= list.Count ? null : list[i + step];
+    }
+
+    private void UpdateStepButtons()
+    {
+        StepButtons.Visibility = Sequence == null ? Visibility.Collapsed : Visibility.Visible;
+        foreach (var (button, step, word) in new[] { (PreviousButton, -1, "Previous"), (NextButton, +1, "Next") })
+        {
+            var folder = Neighbour(step);
+            button.IsEnabled = folder != null;
+            ToolTipService.SetToolTip(button, folder == null
+                ? $"{word}: none (this is the {(step < 0 ? "first" : "last")} card in Step 3)"
+                : $"{word} (Alt+{(step < 0 ? "Left" : "Right")}): save and edit {Path.GetFileName(folder)}");
+        }
+    }
+
+    /// <summary>
+    /// Saves (when anything changed), then shows the next card's NFO in this same
+    /// window, on the same section, so a run of titles can be edited in one go.
+    /// </summary>
+    private async Task StepAsync(int step)
+    {
+        var next = Neighbour(step);
+        if (next == null)
+        {
+            UpdateStepButtons();   // Step 3's list may have changed under us
+            return;
+        }
+        var saving = DirtyCount() > 0;
+        if (saving && !await SaveAsync()) return;
+
+        // Already open in its own window: go there instead
+        if (OpenEditors.TryGetValue(next, out var other) && other != this)
+        {
+            other.Activate();
+            return;
+        }
+
+        var previous = _folder;
+        OpenEditors.Remove(_folder);
+        _folder = next;
+        OpenEditors[_folder] = this;
+        // Pictures and fetched text were for the title we're leaving
+        _images = null;
+        _gallerySlot = null;
+        _fetchCache.Clear();
+        try
+        {
+            Load();
+            if (saving) ShowStatus($"Saved {Path.GetFileName(previous)}.", InfoBarSeverity.Success);
+            else StatusBar.IsOpen = false;
+        }
+        catch (Exception ex)
+        {
+            OpenEditors.Remove(_folder);
+            _folder = previous;
+            OpenEditors[_folder] = this;
+            Load();
+            ShowStatus($"Couldn't open {Path.GetFileName(next)}: {ex.Message}", InfoBarSeverity.Error);
+            return;
+        }
+        // A movie has no Episodes section
+        if (!_isTv && (Nav.SelectedItem as NavigationViewItem)?.Tag as string == "episodes") SelectSection("details");
     }
 
     private void UpdateRestoreButton()

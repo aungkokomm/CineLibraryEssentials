@@ -460,6 +460,38 @@ public class TmdbApiClient
         }
     }
 
+    /// <summary>One film of a TMDb collection; ReleaseDate is "yyyy-mm-dd" or empty.</summary>
+    public record CollectionPart(int TmdbId, string Title, string ReleaseDate);
+
+    /// <summary>
+    /// The collection a movie belongs to (such as "Indiana Jones Collection") with
+    /// every film in it, or null when it isn't in one. Two light calls: the movie,
+    /// then its collection. Throws when TMDb can't be reached.
+    /// </summary>
+    public async Task<(string Name, List<CollectionPart> Parts)?> GetMovieCollectionAsync(int movieTmdbId)
+    {
+        await RateLimitAsync();
+        using var movie = JsonDocument.Parse(await _httpClient.GetStringAsync(
+            AppendLanguage($"{BaseUrl}/movie/{movieTmdbId}?api_key={_apiKey}")));
+        if (!movie.RootElement.TryGetProperty("belongs_to_collection", out var c) || c.ValueKind != JsonValueKind.Object
+            || !c.TryGetProperty("id", out var idEl) || !idEl.TryGetInt32(out var collectionId))
+            return null;
+
+        await RateLimitAsync();
+        using var collection = JsonDocument.Parse(await _httpClient.GetStringAsync(
+            AppendLanguage($"{BaseUrl}/collection/{collectionId}?api_key={_apiKey}")));
+        var root = collection.RootElement;
+        var name = root.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty;
+        var parts = new List<CollectionPart>();
+        if (root.TryGetProperty("parts", out var list) && list.ValueKind == JsonValueKind.Array)
+            foreach (var p in list.EnumerateArray())
+                if (p.TryGetProperty("id", out var pid) && pid.TryGetInt32(out var id))
+                    parts.Add(new CollectionPart(id,
+                        p.TryGetProperty("title", out var t) ? t.GetString() ?? string.Empty : string.Empty,
+                        p.TryGetProperty("release_date", out var d) ? d.GetString() ?? string.Empty : string.Empty));
+        return (name, parts);
+    }
+
     /// <summary>
     /// Fetches every episode for one season of a show. Returns the episodes
     /// keyed by episode number for fast lookup by the scraper.
