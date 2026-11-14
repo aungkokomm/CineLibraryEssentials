@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using CineLibraryEssentials.Models;
 using CineLibraryEssentials.Services;
@@ -75,7 +76,23 @@ public sealed partial class TmdbSearchDialog : Window
     /// </summary>
     public Task<TmdbSearchItem?> ShowDialogAsync(Window? owner = null)
     {
-        _completionSource = new TaskCompletionSource<TmdbSearchItem?>();
+        // 1.5.1: the pick goes on after this window has closed, not while it's still on screen
+        _completionSource = new TaskCompletionSource<TmdbSearchItem?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // 1.5.1: one search window at a time: a new search closes the one left open (a button
+        // clicked twice, or one gone behind the main window), and it stays in front of the main window
+        s_current?.Close();
+        s_current = this;
+        Closed += (_, _) => { if (s_current == this) s_current = null; };
+        if (owner is not null)
+        {
+            try
+            {
+                SetWindowLongPtr(WinRT.Interop.WindowNative.GetWindowHandle(this), GwlpHwndParent,
+                                 WinRT.Interop.WindowNative.GetWindowHandle(owner));
+            }
+            catch { /* then it's a window of its own, as before */ }
+        }
 
         // Re-apply title now that callers may have set TvSearchMode after the
         // constructor ran.
@@ -366,6 +383,12 @@ public sealed partial class TmdbSearchDialog : Window
         _completionSource?.TrySetResult(null);
         this.Close();
     }
+
+    private static TmdbSearchDialog? s_current;
+    private const int GwlpHwndParent = -8;
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 }
 
 public class TmdbSearchItem
